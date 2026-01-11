@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   ArrowRight,
+  ArrowLeft,
   CalendarDays,
   FileText,
   DollarSign,
@@ -69,6 +70,10 @@ export default function ObjetivosPage() {
     setPriorities((prev) =>
       checked ? [...prev, id] : prev.filter((p) => p !== id)
     )
+  }
+
+  const handleBack = () => {
+    router.push("/auth/cadastro/consultorio")
   }
 
   const handleContinue = () => {
@@ -166,8 +171,17 @@ export default function ObjetivosPage() {
         </OnboardingFormField>
       </GlassCard>
 
-      {/* Continue Button */}
-      <div className="mt-8 flex justify-end">
+      {/* Navigation Buttons */}
+      <div className="mt-8 flex justify-between">
+        <Button
+          onClick={handleBack}
+          variant="outline"
+          size="lg"
+          className="font-semibold py-4 px-8 rounded-full border-2 border-slate-200 hover:border-primary/30 hover:bg-primary/5 flex items-center gap-2 text-base h-auto transition-all duration-300"
+        >
+          <ArrowLeft className="size-5" />
+          Voltar
+        </Button>
         <Button
           onClick={handleContinue}
           size="lg"

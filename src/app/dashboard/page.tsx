@@ -1,3 +1,5 @@
+"use client"
+
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { WelcomeSection } from "@/components/dashboard/welcome-section"
 import { ScheduleCard } from "@/components/dashboard/schedule-card"
@@ -7,8 +9,10 @@ import { RecentPatients } from "@/components/dashboard/recent-patients"
 import { RemindersPanel } from "@/components/dashboard/reminders-panel"
 import { DashboardTodoList } from "@/components/dashboard/dashboard-todo-list"
 import { FloatingActionButton } from "@/components/dashboard/floating-action-button"
+import { useTodayAppointments } from "@/hooks"
 
 export default function DashboardPage() {
+  const { appointments, loading } = useTodayAppointments()
   return (
     <>
       <DashboardHeader />
@@ -25,36 +29,39 @@ export default function DashboardPage() {
                   <span className="material-symbols-outlined text-primary">event_available</span>
                   Sua Agenda de Hoje
                 </h3>
-                <span className="text-xs font-bold text-primary bg-purple-50 px-3 py-1 rounded-full">
-                  2 consultas restantes
-                </span>
+                {!loading && appointments.length > 0 && (
+                  <span className="text-xs font-bold text-primary bg-purple-50 px-3 py-1 rounded-full">
+                    {appointments.filter(a => a.status === 'scheduled' || a.status === 'confirmed').length} consultas pendentes
+                  </span>
+                )}
               </div>
               <div className="grid md:grid-cols-2 gap-4">
-                <ScheduleCard
-                  time="14:00"
-                  duration="45min"
-                  patientName="Miguel Garcia"
-                  sessionType="Terapia de Fala"
-                  sessionTypeColor="bg-green-500"
-                  badge="Em 15min"
-                  badgeColor="bg-purple-100 text-primary"
-                  location="Videochamada"
-                  locationIcon="videocam"
-                  locationColor="text-blue-500"
-                  isPrimary
-                />
-                <ScheduleCard
-                  time="16:30"
-                  duration="30min"
-                  patientName="Laura Almeida"
-                  sessionType="Avaliação"
-                  sessionTypeColor="bg-orange-400"
-                  badge="Confirmado"
-                  badgeColor="bg-gray-100 text-gray-500"
-                  location="Presencial"
-                  locationIcon="location_on"
-                  locationColor="text-gray-600"
-                />
+                {loading ? (
+                  <div className="col-span-2 text-center py-8 text-gray-500">
+                    Carregando agendamentos...
+                  </div>
+                ) : appointments.length === 0 ? (
+                  <div className="col-span-2 text-center py-8 text-gray-500">
+                    Nenhum agendamento para hoje
+                  </div>
+                ) : (
+                  appointments.slice(0, 2).map((appointment) => (
+                    <ScheduleCard
+                      key={appointment.id}
+                      time={new Date(appointment.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      duration={`${appointment.duration}min`}
+                      patientName={appointment.patient?.name || 'Paciente'}
+                      sessionType={appointment.type === 'regular' ? 'Terapia' : appointment.type === 'evaluation' ? 'Avaliação' : 'Sessão'}
+                      sessionTypeColor={appointment.type === 'regular' ? 'bg-green-500' : 'bg-orange-400'}
+                      badge={appointment.status === 'confirmed' ? 'Confirmado' : appointment.status === 'scheduled' ? 'Agendado' : 'Em andamento'}
+                      badgeColor={appointment.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-primary'}
+                      location={appointment.location || 'Presencial'}
+                      locationIcon={appointment.location === 'online' ? 'videocam' : 'location_on'}
+                      locationColor={appointment.location === 'online' ? 'text-blue-500' : 'text-gray-600'}
+                      isPrimary={new Date(appointment.dateTime).getHours() === new Date().getHours()}
+                    />
+                  ))
+                )}
               </div>
             </div>
 
