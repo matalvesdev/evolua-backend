@@ -1,260 +1,184 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
-import { useAppointmentMutations, usePatients } from "@/hooks"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import type { CreateAppointmentInput, AppointmentType } from "@/lib/core"
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  AppointmentProgressBar,
+  PatientSearchInput,
+  DatePickerCalendar,
+  TimeSlotGrid,
+  AppointmentOptions,
+  AppointmentSummary,
+} from '@/components/appointment-booking';
+
+interface Patient {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+}
+
+interface TimeSlot {
+  time: string;
+  available: boolean;
+}
+
+// Mock data - Replace with actual data from Supabase
+const mockPatients: Patient[] = [
+  {
+    id: '1',
+    name: 'Ana Souza',
+    email: 'ana.souza@email.com',
+    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBl8G29SjptaNhkbAzIp7H0eonr_RO8l8W0ZmRdTXeD0r1gXYkQ-44vRnO4CoMQrcknC67vQA_a1F06Hk7YjpJJLdLLnz7icSR_fJBQ3Jt-EWLB9YgBbxlZWTEShvoeBzteu2M8wdr7kXk931m_HhOg0QUsGKW7Oebdoehg24GSnZ8X3LV8wQhq2XZqk0vU5Ig3jVkK_hILOrZDCqrxILgGext2xJL2AmR1Jd9RN5eqpZqClCFxBvJz27VxWQ3xGQPeSRMxdBA88VGb',
+  },
+  {
+    id: '2',
+    name: 'Carlos Lima',
+    email: 'carlos.lima@email.com',
+    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBxa5FU70GGvSbf3g7tEtMcqnDw_-LBzJ5edwiiv4j8iYY6EkZetAI-4X8_HqWWffylqm6v7XkC9C2heNfDy8idkAmaZnKgEFM-a9CnN9LTg6yV6R-4PIckH3-E6_VrEP3A5lPf_hdZvww2r56-FxamwGg1McVOeWbOcJS_rGQr1aA2XU7QmafoWFqWS43cagovf6r627HGfPk6mGMN56-4jvfPMI-pxhOM4Ub4HU1OgwXOwamavSWB9mBBF3BX6obZHF0svOlz6mH5',
+  },
+  {
+    id: '3',
+    name: 'Beatriz Martins',
+    email: 'beatriz.m@email.com',
+    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC18muCJkJILRi4Xn45HOXNgBOaQM0L-ZV-g4tcEhhuBSJkXG4-Y6aksJPt4BKVmVqjwIURx2CC7f0gv4l3JANTnJ8JesRLhtCD5ZFTYLZOGAyo6zVmfmh9Ws6B84SZJXnpqkZiH2FeWIXLLQ4qB2V_e2beSTD3yzHw7qUk5knxCQkFctdMm4QKbVoH5HNf3C3lhReEM2Xf1rZrVYHI7H82s0KK6xh25Hgc0S_VrjwK-gKlQaCKp_LDzn6leW_V8ZPw7LShBmcgc2MK',
+  },
+];
+
+const mockTimeSlots: TimeSlot[] = [
+  { time: '08:00', available: false },
+  { time: '09:00', available: true },
+  { time: '10:00', available: true },
+  { time: '11:00', available: true },
+  { time: '13:30', available: true },
+  { time: '14:30', available: true },
+  { time: '15:00', available: true },
+  { time: '16:00', available: true },
+];
 
 export default function NovoAgendamentoPage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const preSelectedPatientId = searchParams.get("patientId")
+  const router = useRouter();
 
-  const { create, loading, error } = useAppointmentMutations()
-  const { patients, loading: patientsLoading } = usePatients({ limit: 100 })
+  // Form state
+  const [currentStep] = useState(2); // Steps: 1=Paciente, 2=Detalhes, 3=Revisão
+  const [searchValue, setSearchValue] = useState('');
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date(2023, 10, 5)); // Nov 5, 2023
+  const [selectedTime, setSelectedTime] = useState<string | null>('10:00');
+  const [mode, setMode] = useState<'online' | 'presencial'>('online');
+  const [duration, setDuration] = useState<'30m' | '50m' | '1h'>('50m');
 
-  const [formData, setFormData] = React.useState<Omit<CreateAppointmentInput, "therapistId">>({
-    patientId: preSelectedPatientId || "",
-    dateTime: "",
-    duration: 50,
-    type: "regular",
-    notes: "",
-  })
+  // Calendar navigation
+  const [currentMonth, setCurrentMonth] = useState(new Date(2023, 10, 1)); // Nov 2023
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handlePreviousMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
+  };
 
-    // O therapistId será preenchido pelo backend com o usuário atual
-    const result = await create({
-      ...formData,
-      therapistId: "", // Será preenchido pelo server action
-    })
+  const handleNextMonth = () => {
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
+  };
 
-    if (result.success) {
-      router.push("/dashboard/agendamentos")
+  const handlePatientSelect = (patient: Patient) => {
+    setSelectedPatient(patient);
+  };
+
+  const handleCancel = () => {
+    router.push('/dashboard/agendamentos');
+  };
+
+  const handleConfirm = () => {
+    if (!selectedPatient || !selectedDate || !selectedTime) {
+      alert('Por favor, preencha todos os campos obrigatórios');
+      return;
     }
-  }
 
-  const updateField = <K extends keyof typeof formData>(
-    field: K,
-    value: (typeof formData)[K]
-  ) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
+    console.log('Booking appointment:', {
+      patient: selectedPatient,
+      date: selectedDate,
+      time: selectedTime,
+      mode,
+      duration,
+    });
 
-  // Gerar horários disponíveis (07:00 às 20:00)
-  const timeSlots = React.useMemo(() => {
-    const slots: string[] = []
-    for (let hour = 7; hour <= 20; hour++) {
-      for (const minute of [0, 30]) {
-        const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
-        slots.push(time)
-      }
-    }
-    return slots
-  }, [])
+    // TODO: Save to Supabase
+    // await createAppointment({ ... });
 
-  const [selectedDate, setSelectedDate] = React.useState("")
-  const [selectedTime, setSelectedTime] = React.useState("")
+    router.push('/dashboard/agendamentos');
+  };
 
-  React.useEffect(() => {
-    if (selectedDate && selectedTime) {
-      setFormData(prev => ({ ...prev, dateTime: `${selectedDate}T${selectedTime}:00` }))
-    }
-  }, [selectedDate, selectedTime])
-
-  const appointmentTypes: { value: AppointmentType; label: string; description: string }[] = [
-    { value: "regular", label: "Sessão Regular", description: "Atendimento de rotina" },
-    { value: "evaluation", label: "Avaliação", description: "Primeira consulta ou avaliação completa" },
-    { value: "reevaluation", label: "Reavaliação", description: "Reavaliação do progresso" },
-    { value: "discharge", label: "Alta", description: "Sessão de encerramento do tratamento" },
-  ]
-
-  const durations = [
-    { value: 30, label: "30 min" },
-    { value: 45, label: "45 min" },
-    { value: 50, label: "50 min" },
-    { value: 60, label: "1 hora" },
-    { value: 90, label: "1h30" },
-    { value: 120, label: "2 horas" },
-  ]
+  const isFormValid =
+    selectedPatient !== null && selectedDate !== null && selectedTime !== null;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 px-2 sm:px-0">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-            Novo Agendamento
+    <div className="flex-1 overflow-y-auto p-6 lg:p-10 relative">
+      {/* Background Gradients */}
+      <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-[#fbf8fd] to-transparent dark:from-[#2a1b33] dark:to-transparent -z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-l from-[#820AD1]/5 to-transparent -z-10 pointer-events-none opacity-50" />
+
+      <div className="max-w-5xl mx-auto flex flex-col gap-8 h-full">
+        {/* Header */}
+        <div className="flex flex-col gap-2 mb-2">
+          <h1 className="text-2xl font-bold text-[#161118] dark:text-white">
+            Agendar Sessão
           </h1>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Agende uma nova sessão
-          </p>
+          <AppointmentProgressBar currentStep={currentStep} />
         </div>
-        <Link href="/dashboard/agendamentos">
-          <Button variant="ghost">← Voltar</Button>
-        </Link>
-      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Selecionar Paciente */}
-        <Card className="p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Paciente
-          </h2>
+        {/* Main Form Card */}
+        <div className="glass-card rounded-2xl p-8 shadow-xl shadow-[#820AD1]/5 flex flex-col gap-8">
+          {/* Patient Search */}
+          <PatientSearchInput
+            value={searchValue}
+            onChange={setSearchValue}
+            onPatientSelect={handlePatientSelect}
+            patients={mockPatients}
+          />
 
-          {patientsLoading ? (
-            <p className="text-gray-600 dark:text-gray-400">Carregando pacientes...</p>
-          ) : (
-            <div>
-              <Label htmlFor="patientId">Selecione o paciente *</Label>
-              <select
-                id="patientId"
-                value={formData.patientId}
-                onChange={(e) => updateField("patientId", e.target.value)}
-                required
-                className="w-full h-10 px-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              >
-                <option value="">Selecione um paciente</option>
-                {patients.map((patient) => (
-                  <option key={patient.id} value={patient.id}>
-                    {patient.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </Card>
+          <hr className="border-[#f3f0f4] dark:border-white/5" />
 
-        {/* Data e Horário */}
-        <Card className="p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Data e Horário
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="date">Data *</Label>
-              <Input
-                id="date"
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                min={new Date().toISOString().split("T")[0]}
-                required
+          {/* Date & Time Selection */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Date Picker */}
+            <div className="lg:col-span-5 flex flex-col gap-4">
+              <DatePickerCalendar
+                selectedDate={selectedDate}
+                onDateSelect={setSelectedDate}
+                currentMonth={currentMonth}
+                onPreviousMonth={handlePreviousMonth}
+                onNextMonth={handleNextMonth}
               />
             </div>
-            <div>
-              <Label htmlFor="time">Horário *</Label>
-              <select
-                id="time"
-                value={selectedTime}
-                onChange={(e) => setSelectedTime(e.target.value)}
-                required
-                className="w-full h-10 px-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              >
-                <option value="">Selecione</option>
-                {timeSlots.map((time) => (
-                  <option key={time} value={time}>
-                    {time}
-                  </option>
-                ))}
-              </select>
+
+            {/* Time Slots & Options */}
+            <div className="lg:col-span-7 flex flex-col gap-6">
+              <TimeSlotGrid
+                selectedDate={selectedDate}
+                selectedTime={selectedTime}
+                onTimeSelect={setSelectedTime}
+                availableSlots={mockTimeSlots}
+              />
+
+              <AppointmentOptions
+                mode={mode}
+                duration={duration}
+                onModeChange={setMode}
+                onDurationChange={setDuration}
+              />
             </div>
           </div>
 
-          <div>
-            <Label>Duração *</Label>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {durations.map((d) => (
-                <button
-                  key={d.value}
-                  type="button"
-                  onClick={() => updateField("duration", d.value)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    formData.duration === d.value
-                      ? "bg-purple-600 text-white"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
-                  }`}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        {/* Tipo de Sessão */}
-        <Card className="p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Tipo de Sessão
-          </h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {appointmentTypes.map((type) => (
-              <button
-                key={type.value}
-                type="button"
-                onClick={() => updateField("type", type.value)}
-                className={`p-4 rounded-lg border-2 text-left transition-colors ${
-                  formData.type === type.value
-                    ? "border-purple-600 bg-purple-50 dark:bg-purple-900/20"
-                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600"
-                }`}
-              >
-                <p className="font-medium text-gray-900 dark:text-white">{type.label}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{type.description}</p>
-              </button>
-            ))}
-          </div>
-        </Card>
-
-        {/* Observações */}
-        <Card className="p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Observações
-          </h2>
-
-          <div>
-            <Label htmlFor="notes">Notas adicionais</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => updateField("notes", e.target.value)}
-              placeholder="Observações sobre a sessão..."
-              rows={4}
-            />
-          </div>
-        </Card>
-
-        {error && (
-          <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-md text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* Botões */}
-        <div className="flex justify-end gap-3">
-          <Link href="/dashboard/agendamentos">
-            <Button type="button" variant="outline">
-              Cancelar
-            </Button>
-          </Link>
-          <Button
-            type="submit"
-            disabled={loading || !formData.patientId || !formData.dateTime}
-            className="bg-purple-600 hover:bg-purple-700"
-          >
-            {loading ? "Agendando..." : "Agendar Sessão"}
-          </Button>
+          {/* Summary & Actions */}
+          <AppointmentSummary
+            selectedDate={selectedDate}
+            selectedTime={selectedTime}
+            mode={mode}
+            onCancel={handleCancel}
+            onConfirm={handleConfirm}
+            isValid={isFormValid}
+          />
         </div>
-      </form>
+      </div>
     </div>
-  )
+  );
 }
