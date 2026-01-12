@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AudioRecordingModal, AudioTranscriptionReviewModal } from '@/components/audio';
 
 interface Report {
   id: string;
@@ -23,6 +24,12 @@ export default function RelatoriosPage() {
   const [periodFilter, setPeriodFilter] = useState('Últimos 30 dias');
   const [statusFilter, setStatusFilter] = useState('Todos os Status');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+  const [isRecordingModalOpen, setIsRecordingModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [selectedPatientForRecording, setSelectedPatientForRecording] = useState('Ana Souza');
+  const [selectedPatientId, setSelectedPatientId] = useState('8392');
+  const [currentTranscription, setCurrentTranscription] = useState('');
+  const [currentAudioUrl, setCurrentAudioUrl] = useState('');
 
   const reports: Report[] = [
     {
@@ -162,7 +169,10 @@ export default function RelatoriosPage() {
                 </p>
               </div>
             </div>
-            <button className="flex-shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/30 hover:bg-primary/90 hover:scale-105 transition-all duration-200">
+            <button 
+              onClick={() => setIsRecordingModalOpen(true)}
+              className="flex-shrink-0 inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-bold shadow-lg shadow-primary/30 hover:bg-primary/90 hover:scale-105 transition-all duration-200"
+            >
               <span className="material-symbols-outlined">mic</span>
               <span>Iniciar Gravação</span>
             </button>
@@ -370,6 +380,36 @@ export default function RelatoriosPage() {
           </div>
         </div>
       </div>
+
+      {/* Audio Recording Modal */}
+      <AudioRecordingModal
+        isOpen={isRecordingModalOpen}
+        onClose={() => setIsRecordingModalOpen(false)}
+        patientName={selectedPatientForRecording}
+        patientId={selectedPatientId}
+        onTranscriptionComplete={(transcription, audioUrl) => {
+          console.log('Transcription:', transcription);
+          console.log('Audio URL:', audioUrl);
+          setCurrentTranscription(transcription);
+          setCurrentAudioUrl(audioUrl);
+          setIsRecordingModalOpen(false);
+          // Abrir modal de revisão após fechar o de gravação
+          setTimeout(() => setIsReviewModalOpen(true), 300);
+        }}
+      />
+
+      {/* Audio Transcription Review Modal */}
+      <AudioTranscriptionReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        transcription={currentTranscription}
+        patientName={selectedPatientForRecording}
+        onSave={(data) => {
+          console.log('Report saved:', data);
+          // TODO: Salvar relatório no banco de dados
+          setIsReviewModalOpen(false);
+        }}
+      />
     </div>
   );
 }

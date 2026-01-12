@@ -1,300 +1,345 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-
-interface Task {
-  id: number
-  title: string
-  description: string
-  priority: "low" | "medium" | "high"
-  dueDate: string
-  completed: boolean
-  category: "appointment" | "report" | "admin" | "other"
-}
+import { useAppointments, useTodayAppointments } from "@/hooks";
+import { useState } from "react";
 
 export default function TarefasPage() {
-  const [filter, setFilter] = React.useState<"all" | "pending" | "completed">("all")
-  const [newTask, setNewTask] = React.useState("")
-  const [tasks, setTasks] = React.useState<Task[]>([
-    {
-      id: 1,
-      title: "Finalizar relatório de Maria Silva",
-      description: "Completar avaliação mensal",
-      priority: "high",
-      dueDate: "2026-01-12",
-      completed: false,
-      category: "report",
-    },
-    {
-      id: 2,
-      title: "Confirmar agendamento com João Santos",
-      description: "Ligar para confirmar sessão da próxima semana",
-      priority: "medium",
-      dueDate: "2026-01-13",
-      completed: false,
-      category: "appointment",
-    },
-    {
-      id: 3,
-      title: "Atualizar prontuário",
-      description: "Adicionar notas da última sessão",
-      priority: "low",
-      dueDate: "2026-01-11",
-      completed: true,
-      category: "admin",
-    },
-  ])
+  const { appointments: upcomingAppointments, loading: loadingUpcoming } = useAppointments({
+    status: ["scheduled", "confirmed"],
+    startDate: new Date(),
+  });
+  const { appointments: todayAppointments, loading: loadingToday } = useTodayAppointments();
+  
+  const [taskInput, setTaskInput] = useState("");
 
-  const filteredTasks = tasks.filter((task) => {
-    if (filter === "pending") return !task.completed
-    if (filter === "completed") return task.completed
-    return true
-  })
+  // Filtra apenas os próximos 5 agendamentos
+  const nextAppointments = upcomingAppointments.slice(0, 5);
 
-  const toggleTask = (id: number) => {
-    setTasks((prev) =>
-      prev.map((task) => (task.id === id ? { ...task, completed: !task.completed } : task))
-    )
-  }
+  // Agrupa os agendamentos por data
+  const appointmentsByDate = todayAppointments.reduce((acc: Record<string, typeof todayAppointments>, appointment) => {
+    const date = new Date(appointment.dateTime).toLocaleDateString("pt-BR");
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(appointment);
+    return acc;
+  }, {});
 
-  const addTask = () => {
-    if (!newTask.trim()) return
+  const formatTime = (dateTime: string) => {
+    return new Date(dateTime).toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
 
-    const task: Task = {
-      id: Date.now(),
-      title: newTask,
-      description: "",
-      priority: "medium",
-      dueDate: new Date().toISOString().split("T")[0],
-      completed: false,
-      category: "other",
-    }
+  const formatDate = (dateTime: string) => {
+    return new Date(dateTime).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+    });
+  };
 
-    setTasks((prev) => [task, ...prev])
-    setNewTask("")
-  }
+  const getAppointmentTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      evaluation: "Avaliação",
+      session: "Sessão",
+      follow_up: "Acompanhamento",
+      reevaluation: "Reavaliação",
+      parent_meeting: "Reunião com pais",
+      report_delivery: "Entrega de relatório",
+    };
+    return labels[type] || type;
+  };
 
-  const deleteTask = (id: number) => {
-    setTasks((prev) => prev.filter((task) => task.id !== id))
-  }
-
-  const pendingCount = tasks.filter((t) => !t.completed).length
-  const completedCount = tasks.filter((t) => t.completed).length
-
-  const priorityColors = {
-    low: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-    medium: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-    high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  }
-
-  const categoryIcons = {
-    appointment: "event",
-    report: "description",
-    admin: "settings",
-    other: "task",
-  }
+  const isLoading = loadingUpcoming || loadingToday;
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Tarefas</h1>
-        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-          Organize suas atividades e acompanhamentos
-        </p>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-        <Card className="p-4 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800">
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-purple-600 dark:text-purple-400 text-2xl">
-              list_alt
-            </span>
-            <div>
-              <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">Total</p>
-              <p className="text-xl font-bold text-purple-700 dark:text-purple-300">
-                {tasks.length}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800">
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-orange-600 dark:text-orange-400 text-2xl">
-              pending_actions
-            </span>
-            <div>
-              <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">Pendentes</p>
-              <p className="text-xl font-bold text-orange-700 dark:text-orange-300">
-                {pendingCount}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-2xl">
-              check_circle
-            </span>
-            <div>
-              <p className="text-xs text-green-600 dark:text-green-400 font-medium">Concluídas</p>
-              <p className="text-xl font-bold text-green-700 dark:text-green-300">
-                {completedCount}
-              </p>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Add Task */}
-      <Card className="p-4">
-        <div className="flex gap-2">
-          <Input
-            type="text"
-            placeholder="Adicionar nova tarefa..."
-            value={newTask}
-            onChange={(e) => setNewTask(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && addTask()}
-            className="flex-1"
-          />
-          <Button onClick={addTask} className="bg-purple-600 hover:bg-purple-700">
-            <span className="material-symbols-outlined text-base">add</span>
-          </Button>
-        </div>
-      </Card>
-
-      {/* Filter Tabs */}
-      <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
-        <button
-          onClick={() => setFilter("all")}
-          className={`px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            filter === "all"
-              ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
-              : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          }`}
-        >
-          Todas ({tasks.length})
-        </button>
-        <button
-          onClick={() => setFilter("pending")}
-          className={`px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            filter === "pending"
-              ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
-              : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          }`}
-        >
-          Pendentes ({pendingCount})
-        </button>
-        <button
-          onClick={() => setFilter("completed")}
-          className={`px-3 sm:px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-            filter === "completed"
-              ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
-              : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          }`}
-        >
-          Concluídas ({completedCount})
-        </button>
-      </div>
-
-      {/* Tasks List */}
-      <div className="space-y-3">
-        {filteredTasks.length === 0 && (
-          <Card className="p-8 text-center">
-            <span className="material-symbols-outlined text-4xl text-gray-400 dark:text-gray-600 mb-2 block">
-              task_alt
-            </span>
-            <p className="text-gray-500 dark:text-gray-400">
-              {filter === "pending"
-                ? "Nenhuma tarefa pendente"
-                : filter === "completed"
-                  ? "Nenhuma tarefa concluída"
-                  : "Nenhuma tarefa cadastrada"}
+    <div className="min-h-screen bg-gradient-to-br from-[#f6f8fb] via-[#e8edf5] to-[#dce5f0] p-6">
+      <div className="max-w-[1400px] mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Tarefas</h1>
+            <p className="text-gray-600 mt-1">
+              Gerencie suas tarefas e visualize sugestões da IA
             </p>
-          </Card>
+          </div>
+        </div>
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="size-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
         )}
 
-        {filteredTasks.map((task) => (
-          <Card
-            key={task.id}
-            className={`p-4 transition-all ${
-              task.completed ? "opacity-60 bg-gray-50 dark:bg-gray-800/50" : ""
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <button
-                onClick={() => toggleTask(task.id)}
-                className="mt-1 flex-shrink-0"
-                aria-label="Toggle task completion"
-              >
-                <span
-                  className={`material-symbols-outlined text-2xl transition-colors ${
-                    task.completed
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-gray-400 dark:text-gray-600 hover:text-purple-600 dark:hover:text-purple-400"
-                  }`}
-                >
-                  {task.completed ? "check_circle" : "radio_button_unchecked"}
-                </span>
-              </button>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <h3
-                    className={`font-medium text-gray-900 dark:text-white ${
-                      task.completed ? "line-through" : ""
-                    }`}
-                  >
-                    {task.title}
-                  </h3>
-                  <button
-                    onClick={() => deleteTask(task.id)}
-                    className="flex-shrink-0 text-gray-400 hover:text-red-600 dark:hover:text-red-400"
-                    aria-label="Delete task"
-                  >
-                    <span className="material-symbols-outlined text-base">delete</span>
-                  </button>
+        {/* Content */}
+        {!isLoading && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column - AI Cards */}
+            <div className="lg:col-span-1 space-y-6">
+              {/* AI Suggestion 1 */}
+              <div className="relative group">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-300" />
+                <div className="relative bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-lg">
+                  <div className="flex items-start gap-4">
+                    <div className="size-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                      <span className="material-symbols-outlined text-white text-2xl">
+                        psychology
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 mb-2">
+                        Sugestão da IA
+                      </h3>
+                      <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                        Considere agendar uma reunião com os pais do paciente João Silva
+                        para discutir o progresso terapêutico.
+                      </p>
+                      <div className="flex gap-2">
+                        <button className="px-4 py-2 text-sm font-medium text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
+                          Agendar
+                        </button>
+                        <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                          Ignorar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              </div>
 
-                {task.description && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                    {task.description}
-                  </p>
-                )}
+              {/* AI Suggestion 2 */}
+              <div className="relative group">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-300" />
+                <div className="relative bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-lg">
+                  <div className="flex items-start gap-4">
+                    <div className="size-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                      <span className="material-symbols-outlined text-white text-2xl">
+                        description
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 mb-2">
+                        Relatório Pendente
+                      </h3>
+                      <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                        O relatório mensal de Maria Santos está pendente há 5 dias.
+                        Recomendo priorizar sua finalização.
+                      </p>
+                      <div className="flex gap-2">
+                        <button className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                          Criar agora
+                        </button>
+                        <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                          Lembrar depois
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className={`px-2 py-1 rounded-full font-medium ${priorityColors[task.priority]}`}>
-                    {task.priority === "high" && "Alta"}
-                    {task.priority === "medium" && "Média"}
-                    {task.priority === "low" && "Baixa"}
-                  </span>
-
-                  <span className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                    <span className="material-symbols-outlined text-sm">
-                      {categoryIcons[task.category]}
-                    </span>
-                    {task.category === "appointment" && "Agendamento"}
-                    {task.category === "report" && "Relatório"}
-                    {task.category === "admin" && "Administrativo"}
-                    {task.category === "other" && "Outro"}
-                  </span>
-
-                  <span className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                    <span className="material-symbols-outlined text-sm">event</span>
-                    {new Date(task.dueDate).toLocaleDateString("pt-BR")}
-                  </span>
+              {/* AI Suggestion 3 */}
+              <div className="relative group">
+                <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-600 to-orange-600 rounded-2xl blur opacity-30 group-hover:opacity-50 transition duration-300" />
+                <div className="relative bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-lg">
+                  <div className="flex items-start gap-4">
+                    <div className="size-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center flex-shrink-0 shadow-md">
+                      <span className="material-symbols-outlined text-white text-2xl">
+                        calendar_month
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 mb-2">
+                        Otimização de Agenda
+                      </h3>
+                      <p className="text-sm text-gray-600 leading-relaxed mb-4">
+                        Você tem 3 horários vagos na quinta-feira. Que tal entrar em contato
+                        com pacientes na lista de espera?
+                      </p>
+                      <div className="flex gap-2">
+                        <button className="px-4 py-2 text-sm font-medium text-amber-600 hover:bg-amber-50 rounded-lg transition-colors">
+                          Ver lista
+                        </button>
+                        <button className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                          Mais tarde
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </Card>
-        ))}
+
+            {/* Right Column - Tasks & Reminders */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Quick Add Task */}
+              <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-lg">
+                <div className="flex items-center gap-4">
+                  <span className="material-symbols-outlined text-gray-400 text-2xl">
+                    add_circle
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="Adicionar nova tarefa..."
+                    value={taskInput}
+                    onChange={(e) => setTaskInput(e.target.value)}
+                    className="flex-1 bg-transparent border-none outline-none text-gray-900 placeholder-gray-400"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && taskInput.trim()) {
+                        // TODO: Implementar criação de tarefa
+                        setTaskInput("");
+                      }
+                    }}
+                  />
+                  <button className="px-6 py-2.5 bg-gradient-to-r from-primary to-primary-dark text-white rounded-xl font-medium shadow-md hover:shadow-lg transition-all">
+                    Adicionar
+                  </button>
+                </div>
+              </div>
+
+              {/* Próximos Agendamentos */}
+              <div className="bg-white/70 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg overflow-hidden">
+                <div className="p-6 border-b border-gray-100">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Próximos Agendamentos
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {nextAppointments.length} agendamentos confirmados
+                  </p>
+                </div>
+
+                <div className="divide-y divide-gray-100">
+                  {nextAppointments.length === 0 && (
+                    <div className="p-8 text-center">
+                      <span className="material-symbols-outlined text-gray-300 text-5xl mb-3 block">
+                        event_available
+                      </span>
+                      <p className="text-gray-500">
+                        Nenhum agendamento encontrado
+                      </p>
+                    </div>
+                  )}
+
+                  {nextAppointments.map((appointment) => (
+                    <div
+                      key={appointment.id}
+                      className="p-5 hover:bg-white/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="size-12 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center flex-shrink-0">
+                          <span className="material-symbols-outlined text-primary text-2xl">
+                            person
+                          </span>
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-gray-900 truncate">
+                            {appointment.patientName}
+                          </h3>
+                          <p className="text-sm text-gray-600">
+                            {getAppointmentTypeLabel(appointment.type)} •{" "}
+                            {appointment.duration} min
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-gray-900">
+                              {formatTime(appointment.dateTime)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {formatDate(appointment.dateTime)}
+                            </div>
+                          </div>
+
+                          {appointment.status === "confirmed" && (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              Confirmado
+                            </span>
+                          )}
+                          {appointment.status === "scheduled" && (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                              Agendado
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Patient Reminders */}
+              <div className="bg-white/70 backdrop-blur-xl rounded-2xl border border-white/20 shadow-lg overflow-hidden">
+                <div className="p-6 border-b border-gray-100">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Lembretes de Pacientes
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Agendamentos para hoje
+                  </p>
+                </div>
+
+                <div className="divide-y divide-gray-100">
+                  {Object.keys(appointmentsByDate).length === 0 && (
+                    <div className="p-8 text-center">
+                      <span className="material-symbols-outlined text-gray-300 text-5xl mb-3 block">
+                        notifications_none
+                      </span>
+                      <p className="text-gray-500">
+                        Nenhum agendamento para hoje
+                      </p>
+                    </div>
+                  )}
+
+                  {Object.entries(appointmentsByDate).map(([date, appointments]) => (
+                    <div key={date} className="p-5">
+                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                        {date}
+                      </div>
+                      <div className="space-y-3">
+                        {appointments.map((appointment) => (
+                          <div
+                            key={appointment.id}
+                            className="flex items-start gap-3 p-3 rounded-xl hover:bg-white/50 transition-colors"
+                          >
+                            <div className="size-10 rounded-lg bg-gradient-to-br from-blue-500/10 to-purple-500/10 flex items-center justify-center flex-shrink-0">
+                              <span className="material-symbols-outlined text-blue-600 text-xl">
+                                schedule
+                              </span>
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-gray-900 text-sm">
+                                {appointment.patientName}
+                              </h4>
+                              <p className="text-xs text-gray-600 mt-0.5">
+                                {formatTime(appointment.dateTime)} •{" "}
+                                {getAppointmentTypeLabel(appointment.type)}
+                              </p>
+                              {appointment.notes && (
+                                <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+                                  {appointment.notes}
+                                </p>
+                              )}
+                            </div>
+
+                            <button className="flex-shrink-0 size-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors">
+                              <span className="material-symbols-outlined text-gray-400 text-lg">
+                                more_vert
+                              </span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }
