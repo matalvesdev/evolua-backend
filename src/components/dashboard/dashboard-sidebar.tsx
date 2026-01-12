@@ -8,6 +8,7 @@ const navItems = [
   { href: "/dashboard", icon: "dashboard", label: "Dashboard" },
   { href: "/dashboard/pacientes", icon: "groups", label: "Pacientes" },
   { href: "/dashboard/agendamentos", icon: "calendar_month", label: "Agenda" },
+  { href: "/dashboard/financeiro", icon: "payments", label: "Financeiro" },
   { href: "/dashboard/relatorios", icon: "description", label: "Relatórios" },
   { href: "/dashboard/tarefas", icon: "check_circle", label: "Tarefas" },
 ]
@@ -51,7 +52,14 @@ export function DashboardSidebar() {
       </div>
 
       {/* Logout */}
-      <div className="p-4">
+      <div className="p-4 space-y-2">
+        <Link
+          href="/dashboard/perfil"
+          className="flex items-center gap-3 p-3 rounded-xl text-gray-500 hover:bg-gray-50 hover:text-primary transition-colors w-full"
+        >
+          <span className="material-symbols-outlined">person</span>
+          <span className="hidden lg:block font-medium">Perfil</span>
+        </Link>
         <form action={signout}>
           <button
             type="submit"

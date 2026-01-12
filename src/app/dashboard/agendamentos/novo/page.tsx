@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   AppointmentProgressBar,
@@ -10,6 +10,8 @@ import {
   AppointmentOptions,
   AppointmentSummary,
 } from '@/components/appointment-booking';
+import { usePatients, useAppointmentMutations, useAppointments, useUser } from '@/hooks';
+import { Appointment as CoreAppointment } from '@/lib/core/domain/entities/appointment';
 
 interface Patient {
   id: string;
@@ -23,38 +25,41 @@ interface TimeSlot {
   available: boolean;
 }
 
-// Mock data - Replace with actual data from Supabase
-const mockPatients: Patient[] = [
-  {
-    id: '1',
-    name: 'Ana Souza',
-    email: 'ana.souza@email.com',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBl8G29SjptaNhkbAzIp7H0eonr_RO8l8W0ZmRdTXeD0r1gXYkQ-44vRnO4CoMQrcknC67vQA_a1F06Hk7YjpJJLdLLnz7icSR_fJBQ3Jt-EWLB9YgBbxlZWTEShvoeBzteu2M8wdr7kXk931m_HhOg0QUsGKW7Oebdoehg24GSnZ8X3LV8wQhq2XZqk0vU5Ig3jVkK_hILOrZDCqrxILgGext2xJL2AmR1Jd9RN5eqpZqClCFxBvJz27VxWQ3xGQPeSRMxdBA88VGb',
-  },
-  {
-    id: '2',
-    name: 'Carlos Lima',
-    email: 'carlos.lima@email.com',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBxa5FU70GGvSbf3g7tEtMcqnDw_-LBzJ5edwiiv4j8iYY6EkZetAI-4X8_HqWWffylqm6v7XkC9C2heNfDy8idkAmaZnKgEFM-a9CnN9LTg6yV6R-4PIckH3-E6_VrEP3A5lPf_hdZvww2r56-FxamwGg1McVOeWbOcJS_rGQr1aA2XU7QmafoWFqWS43cagovf6r627HGfPk6mGMN56-4jvfPMI-pxhOM4Ub4HU1OgwXOwamavSWB9mBBF3BX6obZHF0svOlz6mH5',
-  },
-  {
-    id: '3',
-    name: 'Beatriz Martins',
-    email: 'beatriz.m@email.com',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC18muCJkJILRi4Xn45HOXNgBOaQM0L-ZV-g4tcEhhuBSJkXG4-Y6aksJPt4BKVmVqjwIURx2CC7f0gv4l3JANTnJ8JesRLhtCD5ZFTYLZOGAyo6zVmfmh9Ws6B84SZJXnpqkZiH2FeWIXLLQ4qB2V_e2beSTD3yzHw7qUk5knxCQkFctdMm4QKbVoH5HNf3C3lhReEM2Xf1rZrVYHI7H82s0KK6xh25Hgc0S_VrjwK-gKlQaCKp_LDzn6leW_V8ZPw7LShBmcgc2MK',
-  },
-];
-
-const mockTimeSlots: TimeSlot[] = [
-  { time: '08:00', available: false },
-  { time: '09:00', available: true },
-  { time: '10:00', available: true },
-  { time: '11:00', available: true },
-  { time: '13:30', available: true },
-  { time: '14:30', available: true },
-  { time: '15:00', available: true },
-  { time: '16:00', available: true },
-];
+// Generate time slots from 8:00 to 18:00 in 30-minute intervals
+const generateTimeSlots = (selectedDate: Date | null, existingAppointments: CoreAppointment[]): TimeSlot[] => {
+  const slots: TimeSlot[] = [];
+  
+  if (!selectedDate) return slots;
+  
+  for (let hour = 8; hour <= 18; hour++) {
+    for (let minute = 0; minute < 60; minute += 30) {
+      if (hour === 18 && minute > 0) break; // Stop at 18:00
+      
+      const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+      
+      // Check if this time slot conflicts with existing appointments
+      const slotDateTime = new Date(selectedDate);
+      slotDateTime.setHours(hour, minute, 0, 0);
+      
+      const isAvailable = !existingAppointments.some(apt => {
+        const aptStart = new Date(apt.dateTime);
+        const aptEnd = new Date(aptStart.getTime() + apt.duration * 60000);
+        const slotEnd = new Date(slotDateTime.getTime() + 30 * 60000); // 30 min slot
+        
+        // Check if slot overlaps with appointment
+        return (slotDateTime >= aptStart && slotDateTime < aptEnd) ||
+               (slotEnd > aptStart && slotEnd <= aptEnd) ||
+               (slotDateTime <= aptStart && slotEnd >= aptEnd);
+      });
+      
+      slots.push({
+        time,
+        available: isAvailable,
+      });
+    }
+  }
+  return slots;
+};
 
 export default function NovoAgendamentoPage() {
   const router = useRouter();
@@ -63,13 +68,42 @@ export default function NovoAgendamentoPage() {
   const [currentStep] = useState(2); // Steps: 1=Paciente, 2=Detalhes, 3=Revisão
   const [searchValue, setSearchValue] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date(2023, 10, 5)); // Nov 5, 2023
-  const [selectedTime, setSelectedTime] = useState<string | null>('10:00');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [mode, setMode] = useState<'online' | 'presencial'>('online');
   const [duration, setDuration] = useState<'30m' | '50m' | '1h'>('50m');
+  const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  // Calendar navigation
-  const [currentMonth, setCurrentMonth] = useState(new Date(2023, 10, 1)); // Nov 2023
+  // Fetch patients from Supabase
+  const { patients: allPatients, loading: patientsLoading } = usePatients();
+  const { create: createAppointment, loading: createLoading } = useAppointmentMutations();
+  const { user } = useUser();
+  
+  // Fetch appointments for selected date to check availability
+  const dateFilter = useMemo(() => {
+    if (!selectedDate) return {};
+    const dateStr = selectedDate.toISOString().split('T')[0];
+    return {
+      dateFrom: dateStr,
+      dateTo: dateStr,
+    };
+  }, [selectedDate]);
+  
+  const { appointments: dayAppointments } = useAppointments(dateFilter);
+
+  // Convert Supabase patients to UI format
+  const uiPatients: Patient[] = allPatients.map(patient => ({
+    id: patient.id,
+    name: patient.name,
+    email: patient.email || '',
+    avatar: '', // Default avatar
+  }));
+
+  // Generate time slots with availability check
+  const timeSlots = useMemo(() => 
+    generateTimeSlots(selectedDate, dayAppointments),
+    [selectedDate, dayAppointments]
+  );
 
   const handlePreviousMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
@@ -87,35 +121,54 @@ export default function NovoAgendamentoPage() {
     router.push('/dashboard/agendamentos');
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selectedPatient || !selectedDate || !selectedTime) {
       alert('Por favor, preencha todos os campos obrigatórios');
       return;
     }
 
-    console.log('Booking appointment:', {
-      patient: selectedPatient,
-      date: selectedDate,
-      time: selectedTime,
-      mode,
-      duration,
+    // Parse time and create datetime
+    const [hours, minutes] = selectedTime.split(':').map(Number);
+    const appointmentDateTime = new Date(selectedDate);
+    appointmentDateTime.setHours(hours, minutes, 0, 0);
+
+    // Parse duration
+    const durationMap = {
+      '30m': 30,
+      '50m': 50,
+      '1h': 60,
+    };
+
+    const durationMinutes = durationMap[duration];
+
+    // Create appointment
+    const result = await createAppointment({
+      patientId: selectedPatient.id,
+      dateTime: appointmentDateTime.toISOString(),
+      duration: durationMinutes,
+      type: 'regular',
+      therapistId: user?.id || '',
+      notes: `Modalidade: ${mode}`,
     });
 
-    // TODO: Save to Supabase
-    // await createAppointment({ ... });
-
-    router.push('/dashboard/agendamentos');
+    if (result.success) {
+      router.push('/dashboard/agendamentos');
+    } else {
+      alert('Erro ao criar agendamento: ' + result.error);
+    }
   };
 
   const isFormValid =
     selectedPatient !== null && selectedDate !== null && selectedTime !== null;
+
+  const isLoading = patientsLoading || createLoading;
 
   return (
     <div className="flex-1 overflow-y-auto p-6 lg:p-10 relative">
       {/* Background Gradients */}
       <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-[#fbf8fd] to-transparent dark:from-[#2a1b33] dark:to-transparent -z-10 pointer-events-none" />
       <div className="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-l from-[#820AD1]/5 to-transparent -z-10 pointer-events-none opacity-50" />
-
+      
       <div className="max-w-5xl mx-auto flex flex-col gap-8 h-full">
         {/* Header */}
         <div className="flex flex-col gap-2 mb-2">
@@ -132,7 +185,7 @@ export default function NovoAgendamentoPage() {
             value={searchValue}
             onChange={setSearchValue}
             onPatientSelect={handlePatientSelect}
-            patients={mockPatients}
+            patients={uiPatients}
           />
 
           <hr className="border-[#f3f0f4] dark:border-white/5" />
@@ -156,7 +209,7 @@ export default function NovoAgendamentoPage() {
                 selectedDate={selectedDate}
                 selectedTime={selectedTime}
                 onTimeSelect={setSelectedTime}
-                availableSlots={mockTimeSlots}
+                availableSlots={timeSlots}
               />
 
               <AppointmentOptions
@@ -175,7 +228,7 @@ export default function NovoAgendamentoPage() {
             mode={mode}
             onCancel={handleCancel}
             onConfirm={handleConfirm}
-            isValid={isFormValid}
+            isValid={isFormValid && !isLoading}
           />
         </div>
       </div>

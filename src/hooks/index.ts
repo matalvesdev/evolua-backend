@@ -33,5 +33,12 @@ export {
 // React Query Hooks (TanStack Query)
 export * from "./queries"
 
+// Audio Hooks
+export { useAudioUpload } from "./use-audio-upload"
+export { useAudioTranscription } from "./use-audio-transcription"
+
 // Legacy hooks (mantidos para compatibilidade)
 export { useUser } from "./use-user"
+export { useTasks } from './use-tasks'
+export { useFinances } from './use-finances'
+export { useTransactions } from './use-transactions'

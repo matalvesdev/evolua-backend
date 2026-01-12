@@ -53,6 +53,7 @@ export default function NovoPatientePage() {
 
     if (result.success) {
       router.push("/dashboard/pacientes")
+      router.refresh()
     }
   }
 

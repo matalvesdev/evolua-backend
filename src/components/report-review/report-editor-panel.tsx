@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ReportEditableSection } from './report-editable-section';
 
 interface ReportSection {
@@ -15,19 +15,43 @@ interface ReportEditorPanelProps {
 }
 
 export function ReportEditorPanel({ sections, onSectionsChange }: ReportEditorPanelProps) {
-  const [canUndo, setCanUndo] = useState(false);
-  const [canRedo, setCanRedo] = useState(false);
+  const [history, setHistory] = useState<ReportSection[][]>([sections]);
+  const [historyIndex, setHistoryIndex] = useState(0);
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
+
+  // Add to history when sections change
+  useEffect(() => {
+    const currentSections = JSON.stringify(sections);
+    const historySections = history[historyIndex] ? JSON.stringify(history[historyIndex]) : '';
+    
+    if (currentSections !== historySections) {
+      const newHistory = history.slice(0, historyIndex + 1);
+      newHistory.push(sections);
+      // Limit history to last 50 entries
+      if (newHistory.length > 50) {
+        newHistory.shift();
+      }
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+    }
+  }, [sections]);
 
   const handleUndo = () => {
-    console.log('Undo action');
-    // TODO: Implement undo functionality with history stack
+    if (canUndo) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      onSectionsChange(history[newIndex]);
+    }
   };
 
   const handleRedo = () => {
-    console.log('Redo action');
-    // TODO: Implement redo functionality with history stack
+    if (canRedo) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      onSectionsChange(history[newIndex]);
+    }
   };
-
   const handleSectionChange = (index: number, newContent: string) => {
     const updatedSections = sections.map((section, i) => 
       i === index ? { ...section, content: newContent } : section

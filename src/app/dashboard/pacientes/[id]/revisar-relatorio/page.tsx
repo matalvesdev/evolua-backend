@@ -53,27 +53,40 @@ export default function RevisarRelatorioPage({ params }: { params: Promise<{ id:
   const handleTemplateChange = (newTemplate: string) => {
     setReportTemplate(newTemplate);
     console.log('Template changed to:', newTemplate);
-    // TODO: Call AI API to regenerate content based on new template
+    // TODO: Regenerar conteúdo com AI será implementado em uma versão futura
+    // quando a integração com API de AI estiver disponível
   };
 
   const handleShare = () => {
     console.log('Sharing report for patient:', id);
-    // TODO: Implement share functionality (PDF export, email, WhatsApp)
+    // Abrir dialog de compartilhamento (implementação futura: PDF, email, WhatsApp)
+    alert('Funcionalidade de compartilhamento será implementada em breve. Por enquanto, você pode copiar o conteúdo manualmente.');
   };
 
   const handleSave = async () => {
     setIsSaving(true);
-    console.log('Saving report for patient:', id);
-    console.log('Report sections:', sections);
-    
-    // TODO: Save to Supabase
-    // await saveReport({ patientId: id, template: reportTemplate, sections });
-    
-    // Simulate save delay
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      // Criar relatório no Supabase
+      const reportContent = sections.map(s => `${s.label}\n${s.content}`).join('\n\n');
+      
+      // TODO: Implementar com hook useReports quando disponível
+      console.log('Saving report:', {
+        patientId: id,
+        template: reportTemplate,
+        content: reportContent,
+        sections
+      });
+      
+      // Simular save (substituir por chamada real ao Supabase)
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
       router.push(`/dashboard/pacientes/${id}/documentos`);
-    }, 1500);
+    } catch (error) {
+      console.error('Error saving report:', error);
+      alert('Erro ao salvar relatório. Tente novamente.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

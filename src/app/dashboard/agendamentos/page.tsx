@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CalendarHeader,
   CalendarMonthView,
   TodayAppointmentsSidebar,
 } from '@/components/calendar';
+import { useTodayAppointments, useWeekAppointments } from '@/hooks';
+import { Appointment as CoreAppointment } from '@/lib/core/domain/entities/appointment';
 
 type CalendarView = 'month' | 'week' | 'day';
 
@@ -28,45 +30,44 @@ interface Appointment {
   status: 'completed' | 'scheduled' | 'pending';
 }
 
-// Mock data - Replace with actual data from Supabase
-const mockAppointments: Appointment[] = [
-  {
-    id: '1',
-    patientName: 'Ana Souza',
-    patientAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBl8G29SjptaNhkbAzIp7H0eonr_RO8l8W0ZmRdTXeD0r1gXYkQ-44vRnO4CoMQrcknC67vQA_a1F06Hk7YjpJJLdLLnz7icSR_fJBQ3Jt-EWLB9YgBbxlZWTEShvoeBzteu2M8wdr7kXk931m_HhOg0QUsGKW7Oebdoehg24GSnZ8X3LV8wQhq2XZqk0vU5Ig3jVkK_hILOrZDCqrxILgGext2xJL2AmR1Jd9RN5eqpZqClCFxBvJz27VxWQ3xGQPeSRMxdBA88VGb',
-    startTime: '09:00',
-    endTime: '10:00',
-    therapyType: 'Terapia Cognitiva',
-    status: 'completed',
-  },
-  {
-    id: '2',
-    patientName: 'Carlos Lima',
-    patientAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBxa5FU70GGvSbf3g7tEtMcqnDw_-LBzJ5edwiiv4j8iYY6EkZetAI-4X8_HqWWffylqm6v7XkC9C2heNfDy8idkAmaZnKgEFM-a9CnN9LTg6yV6R-4PIckH3-E6_VrEP3A5lPf_hdZvww2r56-FxamwGg1McVOeWbOcJS_rGQr1aA2XU7QmafoWFqWS43cagovf6r627HGfPk6mGMN56-4jvfPMI-pxhOM4Ub4HU1OgwXOwamavSWB9mBBF3BX6obZHF0svOlz6mH5',
-    startTime: '10:30',
-    endTime: '11:30',
-    therapyType: 'Retorno',
-    status: 'scheduled',
-  },
-  {
-    id: '3',
-    patientName: 'Beatriz M.',
-    patientAvatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC18muCJkJILRi4Xn45HOXNgBOaQM0L-ZV-g4tcEhhuBSJkXG4-Y6aksJPt4BKVmVqjwIURx2CC7f0gv4l3JANTnJ8JesRLhtCD5ZFTYLZOGAyo6zVmfmh9Ws6B84SZJXnpqkZiH2FeWIXLLQ4qB2V_e2beSTD3yzHw7qUk5knxCQkFctdMm4QKbVoH5HNf3C3lhReEM2Xf1rZrVYHI7H82s0KK6xh25Hgc0S_VrjwK-gKlQaCKp_LDzn6leW_V8ZPw7LShBmcgc2MK',
-    startTime: '14:00',
-    endTime: '15:00',
-    therapyType: 'Terapia de Casal',
-    status: 'completed',
-  },
-];
+// Convert Core Appointment to UI Appointment
+const convertAppointment = (coreAppointment: CoreAppointment): Appointment => {
+  const startDate = new Date(coreAppointment.dateTime);
+  const endDate = new Date(startDate.getTime() + coreAppointment.duration * 60000);
+  
+  return {
+    id: coreAppointment.id,
+    patientName: coreAppointment.patientName,
+    patientAvatar: '', // Default avatar - can be enhanced later
+    startTime: startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    endTime: endDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    therapyType: coreAppointment.type,
+    status: coreAppointment.status === 'completed' ? 'completed' : 
+            coreAppointment.status === 'scheduled' || coreAppointment.status === 'confirmed' ? 'scheduled' : 
+            'pending',
+  };
+};
 
 // Generate calendar days
-const generateCalendarDays = (year: number, month: number): CalendarDay[] => {
+const generateCalendarDays = (
+  year: number, 
+  month: number,
+  weekAppointments: CoreAppointment[]
+): CalendarDay[] => {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
   const startingDayOfWeek = firstDay.getDay();
   const daysInMonth = lastDay.getDate();
   
   const days: CalendarDay[] = [];
+  
+  // Count appointments by day
+  const appointmentsByDay = new Map<string, number>();
+  weekAppointments.forEach(apt => {
+    const aptDate = new Date(apt.dateTime);
+    const key = `${aptDate.getFullYear()}-${aptDate.getMonth()}-${aptDate.getDate()}`;
+    appointmentsByDay.set(key, (appointmentsByDay.get(key) || 0) + 1);
+  });
   
   // Previous month days
   const prevMonthLastDay = new Date(year, month, 0).getDate();
@@ -86,7 +87,8 @@ const generateCalendarDays = (year: number, month: number): CalendarDay[] => {
   
   for (let day = 1; day <= daysInMonth; day++) {
     const isToday = isCurrentMonth && today.getDate() === day;
-    const appointmentCount = isToday ? 2 : [2, 6, 9, 13, 17, 20].includes(day) ? 1 : 0;
+    const dateKey = `${year}-${month}-${day}`;
+    const appointmentCount = appointmentsByDay.get(dateKey) || 0;
     
     days.push({
       day,
@@ -109,7 +111,28 @@ export default function AgendamentosPage() {
   const month = currentDate.getMonth();
   const monthName = currentDate.toLocaleDateString('pt-BR', { month: 'long' });
   
-  const calendarDays = generateCalendarDays(year, month);
+  // Fetch today's appointments
+  const { appointments: todayAppointments, loading: todayLoading } = useTodayAppointments();
+  
+  // Fetch week appointments for calendar
+  const weekStartDate = useMemo(() => {
+    const start = new Date(year, month, 1);
+    return start;
+  }, [year, month]);
+  
+  const { appointments: weekAppointments } = useWeekAppointments(weekStartDate);
+  
+  // Convert appointments for UI
+  const uiAppointments = useMemo(() => 
+    todayAppointments.map(convertAppointment),
+    [todayAppointments]
+  );
+  
+  // Generate calendar days with real appointment counts
+  const calendarDays = useMemo(() => 
+    generateCalendarDays(year, month, weekAppointments),
+    [year, month, weekAppointments]
+  );
   
   const handlePreviousMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -124,18 +147,19 @@ export default function AgendamentosPage() {
   };
   
   const handleDayClick = (date: Date) => {
-    console.log('Day clicked:', date);
-    // TODO: Navigate to day view or show appointments for selected day
+    // Navigate to appointments list filtered by selected date
+    const dateStr = date.toISOString().split('T')[0]
+    router.push(`/dashboard/agendamentos?view=list&date=${dateStr}`)
   };
   
   const handleFilterClick = () => {
-    console.log('Filters clicked');
-    // TODO: Open filters modal
+    // Toggle to list view with filters
+    router.push('/dashboard/agendamentos?view=list')
   };
   
   const handleViewAll = () => {
-    console.log('View all appointments');
-    // TODO: Navigate to full appointments list
+    // Navigate to full appointments list
+    router.push('/dashboard/agendamentos?view=list')
   };
   
   const handleAddAppointment = () => {
@@ -143,14 +167,20 @@ export default function AgendamentosPage() {
   };
   
   const handleStartSession = (appointmentId: string) => {
-    console.log('Start session:', appointmentId);
-    // TODO: Navigate to session start page
+    // Navigate to session/consultation page
+    router.push(`/dashboard/agendamentos/${appointmentId}/sessao`)
   };
   
   const handleViewDetails = (appointmentId: string) => {
-    console.log('View details:', appointmentId);
-    // TODO: Open appointment details modal or navigate to details page
+    // Navigate to appointment details page
+    router.push(`/dashboard/agendamentos/${appointmentId}`)
   };
+  // Format today's date
+  const todayFormatted = new Date().toLocaleDateString('pt-BR', { 
+    weekday: 'long', 
+    day: '2-digit', 
+    month: 'short' 
+  });
 
   return (
     <div className="flex-1 overflow-y-auto p-6 lg:p-8 relative scroll-smooth">
@@ -181,8 +211,8 @@ export default function AgendamentosPage() {
           {/* Today's Appointments Sidebar */}
           <div className="lg:col-span-4 xl:col-span-3">
             <TodayAppointmentsSidebar
-              date="Quinta-feira, 05 Nov"
-              appointments={mockAppointments}
+              date={todayFormatted}
+              appointments={uiAppointments}
               onViewAll={handleViewAll}
               onAddAppointment={handleAddAppointment}
               onStartSession={handleStartSession}
