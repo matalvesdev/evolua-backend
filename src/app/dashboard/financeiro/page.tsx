@@ -1,31 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-
-// TODO: Integrar com Supabase quando a tabela de transações/finanças for criada
-// Por enquanto, mostramos dados vazios preparados para integração
+import { useFinances } from "@/hooks";
 
 export default function FinanceiroPage() {
-  const [activeTab, setActiveTab] = useState("overview");
+  const {
+    balanceData,
+    monthlyData,
+    revenueSources,
+    transactions,
+    loading,
+    error,
+  } = useFinances();
 
-  // Estado vazio - pronto para integração futura com Supabase
-  const loading = false;
-  const monthlyData: Array<{ month: string; revenue: number }> = [];
-  const revenueSources: Array<{ name: string; value: number; color: string }> = [];
-  const recentTransactions: Array<{
-    id: string;
-    type: string;
-    amount: number;
-    date: string;
-    patient: string;
-    status: string;
-  }> = [];
+  // Pegar apenas as 5 transações mais recentes
+  const recentTransactions = transactions.slice(0, 5);
 
-  const totalBalance = 0;
-  const monthlyIncome = 0;
-  const monthlyExpenses = 0;
-  const pendingPayments = 0;
+  // Calcular receitas e despesas do mês atual
+  const currentMonth = new Date().toLocaleDateString("pt-BR", { month: "short" });
+  const currentMonthData = monthlyData.find(m => 
+    m.month.toLowerCase() === currentMonth.toLowerCase()
+  );
+  const monthlyIncome = currentMonthData?.income || 0;
+  const monthlyExpenses = currentMonthData?.expenses || 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#f6f8fb] via-[#e8edf5] to-[#dce5f0] p-6">
@@ -76,13 +73,13 @@ export default function FinanceiroPage() {
                     </div>
                   </div>
                   <div className="text-2xl font-bold text-gray-900">
-                    R$ {totalBalance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    R$ {balanceData.balance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </div>
-                  <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-1 mt-2 text-xs text-emerald-600">
                     <span className="material-symbols-outlined text-sm">
-                      info
+                      check_circle
                     </span>
-                    Aguardando integração
+                    Atualizado
                   </div>
                 </div>
               </div>
@@ -104,11 +101,11 @@ export default function FinanceiroPage() {
                   <div className="text-2xl font-bold text-gray-900">
                     R$ {monthlyIncome.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </div>
-                  <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-1 mt-2 text-xs text-blue-600">
                     <span className="material-symbols-outlined text-sm">
-                      info
+                      check_circle
                     </span>
-                    Aguardando integração
+                    Mês atual
                   </div>
                 </div>
               </div>
@@ -130,11 +127,11 @@ export default function FinanceiroPage() {
                   <div className="text-2xl font-bold text-gray-900">
                     R$ {monthlyExpenses.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </div>
-                  <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-1 mt-2 text-xs text-rose-600">
                     <span className="material-symbols-outlined text-sm">
-                      info
+                      check_circle
                     </span>
-                    Aguardando integração
+                    Mês atual
                   </div>
                 </div>
               </div>
@@ -154,13 +151,13 @@ export default function FinanceiroPage() {
                     </div>
                   </div>
                   <div className="text-2xl font-bold text-gray-900">
-                    R$ {pendingPayments.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    R$ {balanceData.pending.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                   </div>
-                  <div className="flex items-center gap-1 mt-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-1 mt-2 text-xs text-amber-600">
                     <span className="material-symbols-outlined text-sm">
-                      info
+                      pending
                     </span>
-                    Aguardando integração
+                    Aguardando pagamento
                   </div>
                 </div>
               </div>
