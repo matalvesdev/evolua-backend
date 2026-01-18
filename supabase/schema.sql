@@ -417,6 +417,69 @@ CREATE POLICY "Users can delete reminders from their clinic"
   USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
 
 -- ============================================================================
+-- AUDIO SESSIONS TABLE
+-- ============================================================================
+
+-- Audio sessions table for storing audio recordings and transcriptions
+CREATE TABLE IF NOT EXISTS public.audio_sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  clinic_id UUID NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
+  patient_id UUID NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
+  therapist_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  appointment_id UUID REFERENCES public.appointments(id) ON DELETE SET NULL,
+  
+  -- Audio file info
+  audio_url TEXT NOT NULL,
+  file_name TEXT,
+  file_size INTEGER,
+  duration_seconds INTEGER,
+  mime_type TEXT DEFAULT 'audio/webm',
+  
+  -- Transcription info
+  transcription TEXT,
+  transcription_status TEXT NOT NULL DEFAULT 'pending' CHECK (transcription_status IN ('pending', 'processing', 'completed', 'failed')),
+  transcription_error TEXT,
+  transcribed_at TIMESTAMPTZ,
+  
+  -- Report generation
+  report_id UUID REFERENCES public.reports(id) ON DELETE SET NULL,
+  report_generated BOOLEAN DEFAULT FALSE,
+  
+  -- Metadata
+  language TEXT DEFAULT 'pt',
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for audio_sessions
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_clinic_id ON public.audio_sessions(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_patient_id ON public.audio_sessions(patient_id);
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_therapist_id ON public.audio_sessions(therapist_id);
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_appointment_id ON public.audio_sessions(appointment_id);
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_status ON public.audio_sessions(transcription_status);
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_created_at ON public.audio_sessions(created_at DESC);
+
+-- RLS for audio_sessions
+ALTER TABLE public.audio_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view audio sessions from their clinic"
+  ON public.audio_sessions FOR SELECT
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can insert audio sessions to their clinic"
+  ON public.audio_sessions FOR INSERT
+  WITH CHECK (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can update audio sessions from their clinic"
+  ON public.audio_sessions FOR UPDATE
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can delete audio sessions from their clinic"
+  ON public.audio_sessions FOR DELETE
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+-- ============================================================================
 -- FUNCTIONS
 -- ============================================================================
 
@@ -437,4 +500,7 @@ CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON public.tasks
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_patient_reminders_updated_at BEFORE UPDATE ON public.patient_reminders
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_audio_sessions_updated_at BEFORE UPDATE ON public.audio_sessions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

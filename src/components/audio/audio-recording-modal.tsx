@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 interface AudioRecordingModalProps {
   isOpen: boolean;
@@ -8,6 +9,137 @@ interface AudioRecordingModalProps {
   patientName?: string;
   patientId?: string;
   onTranscriptionComplete?: (transcription: string, audioUrl: string) => void;
+}
+
+// Função para fazer upload e transcrição do áudio
+async function uploadAndTranscribe(
+  audioBlob: Blob,
+  patientId: string
+): Promise<{ transcription: string; audioUrl: string; sessionId: string }> {
+  const supabase = createClient();
+
+  // 1. Verificar autenticação
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Usuário não autenticado");
+  }
+
+  // 2. Obter clinic_id do usuário
+  const { data: userData, error: userError } = await supabase
+    .from("users")
+    .select("clinic_id")
+    .eq("id", user.id)
+    .single();
+
+  if (userError || !userData?.clinic_id) {
+    throw new Error("Clínica não encontrada");
+  }
+
+  // 3. Gerar nome único para o arquivo
+  const fileName = `${patientId}/${Date.now()}-${Math.random().toString(36).substring(7)}.webm`;
+
+  // 4. Upload do áudio para Supabase Storage
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from("audio-sessions")
+    .upload(fileName, audioBlob, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: "audio/webm",
+    });
+
+  if (uploadError) {
+    console.error("Upload error:", uploadError);
+    throw new Error("Erro ao fazer upload do áudio");
+  }
+
+  // 5. Obter URL pública do áudio
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from("audio-sessions").getPublicUrl(uploadData.path);
+
+  // 6. Criar registro no banco de dados
+  const { data: sessionData, error: sessionError } = await supabase
+    .from("audio_sessions")
+    .insert({
+      clinic_id: userData.clinic_id,
+      patient_id: patientId,
+      therapist_id: user.id,
+      audio_url: publicUrl,
+      file_name: fileName,
+      file_size: audioBlob.size,
+      mime_type: audioBlob.type || "audio/webm",
+      transcription_status: "processing",
+      language: "pt",
+    })
+    .select()
+    .single();
+
+  if (sessionError) {
+    console.error("Session creation error:", sessionError);
+    throw new Error("Erro ao criar sessão de áudio");
+  }
+
+  // 7. Chamar API de transcrição
+  const transcribeResponse = await fetch("/api/transcribe", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      audioUrl: publicUrl,
+      language: "pt",
+    }),
+  });
+
+  if (!transcribeResponse.ok) {
+    // Atualizar status para falha
+    await supabase
+      .from("audio_sessions")
+      .update({
+        transcription_status: "failed",
+        transcription_error: "Erro na API de transcrição",
+      })
+      .eq("id", sessionData.id);
+
+    throw new Error("Erro ao transcrever áudio");
+  }
+
+  const transcribeData = await transcribeResponse.json();
+
+  if (!transcribeData.success) {
+    // Atualizar status para falha
+    await supabase
+      .from("audio_sessions")
+      .update({
+        transcription_status: "failed",
+        transcription_error: transcribeData.error || "Erro desconhecido",
+      })
+      .eq("id", sessionData.id);
+
+    throw new Error(transcribeData.error || "Erro ao transcrever áudio");
+  }
+
+  // 8. Atualizar registro com a transcrição
+  const { error: updateError } = await supabase
+    .from("audio_sessions")
+    .update({
+      transcription: transcribeData.transcription,
+      transcription_status: "completed",
+      transcribed_at: new Date().toISOString(),
+    })
+    .eq("id", sessionData.id);
+
+  if (updateError) {
+    console.error("Update error:", updateError);
+  }
+
+  return {
+    transcription: transcribeData.transcription,
+    audioUrl: publicUrl,
+    sessionId: sessionData.id,
+  };
 }
 
 export function AudioRecordingModal({
@@ -80,21 +212,13 @@ export function AudioRecordingModal({
         if (onTranscriptionComplete && patientId) {
           setIsProcessing(true);
           try {
-            // TODO: Implementar upload e transcrição quando a API estiver pronta
-            // const result = await uploadAndTranscribe(audioBlob, patientId);
-            // onTranscriptionComplete(result.transcription, result.audioUrl);
-            
-            // Por enquanto, simular processamento
-            setTimeout(() => {
-              onTranscriptionComplete(
-                "Transcrição simulada do áudio gravado...",
-                URL.createObjectURL(audioBlob)
-              );
-              setIsProcessing(false);
-            }, 2000);
+            // Upload e transcrição real
+            const result = await uploadAndTranscribe(audioBlob, patientId);
+            onTranscriptionComplete(result.transcription, result.audioUrl);
+            setIsProcessing(false);
           } catch (error) {
             console.error("Error processing audio:", error);
-            setError("Erro ao processar o áudio. Tente novamente.");
+            setError(error instanceof Error ? error.message : "Erro ao processar o áudio. Tente novamente.");
             setIsProcessing(false);
           }
         }
@@ -369,7 +493,3 @@ export function AudioRecordingModal({
     </div>
   );
 }
-async function uploadAndTranscribe(audioBlob: Blob, patientId: string): Promise<{ transcription: string; audioUrl: string }> {
-    throw new Error("Function not implemented.");
-}
-
