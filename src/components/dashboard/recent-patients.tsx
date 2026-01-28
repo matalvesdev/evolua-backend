@@ -9,36 +9,8 @@ interface Patient {
   isOnline?: boolean
 }
 
-const patients: Patient[] = [
-  {
-    initials: "MG",
-    name: "Miguel Garcia",
-    specialty: "Terapia de Fala",
-    sessionLabel: "Última Sessão",
-    sessionTime: "Ontem, 14:00",
-    bgColor: "bg-blue-100",
-    textColor: "text-blue-600",
-    isOnline: true,
-  },
-  {
-    initials: "LA",
-    name: "Laura Almeida",
-    specialty: "Audiometria",
-    sessionLabel: "Próxima Sessão",
-    sessionTime: "Hoje, 16:30",
-    bgColor: "bg-pink-100",
-    textColor: "text-pink-600",
-  },
-  {
-    initials: "JS",
-    name: "João Silva",
-    specialty: "Motricidade",
-    sessionLabel: "Última Sessão",
-    sessionTime: "22 Out, 10:00",
-    bgColor: "bg-yellow-100",
-    textColor: "text-yellow-600",
-  },
-]
+// TODO: Fetch from Supabase
+const patients: Patient[] = [];
 
 export function RecentPatients() {
   return (

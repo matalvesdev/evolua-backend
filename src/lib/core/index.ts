@@ -14,7 +14,6 @@ import {
   RegisterUseCase,
   GetCurrentUserUseCase,
   ChangePasswordUseCase,
-  LogoutUseCase,
 } from "./application/use-cases/auth"
 import {
   CreatePatientUseCase,

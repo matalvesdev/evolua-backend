@@ -222,7 +222,7 @@ export async function reactivatePatientAction(
 ): Promise<ActionResult<PatientOutput>> {
   try {
     const useCase = await getChangePatientStatusUseCase()
-    const result = await useCase.execute(id, "active")
+    const result = await useCase.execute({ id, status: "active" })
 
     revalidatePath("/dashboard/pacientes")
     revalidatePath(`/pacientes/${id}`)

@@ -114,19 +114,28 @@ export default function PatientDetailPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Link href={`/pacientes/${patientId}/editar`}>
+          <Link href={`/dashboard/pacientes/${patientId}/editar`}>
             <Button variant="outline" size="sm">
-              ✏️ Editar
+              <span className="material-symbols-outlined text-base mr-1">edit</span>
+              Editar
             </Button>
           </Link>
-          <Link href={`/agendamentos/novo?patientId=${patientId}`}>
+          <Link href={`/dashboard/pacientes/${patientId}/audio`}>
+            <Button variant="outline" size="sm">
+              <span className="material-symbols-outlined text-base mr-1">mic</span>
+              Áudio/Transcrição
+            </Button>
+          </Link>
+          <Link href={`/dashboard/agendamentos/novo?patientId=${patientId}`}>
             <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
-              + Agendar
+              <span className="material-symbols-outlined text-base mr-1">add</span>
+              Agendar
             </Button>
           </Link>
-          <Link href={`/relatorios/novo?patientId=${patientId}`}>
+          <Link href={`/dashboard/relatorios/novo?patientId=${patientId}`}>
             <Button size="sm" variant="outline">
-              📝 Novo Relatório
+              <span className="material-symbols-outlined text-base mr-1">description</span>
+              Novo Relatório
             </Button>
           </Link>
         </div>

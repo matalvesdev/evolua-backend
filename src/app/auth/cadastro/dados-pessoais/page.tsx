@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { ArrowRight, User, Mail, Smartphone, Lock, ShieldCheck, MailCheck } from "lucide-react"
+import { ArrowRight, ArrowLeft, User, Mail, Smartphone, Lock, ShieldCheck, MailCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   OnboardingLayout,
@@ -18,8 +18,46 @@ const TOTAL_STEPS = 6
 
 export default function DadosPessoaisPage() {
   const router = useRouter()
+  const [fullName, setFullName] = useState("")
+  const [email, setEmail] = useState("")
+  const [phone, setPhone] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+
+  const handleBack = () => {
+    router.push("/auth/cadastro")
+  }
 
   const handleContinue = () => {
+    setError(null)
+
+    // Validações
+    if (!fullName || !email || !phone || !password || !confirmPassword) {
+      setError("Por favor, preencha todos os campos")
+      return
+    }
+
+    if (password.length < 8) {
+      setError("A senha deve ter no mínimo 8 caracteres")
+      return
+    }
+
+    if (password !== confirmPassword) {
+      setError("As senhas não coincidem")
+      return
+    }
+
+    // Salvar dados no localStorage
+    const onboardingData = {
+      full_name: fullName,
+      email: email,
+      phone: phone,
+      password: password,
+    }
+
+    localStorage.setItem("onboarding_data", JSON.stringify(onboardingData))
+
     router.push("/auth/cadastro/atuacao")
   }
 
@@ -72,6 +110,13 @@ export default function DadosPessoaisPage() {
         description="Seu nome e contato são o ponto de partida para sua conta segura e personalizada. Tudo será tratado com o carinho e a discrição que você merece."
       />
 
+      {/* Error Message */}
+      {error && (
+        <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          {error}
+        </div>
+      )}
+
       {/* Form Card */}
       <GlassCard className="text-left items-stretch">
         <OnboardingFormField
@@ -82,6 +127,8 @@ export default function DadosPessoaisPage() {
             id="name"
             type="text"
             placeholder="Digite seu nome completo"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
           />
         </OnboardingFormField>
 
@@ -94,6 +141,8 @@ export default function DadosPessoaisPage() {
             id="email"
             type="email"
             placeholder="seu.email@exemplo.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
         </OnboardingFormField>
 
@@ -114,13 +163,51 @@ export default function DadosPessoaisPage() {
               id="phone"
               type="tel"
               placeholder="(00) 00000-0000"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
             />
           </div>
         </OnboardingFormField>
+
+        <OnboardingFormField
+          label="Senha"
+          icon={<Lock className="size-4" />}
+          hint="Mínimo de 8 caracteres, incluindo letras e números."
+        >
+          <OnboardingInput
+            id="password"
+            type="password"
+            placeholder="Digite sua senha"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </OnboardingFormField>
+
+        <OnboardingFormField
+          label="Confirmar Senha"
+          icon={<ShieldCheck className="size-4" />}
+        >
+          <OnboardingInput
+            id="confirmPassword"
+            type="password"
+            placeholder="Digite sua senha novamente"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
+        </OnboardingFormField>
       </GlassCard>
 
-      {/* Continue Button */}
-      <div className="mt-8 flex justify-end">
+      {/* Navigation Buttons */}
+      <div className="mt-8 flex justify-between">
+        <Button
+          onClick={handleBack}
+          variant="outline"
+          size="lg"
+          className="font-semibold py-4 px-8 rounded-full border-2 border-slate-200 hover:border-primary/30 hover:bg-primary/5 flex items-center gap-2 text-base h-auto transition-all duration-300"
+        >
+          <ArrowLeft className="size-5" />
+          Voltar
+        </Button>
         <Button
           onClick={handleContinue}
           size="lg"

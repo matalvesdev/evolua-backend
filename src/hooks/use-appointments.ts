@@ -15,7 +15,6 @@ import {
 } from "@/actions"
 import type {
   CreateAppointmentInput,
-  CancellationReason,
 } from "@/lib/core"
 import type { Appointment } from "@/lib/core/domain/entities/appointment"
 

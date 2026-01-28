@@ -1,4 +1,11 @@
+"use client"
+
+import { useTasks } from "@/hooks"
+
 export function RemindersPanel() {
+  const { tasks: reminders, loading } = useTasks({ type: 'reminder' })
+  const pendingReminders = reminders.filter(r => r.status === 'pending').slice(0, 3)
+
   return (
     <div className="mb-6">
       <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2 text-lg">
@@ -32,37 +39,35 @@ export function RemindersPanel() {
 
       {/* Reminder items */}
       <div className="space-y-3">
-        <div className="bg-white/60 p-3 rounded-2xl border border-white hover:border-purple-200 transition-all hover:shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="mt-1 min-w-6 h-6 rounded-full bg-red-50 flex items-center justify-center text-red-500">
-              <span className="material-symbols-outlined text-xs">priority_high</span>
-            </div>
-            <div className="flex-1">
-              <div className="flex justify-between items-start">
-                <p className="text-sm font-bold text-gray-800 leading-tight">Relatório Pendente</p>
+        {loading ? (
+          <p className="text-sm text-gray-400 text-center py-4">Carregando...</p>
+        ) : pendingReminders.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-4">Nenhum lembrete pendente</p>
+        ) : (
+          pendingReminders.map((reminder) => (
+            <div key={reminder.id} className="bg-white/60 p-3 rounded-2xl border border-white hover:border-purple-200 transition-all hover:shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="mt-1 min-w-6 h-6 rounded-full bg-red-50 flex items-center justify-center text-red-500">
+                  <span className="material-symbols-outlined text-xs">priority_high</span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex justify-between items-start">
+                    <p className="text-sm font-bold text-gray-800 leading-tight">{reminder.title}</p>
+                  </div>
+                  {reminder.description && (
+                    <p className="text-[11px] text-gray-500 mb-2">{reminder.description}</p>
+                  )}
+                  {reminder.dueDate && (
+                    <p className="text-[11px] text-gray-400 mb-2">
+                      {new Date(reminder.dueDate).toLocaleDateString('pt-BR')}
+                    </p>
+                  )}
+                </div>
               </div>
-              <p className="text-[11px] text-gray-500 mb-2">João Silva (Motricidade)</p>
-              <button className="w-full py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:text-primary hover:border-primary hover:bg-purple-50 transition-colors">
-                Preencher Agora
-              </button>
             </div>
-          </div>
-        </div>
-        <div className="bg-white/60 p-3 rounded-2xl border border-white hover:border-purple-200 transition-all hover:shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="mt-1 min-w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
-              <span className="material-symbols-outlined text-xs">send</span>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-bold text-gray-800 leading-tight">Enviar Exercícios</p>
-              <p className="text-[11px] text-gray-500 mb-2">Para: Ana Clara</p>
-              <button className="py-1.5 px-3 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-600 hover:text-primary hover:border-primary hover:bg-purple-50 transition-colors">
-                Enviar
-              </button>
-            </div>
-          </div>
-        </div>
+          ))
+        )}
       </div>
     </div>
-  )
+  );
 }

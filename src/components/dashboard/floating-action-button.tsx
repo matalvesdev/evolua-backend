@@ -1,20 +1,22 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 
 interface FABAction {
   icon: string
   label: string
-  onClick?: () => void
+  href: string
 }
 
 const fabActions: FABAction[] = [
-  { icon: "person_add", label: "Novo Paciente" },
-  { icon: "event", label: "Agendar" },
+  { icon: "person_add", label: "Novo Paciente", href: "/dashboard/pacientes/novo" },
+  { icon: "event", label: "Agendar", href: "/dashboard/agendamentos/novo" },
 ]
 
 export function FloatingActionButton() {
   const [isOpen, setIsOpen] = useState(false)
+  const router = useRouter()
 
   return (
     <div
@@ -31,7 +33,11 @@ export function FloatingActionButton() {
         }`}
       >
         {fabActions.map((action) => (
-          <button key={action.label} className="flex items-center gap-3 group/item" onClick={action.onClick}>
+          <button 
+            key={action.label} 
+            className="flex items-center gap-3 group/item" 
+            onClick={() => router.push(action.href)}
+          >
             <span className="bg-white px-3 py-1 rounded-lg text-xs font-bold shadow-sm text-gray-700 group-hover/item:text-primary transition-colors">
               {action.label}
             </span>

@@ -1,74 +1,82 @@
 "use client"
 
 import { useState } from "react"
-import Image from "next/image"
-
-interface TodoItem {
-  id: number
-  text: string
-  completed: boolean
-}
-
-const initialTodos: TodoItem[] = [
-  { id: 1, text: "Revisar prontuário de Miguel", completed: false },
-  { id: 2, text: "Responder e-mail da clínica", completed: false },
-  { id: 3, text: "Preparar material para Laura", completed: true },
-]
+import { useTasks } from "@/hooks"
+import { TaskForm } from "@/components/tasks"
+import Link from "next/link"
 
 export function DashboardTodoList() {
-  const [todos, setTodos] = useState(initialTodos)
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const { tasks, loading, updateTaskStatus } = useTasks({ 
+    type: 'task',
+    status: ['pending'],
+    limit: 5
+  })
 
-  const toggleTodo = (id: number) => {
-    setTodos(todos.map(todo => 
-      todo.id === id ? { ...todo, completed: !todo.completed } : todo
-    ))
+  const toggleTask = async (taskId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
+    await updateTaskStatus(taskId, newStatus)
   }
 
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
-          <div className="p-1.5 bg-green-100 rounded-lg">
-            <span className="material-symbols-outlined text-green-600 text-sm">check_circle</span>
-          </div>
-          Minha To-Do List
-        </h3>
-        <button className="text-xs font-bold text-primary hover:bg-purple-50 px-2 py-1 rounded-md transition-colors">
-          + Add
-        </button>
-      </div>
-      <div className="space-y-2 mb-6">
-        {todos.map((todo) => (
-          <label
-            key={todo.id}
-            className="flex items-start gap-3 p-2 hover:bg-white/40 rounded-lg cursor-pointer transition-colors group"
+    <>
+      <div className="flex-1 flex flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-800 flex items-center gap-2 text-lg">
+            <div className="p-1.5 bg-green-100 rounded-lg">
+              <span className="material-symbols-outlined text-green-600 text-sm">check_circle</span>
+            </div>
+            Minha To-Do List
+          </h3>
+          <button 
+            onClick={() => setIsFormOpen(true)}
+            className="text-xs font-bold text-primary hover:bg-purple-50 px-2 py-1 rounded-md transition-colors"
           >
-            <input
-              type="checkbox"
-              className={`mt-1 rounded border-gray-300 text-primary focus:ring-primary w-4 h-4 ${todo.completed ? "opacity-50" : ""}`}
-              checked={todo.completed}
-              onChange={() => toggleTodo(todo.id)}
-            />
-            <span className={`text-sm transition-colors ${todo.completed ? "text-gray-400 line-through" : "text-gray-600 group-hover:text-gray-900"}`}>
-              {todo.text}
-            </span>
-          </label>
-        ))}
-      </div>
-      <div className="mt-auto relative rounded-2xl overflow-hidden min-h-40 shadow-sm">
-        <Image
-          alt="Fonoaudióloga interagindo com tecnologia"
-          className="absolute inset-0 w-full h-full object-cover"
-          src="https://lh3.googleusercontent.com/aida-public/AB6AXuBowjBdJ77dfaU37M_dwmTXJ0wC17N8mwUCZojMLsVRTmzPhFK40fs1u-jUfmtX4ikkRiDO79tSnlHumVpzlzb4UrdZur8oaKnEoUsGf-kmD6MQjfykYk6XdsexkWF8r2FTQL6E6aEdb10h1WE0tonjQN7TvvppXKzl-W3MRaF2ud0sLt4AGZg3wKq-2_vA4HuBYSoknCV5y6mrQBZar6fN4w4l9PceKwB9Y08YNkIwnQ0rqx_xr6nyjIPVnCKVuz3Ctf0xt1bKK47x"
-          fill
-          sizes="(max-width: 768px) 100vw, 400px"
-        />
-        <div className="absolute inset-0 bg-linear-to-t from-purple-900/80 to-transparent flex items-end p-4">
-          <p className="text-white text-xs font-medium leading-tight">
-            &ldquo;A tecnologia conecta, mas é o seu cuidado que transforma vidas.&rdquo;
-          </p>
+            + Add
+          </button>
         </div>
+        <div className="space-y-2 mb-6">
+          {loading ? (
+            <p className="text-sm text-gray-400 text-center py-4">Carregando...</p>
+          ) : tasks.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-sm text-gray-400 mb-2">Nenhuma tarefa pendente</p>
+              <button 
+                onClick={() => setIsFormOpen(true)}
+                className="text-xs text-primary hover:underline"
+              >
+                Criar primeira tarefa
+              </button>
+            </div>
+          ) : (
+            <>
+              {tasks.map((task) => (
+                <label
+                  key={task.id}
+                  className="flex items-start gap-3 p-2 hover:bg-white/40 rounded-lg cursor-pointer transition-colors group"
+                >
+                  <input
+                    type="checkbox"
+                    className={`mt-1 rounded border-gray-300 text-primary focus:ring-primary w-4 h-4 ${task.status === 'completed' ? "opacity-50" : ""}`}
+                    checked={task.status === 'completed'}
+                    onChange={() => toggleTask(task.id, task.status)}
+                  />
+                  <span className={`text-sm transition-colors ${task.status === 'completed' ? "text-gray-400 line-through" : "text-gray-600 group-hover:text-gray-900"}`}>
+                    {task.title}
+                  </span>
+                </label>
+              ))}
+              <Link 
+                href="/dashboard/tarefas"
+                className="block text-center text-xs text-primary hover:underline pt-2"
+              >
+                Ver todas as tarefas
+              </Link>
+            </>
+          )}
+        </div>
+        <TaskForm open={isFormOpen} onOpenChange={setIsFormOpen} />
       </div>
-    </div>
-  )
+    </>
+  );
 }
