@@ -1,8 +1,19 @@
 "use client"
 
 import Image from 'next/image'
+import { useUser } from '@/hooks'
 
 export function DashboardHeader() {
+  const { user } = useUser()
+  
+  const today = new Date()
+  const dateStr = today.toLocaleDateString('pt-BR', { 
+    weekday: 'long', 
+    day: 'numeric', 
+    month: 'long' 
+  })
+  const formattedDate = dateStr.charAt(0).toUpperCase() + dateStr.slice(1)
+
   return (
     <header className="h-20 px-6 lg:px-10 flex items-center justify-between bg-white/30 backdrop-blur-sm sticky top-0 z-40 border-b border-white/40">
       {/* Mobile menu */}
@@ -16,7 +27,7 @@ export function DashboardHeader() {
       {/* Page title */}
       <div className="hidden md:flex flex-col mr-auto">
         <h2 className="text-sm font-bold text-gray-800">Visão Geral</h2>
-        <p className="text-xs text-gray-500">Quinta, 24 de Outubro</p>
+        <p className="text-xs text-gray-500">{formattedDate}</p>
       </div>
 
       {/* Search */}
@@ -37,22 +48,16 @@ export function DashboardHeader() {
       <div className="flex items-center gap-4">
         <button className="relative p-2.5 bg-white rounded-full text-gray-400 hover:text-primary hover:shadow-md transition-all">
           <span className="material-symbols-outlined text-[20px]">notifications</span>
-          <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
         </button>
-        <div className="h-8 w-px bg-gray-300 mx-1"></div>
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-bold text-gray-800 leading-tight">Dra. Camila</p>
-            <p className="text-[11px] text-primary font-bold uppercase tracking-wide">Fonoaudióloga</p>
+        <div className="flex items-center gap-3 md:pl-3">
+          <div className="hidden md:block text-right">
+            <p className="text-sm font-bold text-gray-800">{user?.name || 'Usuário'}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">
+              {user?.role === 'therapist' ? 'FONOAUDIÓLOGO/A' : 'PROFISSIONAL'}
+            </p>
           </div>
-          <div className="h-10 w-10 rounded-full bg-linear-to-tr from-purple-400 to-primary p-0.5">
-            <Image
-              alt="Avatar"
-              className="rounded-full h-full w-full object-cover border border-white"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2KPblk46KwFdISsMpPH2vgNjtrqpVcHWOqiSWrdFLGkTYIlSr4vxk3cfAYPaZYa86BKcoacNdAMEPKfYVdVgFud_DqtMNh4kZm9dMWE37O-IYba-Bz6buYiH21pRj8G6WsGkMQWtFiNt_DJmOzxwdEKJZltrVAEdhE3itEmRKHlDIsCI7GIirsYtPgRMvopsWVpWb4mio0CSldzdPVfQ6vYLWwB8kF6uhDVlcGH2duwQmIWggQwWkzjKBjLosC3re1AFs1Hqhj83b"
-              width={40}
-              height={40}
-            />
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold shadow-md">
+            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
           </div>
         </div>
       </div>

@@ -273,3 +273,234 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ============================================================================
+-- FINANCIAL TABLES
+-- ============================================================================
+
+-- Transactions table
+CREATE TABLE IF NOT EXISTS public.financial_transactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  clinic_id UUID NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
+  patient_id UUID REFERENCES public.patients(id) ON DELETE SET NULL,
+  patient_name TEXT,
+  therapist_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('income', 'expense')),
+  category TEXT NOT NULL,
+  description TEXT NOT NULL,
+  amount DECIMAL(10, 2) NOT NULL,
+  payment_method TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('paid', 'pending', 'overdue', 'cancelled')),
+  due_date TIMESTAMPTZ,
+  paid_date TIMESTAMPTZ,
+  notes TEXT,
+  appointment_id UUID REFERENCES public.appointments(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_transactions_clinic_id ON public.financial_transactions(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_patient_id ON public.financial_transactions(patient_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_therapist_id ON public.financial_transactions(therapist_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_status ON public.financial_transactions(status);
+CREATE INDEX IF NOT EXISTS idx_transactions_type ON public.financial_transactions(type);
+CREATE INDEX IF NOT EXISTS idx_transactions_due_date ON public.financial_transactions(due_date);
+
+-- Financial policies
+ALTER TABLE public.financial_transactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view transactions from their clinic"
+  ON public.financial_transactions FOR SELECT
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can insert transactions to their clinic"
+  ON public.financial_transactions FOR INSERT
+  WITH CHECK (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can update transactions from their clinic"
+  ON public.financial_transactions FOR UPDATE
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can delete transactions from their clinic"
+  ON public.financial_transactions FOR DELETE
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+-- ============================================================================
+-- TASKS TABLES
+-- ============================================================================
+
+-- Tasks table
+CREATE TABLE IF NOT EXISTS public.tasks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  clinic_id UUID NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
+  therapist_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  patient_id UUID REFERENCES public.patients(id) ON DELETE SET NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  type TEXT NOT NULL CHECK (type IN ('clinical', 'admin', 'general')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'completed', 'overdue', 'cancelled')),
+  priority TEXT DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
+  due_date TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  completed BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_clinic_id ON public.tasks(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_therapist_id ON public.tasks(therapist_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_patient_id ON public.tasks(patient_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON public.tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_type ON public.tasks(type);
+CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON public.tasks(due_date);
+
+-- Tasks policies
+ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view tasks from their clinic"
+  ON public.tasks FOR SELECT
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can insert tasks to their clinic"
+  ON public.tasks FOR INSERT
+  WITH CHECK (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can update tasks from their clinic"
+  ON public.tasks FOR UPDATE
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can delete tasks from their clinic"
+  ON public.tasks FOR DELETE
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+-- Patient reminders table
+CREATE TABLE IF NOT EXISTS public.patient_reminders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  clinic_id UUID NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
+  patient_id UUID NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
+  patient_name TEXT NOT NULL,
+  patient_avatar TEXT,
+  therapist_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('birthday', 'contract', 'followup', 'appointment', 'payment')),
+  message TEXT NOT NULL,
+  action_label TEXT NOT NULL,
+  due_date TIMESTAMPTZ,
+  completed BOOLEAN DEFAULT FALSE,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminders_clinic_id ON public.patient_reminders(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_patient_id ON public.patient_reminders(patient_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_therapist_id ON public.patient_reminders(therapist_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_type ON public.patient_reminders(type);
+CREATE INDEX IF NOT EXISTS idx_reminders_completed ON public.patient_reminders(completed);
+
+-- Reminders policies
+ALTER TABLE public.patient_reminders ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view reminders from their clinic"
+  ON public.patient_reminders FOR SELECT
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can insert reminders to their clinic"
+  ON public.patient_reminders FOR INSERT
+  WITH CHECK (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can update reminders from their clinic"
+  ON public.patient_reminders FOR UPDATE
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can delete reminders from their clinic"
+  ON public.patient_reminders FOR DELETE
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+-- ============================================================================
+-- AUDIO SESSIONS TABLE
+-- ============================================================================
+
+-- Audio sessions table for storing audio recordings and transcriptions
+CREATE TABLE IF NOT EXISTS public.audio_sessions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  clinic_id UUID NOT NULL REFERENCES public.clinics(id) ON DELETE CASCADE,
+  patient_id UUID NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
+  therapist_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  appointment_id UUID REFERENCES public.appointments(id) ON DELETE SET NULL,
+  
+  -- Audio file info
+  audio_url TEXT NOT NULL,
+  file_name TEXT,
+  file_size INTEGER,
+  duration_seconds INTEGER,
+  mime_type TEXT DEFAULT 'audio/webm',
+  
+  -- Transcription info
+  transcription TEXT,
+  transcription_status TEXT NOT NULL DEFAULT 'pending' CHECK (transcription_status IN ('pending', 'processing', 'completed', 'failed')),
+  transcription_error TEXT,
+  transcribed_at TIMESTAMPTZ,
+  
+  -- Report generation
+  report_id UUID REFERENCES public.reports(id) ON DELETE SET NULL,
+  report_generated BOOLEAN DEFAULT FALSE,
+  
+  -- Metadata
+  language TEXT DEFAULT 'pt',
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for audio_sessions
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_clinic_id ON public.audio_sessions(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_patient_id ON public.audio_sessions(patient_id);
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_therapist_id ON public.audio_sessions(therapist_id);
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_appointment_id ON public.audio_sessions(appointment_id);
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_status ON public.audio_sessions(transcription_status);
+CREATE INDEX IF NOT EXISTS idx_audio_sessions_created_at ON public.audio_sessions(created_at DESC);
+
+-- RLS for audio_sessions
+ALTER TABLE public.audio_sessions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view audio sessions from their clinic"
+  ON public.audio_sessions FOR SELECT
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can insert audio sessions to their clinic"
+  ON public.audio_sessions FOR INSERT
+  WITH CHECK (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can update audio sessions from their clinic"
+  ON public.audio_sessions FOR UPDATE
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+CREATE POLICY "Users can delete audio sessions from their clinic"
+  ON public.audio_sessions FOR DELETE
+  USING (clinic_id IN (SELECT clinic_id FROM public.users WHERE id = auth.uid()));
+
+-- ============================================================================
+-- FUNCTIONS
+-- ============================================================================
+
+-- Function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Triggers for updated_at
+CREATE TRIGGER update_financial_transactions_updated_at BEFORE UPDATE ON public.financial_transactions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE ON public.tasks
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_patient_reminders_updated_at BEFORE UPDATE ON public.patient_reminders
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_audio_sessions_updated_at BEFORE UPDATE ON public.audio_sessions
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

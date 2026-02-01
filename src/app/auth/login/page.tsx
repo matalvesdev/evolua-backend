@@ -1,13 +1,12 @@
 "use client"
 
 import * as React from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { loginAction } from "@/actions"
 import { syncOnboardingData } from "@/actions/onboarding.actions"
 
 export default function LoginPage() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
@@ -28,33 +27,39 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const result = await loginAction({ email, password })
+    try {
+      const result = await loginAction({ email, password })
+      console.log("Login result:", result)
 
-    if (result.success) {
-      const onboardingData = localStorage.getItem("onboarding_data")
-      if (onboardingData) {
-        try {
-          const data = JSON.parse(onboardingData)
-          await syncOnboardingData(data)
-          localStorage.removeItem("onboarding_data")
-        } catch (err) {
-          console.error("Erro ao sincronizar dados do onboarding:", err)
+      if (result.success) {
+        console.log("Login bem-sucedido, redirecionando para dashboard...")
+        const onboardingData = localStorage.getItem("onboarding_data")
+        if (onboardingData) {
+          try {
+            const data = JSON.parse(onboardingData)
+            await syncOnboardingData(data)
+            localStorage.removeItem("onboarding_data")
+          } catch (err) {
+            console.error("Erro ao sincronizar dados do onboarding:", err)
+          }
         }
-      }
 
-      router.push("/dashboard")
-      router.refresh()
-    } else {
-      setError(result.error)
+        window.location.href = "/dashboard"
+      } else {
+        console.error("Login falhou:", result.error)
+        setError(result.error || "Erro ao fazer login")
+        setLoading(false)
+      }
+    } catch (err) {
+      console.error("Erro inesperado no login:", err)
+      setError("Erro inesperado ao fazer login")
       setLoading(false)
     }
   }
 
   return (
     <div className="bg-[#fcfbfd] font-sans text-slate-800 overflow-hidden h-screen w-screen flex flex-col md:flex-row">
-      {/* Left Side - Hero */}
       <div className="hidden md:flex md:w-1/2 h-full bg-gradient-to-br from-purple-50 via-purple-100 to-purple-200 relative flex-col p-12 justify-between overflow-hidden">
-        {/* Logo */}
         <div className="z-10 flex items-center gap-3 text-purple-600">
           <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center shadow-lg shadow-purple-200">
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -64,7 +69,6 @@ export default function LoginPage() {
           <h2 className="text-xl font-bold tracking-tight">Evolua</h2>
         </div>
 
-        {/* Background Elements */}
         <div className="absolute inset-0 z-0 flex items-center justify-center opacity-100 pointer-events-none">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-200/40 rounded-full blur-[80px]"></div>
           <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-blue-100/40 rounded-full blur-[60px]"></div>
@@ -77,7 +81,6 @@ export default function LoginPage() {
               }}
             />
             
-            {/* Floating Cards */}
             <div className="absolute top-[30%] right-[22%] bg-white/90 backdrop-blur-md border border-white p-3 rounded-2xl shadow-xl flex items-center gap-3 animate-bounce" style={{animationDuration: '4s'}}>
               <div className="bg-purple-100 p-1.5 rounded-full flex items-center justify-center">
                 <svg className="w-4 h-4 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
@@ -99,9 +102,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right Side - Form */}
       <div className="w-full md:w-1/2 h-full relative flex flex-col overflow-y-auto bg-[#fcfbfd]">
-        {/* Mobile Header */}
         <div className="md:hidden flex items-center justify-between p-6 pb-2 bg-white/50 backdrop-blur-sm sticky top-0 z-20">
           <div className="flex items-center gap-2 text-purple-600">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -112,7 +113,6 @@ export default function LoginPage() {
           <div className="text-xs text-purple-600 font-bold bg-purple-100 px-3 py-1 rounded-full border border-purple-200">Login</div>
         </div>
 
-        {/* Form Container */}
         <div className="flex-1 flex flex-col max-w-lg mx-auto w-full p-6 md:p-12 justify-center">
           <div className="mb-8">
             <div className="w-16 h-1.5 bg-purple-600/10 rounded-full mb-6 overflow-hidden flex">
