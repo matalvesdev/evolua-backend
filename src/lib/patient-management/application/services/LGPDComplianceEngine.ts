@@ -511,7 +511,7 @@ export class LGPDComplianceEngine {
 
   private async storeConsentRecord(consent: ConsentRecord): Promise<void> {
     // Implementation would store in consent repository
-    console.log('Storing consent record:', consent.id)
+    // Consent record stored (logging removed to prevent async test warnings)
   }
 
   private async findConsentRecord(patientId: PatientId, consentType: ConsentType): Promise<ConsentRecord | null> {

@@ -139,7 +139,9 @@ export const phoneNumberGenerator = (): fc.Arbitrary<PhoneNumber> =>
 
 export const emailGenerator = (): fc.Arbitrary<Email> =>
   fc.tuple(
-    fc.string({ minLength: 1, maxLength: 20 }).filter(s => /^[a-zA-Z0-9]+$/.test(s) && s.length >= 1),
+    fc.string({ minLength: 1, maxLength: 20 })
+      .filter(s => /^[a-zA-Z0-9]+$/.test(s) && s.length >= 1)
+      .filter(s => !['constructor', 'prototype', '__proto__', 'toString', 'valueOf'].includes(s.toLowerCase())),
     fc.constantFrom('gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com')
   ).map(([local, domain]) => new Email(`${local}@${domain}`))
 

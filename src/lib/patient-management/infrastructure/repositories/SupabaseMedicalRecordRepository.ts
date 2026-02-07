@@ -184,17 +184,28 @@ export class SupabaseMedicalRecordRepository implements IMedicalRecordRepository
       updated_at: now.toISOString()
     }
 
+    // Merge new diagnosis with existing diagnosis (append, don't replace)
     if (request.diagnosis) {
-      updateData.diagnosis = request.diagnosis.map(d => ({
+      const existingDiagnosis = existing.diagnosis.map(d => ({
         code: d.code,
         description: d.description,
         diagnosedAt: d.diagnosedAt.toISOString(),
         severity: d.severity
       }))
+      
+      const newDiagnosis = request.diagnosis.map(d => ({
+        code: d.code,
+        description: d.description,
+        diagnosedAt: d.diagnosedAt.toISOString(),
+        severity: d.severity
+      }))
+      
+      updateData.diagnosis = [...existingDiagnosis, ...newDiagnosis]
     }
 
+    // Merge new medications with existing medications (append, don't replace)
     if (request.medications) {
-      updateData.medications = request.medications.map(m => ({
+      const existingMedications = existing.medications.map(m => ({
         name: m.name,
         dosage: m.dosage,
         frequency: m.frequency,
@@ -202,15 +213,36 @@ export class SupabaseMedicalRecordRepository implements IMedicalRecordRepository
         endDate: m.endDate?.toISOString(),
         prescribedBy: m.prescribedBy
       }))
+      
+      const newMedications = request.medications.map(m => ({
+        name: m.name,
+        dosage: m.dosage,
+        frequency: m.frequency,
+        startDate: m.startDate.toISOString(),
+        endDate: m.endDate?.toISOString(),
+        prescribedBy: m.prescribedBy
+      }))
+      
+      updateData.medications = [...existingMedications, ...newMedications]
     }
 
+    // Merge new allergies with existing allergies (append, don't replace)
     if (request.allergies) {
-      updateData.allergies = request.allergies.map(a => ({
+      const existingAllergies = existing.allergies.map(a => ({
         allergen: a.allergen,
         reaction: a.reaction,
         severity: a.severity,
         diagnosedAt: a.diagnosedAt.toISOString()
       }))
+      
+      const newAllergies = request.allergies.map(a => ({
+        allergen: a.allergen,
+        reaction: a.reaction,
+        severity: a.severity,
+        diagnosedAt: a.diagnosedAt.toISOString()
+      }))
+      
+      updateData.allergies = [...existingAllergies, ...newAllergies]
     }
 
     const { data, error } = await this.supabase
