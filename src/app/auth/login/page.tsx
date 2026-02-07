@@ -3,8 +3,7 @@
 import * as React from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { loginAction } from "@/actions"
-import { syncOnboardingData } from "@/actions/onboarding.actions"
+import * as authApi from "@/lib/api/auth"
 
 export default function LoginPage() {
   const searchParams = useSearchParams()
@@ -28,38 +27,20 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const result = await loginAction({ email, password })
-      console.log("Login result:", result)
+      await authApi.login(email, password)
+      console.log("Login bem-sucedido, redirecionando para dashboard...")
 
-      if (result.success) {
-        console.log("Login bem-sucedido, redirecionando para dashboard...")
-        const onboardingData = localStorage.getItem("onboarding_data")
-        if (onboardingData) {
-          try {
-            const data = JSON.parse(onboardingData)
-            await syncOnboardingData(data)
-            localStorage.removeItem("onboarding_data")
-          } catch (err) {
-            console.error("Erro ao sincronizar dados do onboarding:", err)
-          }
-        }
-
-        window.location.href = "/dashboard"
-      } else {
-        console.error("Login falhou:", result.error)
-        setError(result.error || "Erro ao fazer login")
-        setLoading(false)
-      }
+      window.location.href = "/dashboard"
     } catch (err) {
       console.error("Erro inesperado no login:", err)
-      setError("Erro inesperado ao fazer login")
+      setError(err instanceof Error ? err.message : "Erro inesperado ao fazer login")
       setLoading(false)
     }
   }
 
   return (
     <div className="bg-[#fcfbfd] font-sans text-slate-800 overflow-hidden h-screen w-screen flex flex-col md:flex-row">
-      <div className="hidden md:flex md:w-1/2 h-full bg-gradient-to-br from-purple-50 via-purple-100 to-purple-200 relative flex-col p-12 justify-between overflow-hidden">
+      <div className="hidden md:flex md:w-1/2 h-full bg-linear-to-br from-purple-50 via-purple-100 to-purple-200 relative flex-col p-12 justify-between overflow-hidden">
         <div className="z-10 flex items-center gap-3 text-purple-600">
           <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center shadow-lg shadow-purple-200">
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -1,12 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { createClient } from "@/lib/supabase/client"
-import type { Database } from "@/types/database.types"
+import * as financesApi from "@/lib/api/finances"
+import type { Transaction, CreateTransactionInput, UpdateTransactionInput } from "@/lib/api/finances"
 
-type Transaction = Database["public"]["Tables"]["financial_transactions"]["Row"]
-type TransactionInsert = Database["public"]["Tables"]["financial_transactions"]["Insert"]
-type TransactionUpdate = Database["public"]["Tables"]["financial_transactions"]["Update"]
+export type { Transaction, CreateTransactionInput, UpdateTransactionInput }
 
 export interface BalanceData {
   balance: number
@@ -43,58 +41,35 @@ const CATEGORY_COLORS: Record<string, string> = {
 export function useFinances() {
   const [transactions, setTransactions] = React.useState<Transaction[]>([])
   const [balanceData, setBalanceData] = React.useState<BalanceData>({
-    balance: 0,
-    income: 0,
-    expenses: 0,
-    pending: 0,
+    balance: 0, income: 0, expenses: 0, pending: 0,
   })
   const [monthlyData, setMonthlyData] = React.useState<MonthlyData[]>([])
   const [revenueSources, setRevenueSources] = React.useState<RevenueSource[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
-  const supabase = React.useMemo(() => createClient(), [])
-
   const fetchData = React.useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
 
-      // Fetch all transactions
-      const { data, error: fetchError } = await supabase
-        .from("financial_transactions")
-        .select("*")
-        .order("created_at", { ascending: false })
+      const [txResponse, summary] = await Promise.all([
+        financesApi.listTransactions({ limit: 500 }),
+        financesApi.getSummary(),
+      ])
 
-      if (fetchError) throw fetchError
-
-      const txs = data || []
+      const txs = txResponse.data || []
       setTransactions(txs)
 
-      // Calculate balance data
-      const income = txs
-        .filter((t) => t.type === "income" && t.status === "paid")
-        .reduce((sum, t) => sum + t.amount, 0)
-
-      const expenses = txs
-        .filter((t) => t.type === "expense" && t.status === "paid")
-        .reduce((sum, t) => sum + t.amount, 0)
-
-      const pending = txs
-        .filter((t) => t.status === "pending")
-        .reduce((sum, t) => sum + t.amount, 0)
-
       setBalanceData({
-        balance: income - expenses,
-        income,
-        expenses,
-        pending,
+        balance: summary.balance,
+        income: summary.totalIncome,
+        expenses: summary.totalExpenses,
+        pending: summary.pendingReceivables + summary.pendingPayables,
       })
 
-      // Calculate monthly data (last 6 months)
       const now = new Date()
       const months: MonthlyData[] = []
-      
       for (let i = 5; i >= 0; i--) {
         const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const monthKey = date.toLocaleDateString("pt-BR", { month: "short" })
@@ -103,25 +78,15 @@ export function useFinances() {
 
         const monthIncome = txs
           .filter((t) => {
-            const txDate = new Date(t.created_at)
-            return (
-              t.type === "income" &&
-              t.status === "paid" &&
-              txDate >= monthStart &&
-              txDate <= monthEnd
-            )
+            const txDate = new Date(t.createdAt)
+            return t.type === "income" && t.status === "paid" && txDate >= monthStart && txDate <= monthEnd
           })
           .reduce((sum, t) => sum + t.amount, 0)
 
         const monthExpenses = txs
           .filter((t) => {
-            const txDate = new Date(t.created_at)
-            return (
-              t.type === "expense" &&
-              t.status === "paid" &&
-              txDate >= monthStart &&
-              txDate <= monthEnd
-            )
+            const txDate = new Date(t.createdAt)
+            return t.type === "expense" && t.status === "paid" && txDate >= monthStart && txDate <= monthEnd
           })
           .reduce((sum, t) => sum + t.amount, 0)
 
@@ -133,7 +98,6 @@ export function useFinances() {
       }
       setMonthlyData(months)
 
-      // Calculate revenue sources by category
       const incomeByCategory = txs
         .filter((t) => t.type === "income" && t.status === "paid")
         .reduce((acc, t) => {
@@ -149,90 +113,41 @@ export function useFinances() {
         })
       )
       setRevenueSources(sources)
-
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao carregar dados financeiros")
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [])
 
   React.useEffect(() => {
     fetchData()
   }, [fetchData])
 
   const createTransaction = React.useCallback(
-    async (transaction: Omit<TransactionInsert, "clinic_id" | "therapist_id">) => {
-      try {
-        const { data: userData } = await supabase.auth.getUser()
-        if (!userData.user) throw new Error("Usuário não autenticado")
-
-        const { data: userProfile } = await supabase
-          .from("users")
-          .select("clinic_id")
-          .eq("id", userData.user.id)
-          .single()
-
-        if (!userProfile) throw new Error("Perfil não encontrado")
-
-        const { data, error } = await supabase
-          .from("financial_transactions")
-          .insert({
-            ...transaction,
-            clinic_id: userProfile.clinic_id,
-            therapist_id: userData.user.id,
-          })
-          .select()
-          .single()
-
-        if (error) throw error
-        await fetchData()
-        return data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Erro ao criar transação")
-        throw err
-      }
+    async (input: CreateTransactionInput) => {
+      const data = await financesApi.createTransaction(input)
+      await fetchData()
+      return data
     },
-    [supabase, fetchData]
+    [fetchData]
   )
 
   const updateTransaction = React.useCallback(
-    async (id: string, updates: TransactionUpdate) => {
-      try {
-        const { data, error } = await supabase
-          .from("financial_transactions")
-          .update(updates)
-          .eq("id", id)
-          .select()
-          .single()
-
-        if (error) throw error
-        await fetchData()
-        return data
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Erro ao atualizar transação")
-        throw err
-      }
+    async (id: string, updates: UpdateTransactionInput) => {
+      const data = await financesApi.updateTransaction(id, updates)
+      await fetchData()
+      return data
     },
-    [supabase, fetchData]
+    [fetchData]
   )
 
   const deleteTransaction = React.useCallback(
     async (id: string) => {
-      try {
-        const { error } = await supabase
-          .from("financial_transactions")
-          .delete()
-          .eq("id", id)
-
-        if (error) throw error
-        await fetchData()
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Erro ao deletar transação")
-        throw err
-      }
+      await financesApi.deleteTransaction(id)
+      await fetchData()
     },
-    [supabase, fetchData]
+    [fetchData]
   )
 
   return {

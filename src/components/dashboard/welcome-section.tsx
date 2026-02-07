@@ -11,7 +11,11 @@ export function WelcomeSection() {
     a => a.status === 'scheduled' || a.status === 'confirmed'
   ).length
 
-  const userName = user?.name ? user.name.split(' ')[0] : 'Profissional'
+  const userName = user?.user_metadata?.name 
+    ? user.user_metadata.name.split(' ')[0] 
+    : user?.user_metadata?.full_name 
+    ? user.user_metadata.full_name.split(' ')[0] 
+    : 'Profissional'
 
   return (
     <div className="mb-6">

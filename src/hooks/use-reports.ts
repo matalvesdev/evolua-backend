@@ -1,283 +1,82 @@
-"use client"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import * as reportsApi from "@/lib/api/reports"
+import type { Report, CreateReportInput, UpdateReportInput } from "@/lib/api/reports"
 
-import * as React from "react"
-import {
-  listReportsAction,
-  getReportAction,
-  createReportAction,
-  updateReportAction,
-  submitReportForReviewAction,
-  getPatientReportsAction,
-  getPendingReportsAction,
-} from "@/actions"
-import type {
-  CreateReportInput,
-  UpdateReportInput,
-} from "@/lib/core"
-import type { Report } from "@/lib/core/domain/entities/report"
+export type { Report }
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-type ReportFilters = {
+export function useReports(params?: {
   patientId?: string
   therapistId?: string
   type?: string
   status?: string
-  dateFrom?: string
-  dateTo?: string
   page?: number
   limit?: number
-}
-
-// ============================================================================
-// USE REPORTS HOOK
-// Lista de relatórios com paginação e filtros
-// ============================================================================
-
-export function useReports(initialFilters?: ReportFilters) {
-  const [reports, setReports] = React.useState<Report[]>([])
-  const [total, setTotal] = React.useState(0)
-  const [page, setPage] = React.useState(initialFilters?.page ?? 1)
-  const [limit, setLimit] = React.useState(initialFilters?.limit ?? 10)
-  const [totalPages, setTotalPages] = React.useState(0)
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
-  const [filters, setFilters] = React.useState<ReportFilters>(initialFilters ?? {})
-
-  const fetchReports = React.useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    const result = await listReportsAction({
-      ...filters,
-      page,
-      limit,
-    })
-
-    if (result.success) {
-      setReports(result.data.data)
-      setTotal(result.data.total)
-      setTotalPages(result.data.totalPages)
-    } else {
-      setError(result.error)
-    }
-
-    setLoading(false)
-  }, [filters, page, limit])
-
-  React.useEffect(() => {
-    fetchReports()
-  }, [fetchReports])
-
-  const updateFilters = React.useCallback((newFilters: ReportFilters) => {
-    setFilters(prev => ({ ...prev, ...newFilters }))
-    setPage(1)
-  }, [])
+}) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["reports", params],
+    queryFn: () => reportsApi.listReports(params),
+  })
 
   return {
-    reports,
-    total,
-    page,
-    limit,
-    totalPages,
-    loading,
+    reports: data?.data ?? [],
+    total: data?.total ?? 0,
+    loading: isLoading,
     error,
-    filters,
-    setPage,
-    setLimit,
-    updateFilters,
-    refetch: fetchReports,
+    refetch,
   }
 }
 
-// ============================================================================
-// USE REPORT HOOK
-// Detalhes de um relatório específico
-// ============================================================================
+export function useReport(id: string) {
+  const { data: report, isLoading, error } = useQuery({
+    queryKey: ["report", id],
+    queryFn: () => reportsApi.getReport(id),
+    enabled: !!id,
+  })
 
-export function useReport(id: string | null) {
-  const [report, setReport] = React.useState<Report | null>(null)
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-
-  const fetchReport = React.useCallback(async () => {
-    if (!id) {
-      setReport(null)
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    const result = await getReportAction(id)
-
-    if (result.success && result.data?.report) {
-      setReport(result.data.report)
-    } else {
-      setError(result.success ? "Relatório não encontrado" : result.error)
-    }
-
-    setLoading(false)
-  }, [id])
-
-  React.useEffect(() => {
-    fetchReport()
-  }, [fetchReport])
-
-  return {
-    report,
-    loading,
-    error,
-    refetch: fetchReport,
-  }
+  return { report, loading: isLoading, error }
 }
 
-// ============================================================================
-// USE PATIENT REPORTS HOOK
-// Relatórios de um paciente específico
-// ============================================================================
-
-export function usePatientReports(patientId: string | null) {
-  const [reports, setReports] = React.useState<Report[]>([])
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-
-  const fetchReports = React.useCallback(async () => {
-    if (!patientId) {
-      setReports([])
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    const result = await getPatientReportsAction(patientId)
-
-    if (result.success) {
-      setReports(result.data)
-    } else {
-      setError(result.error)
-    }
-
-    setLoading(false)
-  }, [patientId])
-
-  React.useEffect(() => {
-    fetchReports()
-  }, [fetchReports])
-
-  return {
-    reports,
-    loading,
-    error,
-    refetch: fetchReports,
-  }
+export function usePatientReports(patientId: string) {
+  return useReports({ patientId })
 }
 
-// ============================================================================
-// USE PENDING REPORTS HOOK
-// Relatórios pendentes de revisão
-// ============================================================================
-
-export function usePendingReports(therapistId?: string) {
-  const [reports, setReports] = React.useState<ReportListOutput[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
-
-  const fetchReports = React.useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    const result = await getPendingReportsAction(therapistId)
-
-    if (result.success) {
-      setReports(result.data)
-    } else {
-      setError(result.error)
-    }
-
-    setLoading(false)
-  }, [therapistId])
-
-  React.useEffect(() => {
-    fetchReports()
-  }, [fetchReports])
-
-  return {
-    reports,
-    loading,
-    error,
-    refetch: fetchReports,
-  }
+export function usePendingReports() {
+  return useReports({ status: "pending_review" })
 }
-
-// ============================================================================
-// USE REPORT MUTATIONS HOOK
-// Criar, atualizar, aprovar relatórios
-// ============================================================================
 
 export function useReportMutations() {
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
+  const queryClient = useQueryClient()
 
-  const create = React.useCallback(async (input: CreateReportInput) => {
-    setLoading(true)
-    setError(null)
+  const createMutation = useMutation({
+    mutationFn: (input: CreateReportInput) => reportsApi.createReport(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["reports"] }),
+  })
 
-    const result = await createReportAction(input)
-
-    setLoading(false)
-
-    if (result.success) {
-      return { success: true as const, data: result.data }
-    } else {
-      setError(result.error)
-      return { success: false as const, error: result.error }
-    }
-  }, [])
-
-  const update = React.useCallback(
-    async (id: string, input: UpdateReportInput) => {
-      setLoading(true)
-      setError(null)
-
-      const result = await updateReportAction(id, input)
-
-      setLoading(false)
-
-      if (result.success) {
-        return { success: true as const, data: result.data }
-      } else {
-        setError(result.error)
-        return { success: false as const, error: result.error }
-      }
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...input }: UpdateReportInput & { id: string }) =>
+      reportsApi.updateReport(id, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] })
+      queryClient.invalidateQueries({ queryKey: ["report"] })
     },
-    []
-  )
+  })
 
-  const submitForReview = React.useCallback(async (id: string) => {
-    setLoading(true)
-    setError(null)
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => reportsApi.deleteReport(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["reports"] }),
+  })
 
-    const result = await submitReportForReviewAction(id)
-
-    setLoading(false)
-
-    if (result.success) {
-      return { success: true as const, data: result.data }
-    } else {
-      setError(result.error)
-      return { success: false as const, error: result.error }
-    }
-  }, [])
+  const submitMutation = useMutation({
+    mutationFn: (id: string) => reportsApi.submitReportForReview(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["reports"] }),
+  })
 
   return {
-    loading,
-    error,
-    create,
-    update,
-    submitForReview,
+    createReport: createMutation.mutateAsync,
+    updateReport: updateMutation.mutateAsync,
+    deleteReport: deleteMutation.mutateAsync,
+    submitForReview: submitMutation.mutateAsync,
+    isCreating: createMutation.isPending,
+    isUpdating: updateMutation.isPending,
   }
 }

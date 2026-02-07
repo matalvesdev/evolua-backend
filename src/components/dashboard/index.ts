@@ -9,4 +9,4 @@ export { RecentPatients } from "./recent-patients"
 export { RemindersPanel } from "./reminders-panel"
 export { DashboardTodoList } from "./dashboard-todo-list"
 export { FloatingActionButton } from "./floating-action-button"
-
+export { LogoutButton } from "./logout-button"

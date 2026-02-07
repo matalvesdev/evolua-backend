@@ -76,7 +76,7 @@ export default function NovoAgendamentoPage() {
 
   // Fetch patients from Supabase
   const { patients: allPatients, loading: patientsLoading } = usePatients();
-  const { create: createAppointment, loading: createLoading } = useAppointmentMutations();
+  const { createAppointment, isCreating: createLoading } = useAppointmentMutations();
   const { user } = useUser();
   
   // Fetch appointments for selected date to check availability
@@ -84,8 +84,8 @@ export default function NovoAgendamentoPage() {
     if (!selectedDate) return {};
     const dateStr = selectedDate.toISOString().split('T')[0];
     return {
-      dateFrom: dateStr,
-      dateTo: dateStr,
+      startDate: dateStr,
+      endDate: dateStr,
     };
   }, [selectedDate]);
   
@@ -94,14 +94,14 @@ export default function NovoAgendamentoPage() {
   // Convert Supabase patients to UI format
   const uiPatients: Patient[] = allPatients.map(patient => ({
     id: patient.id,
-    name: patient.name,
+    name: patient.fullName,
     email: patient.email || '',
     avatar: '', // Default avatar
   }));
 
   // Generate time slots with availability check
   const timeSlots = useMemo(() => 
-    generateTimeSlots(selectedDate, dayAppointments),
+    generateTimeSlots(selectedDate, dayAppointments as unknown as CoreAppointment[]),
     [selectedDate, dayAppointments]
   );
 
@@ -141,20 +141,17 @@ export default function NovoAgendamentoPage() {
 
     const durationMinutes = durationMap[duration];
 
-    // Create appointment
-    const result = await createAppointment({
-      patientId: selectedPatient.id,
-      dateTime: appointmentDateTime.toISOString(),
-      duration: durationMinutes,
-      type: 'regular',
-      therapistId: user?.id || '',
-      notes: `Modalidade: ${mode}`,
-    });
-
-    if (result.success) {
+    try {
+      await createAppointment({
+        patientId: selectedPatient.id,
+        dateTime: appointmentDateTime.toISOString(),
+        duration: durationMinutes,
+        type: 'regular',
+        therapistId: user?.id || '',
+      });
       router.push('/dashboard/agendamentos');
-    } else {
-      alert('Erro ao criar agendamento: ' + result.error);
+    } catch (err) {
+      alert('Erro ao criar agendamento: ' + (err instanceof Error ? err.message : 'Erro desconhecido'));
     }
   };
 
@@ -166,8 +163,8 @@ export default function NovoAgendamentoPage() {
   return (
     <div className="flex-1 overflow-y-auto p-6 lg:p-10 relative">
       {/* Background Gradients */}
-      <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-[#fbf8fd] to-transparent dark:from-[#2a1b33] dark:to-transparent -z-10 pointer-events-none" />
-      <div className="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-l from-[#820AD1]/5 to-transparent -z-10 pointer-events-none opacity-50" />
+      <div className="absolute top-0 left-0 w-full h-96 bg-linear-to-b from-[#fbf8fd] to-transparent dark:from-[#2a1b33] dark:to-transparent -z-10 pointer-events-none" />
+      <div className="absolute right-0 top-0 w-1/3 h-full bg-linear-to-l from-[#820AD1]/5 to-transparent -z-10 pointer-events-none opacity-50" />
       
       <div className="max-w-5xl mx-auto flex flex-col gap-8 h-full">
         {/* Header */}

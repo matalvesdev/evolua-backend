@@ -22,9 +22,6 @@ export default function PerfilPage() {
     specialization: "",
   })
 
-  // Type-safe user data access
-  const userData = user as Record<string, unknown>
-
   const [preferences, setPreferences] = React.useState({
     emailNotifications: true,
     pushNotifications: true,
@@ -35,15 +32,17 @@ export default function PerfilPage() {
 
   React.useEffect(() => {
     if (user) {
+      // Supabase User type has user_metadata for custom fields
+      const metadata = user.user_metadata || {}
       setFormData({
-        name: userData.name || "",
+        name: (metadata.name || metadata.full_name || "") as string,
         email: user.email || "",
-        phone: userData.phone || "",
-        crfa: userData.crfa || "",
-        specialization: userData.specialization || "",
+        phone: (metadata.phone || "") as string,
+        crfa: (metadata.crfa || "") as string,
+        specialization: (metadata.specialization || "") as string,
       })
     }
-  }, [user, userData])
+  }, [user])
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -102,13 +101,13 @@ export default function PerfilPage() {
             {/* Avatar Section */}
             <div className="flex items-center gap-6 pb-6 border-b">
               <Avatar className="size-24">
-                <AvatarImage src={userData?.avatarUrl} />
+                <AvatarImage src={user?.user_metadata?.avatar_url as string | undefined} />
                 <AvatarFallback className="text-2xl bg-primary text-white">
-                  {userData?.name ? getInitials(userData.name) : "U"}
+                  {user?.user_metadata?.name ? getInitials(user.user_metadata.name as string) : user?.user_metadata?.full_name ? getInitials(user.user_metadata.full_name as string) : "U"}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900">{userData?.name}</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{(user?.user_metadata?.name || user?.user_metadata?.full_name || "Usuário") as string}</h3>
                 <p className="text-sm text-gray-500">{user?.email}</p>
                 <Button variant="outline" className="mt-2" size="sm">
                   <span className="material-symbols-outlined text-lg mr-2">photo_camera</span>

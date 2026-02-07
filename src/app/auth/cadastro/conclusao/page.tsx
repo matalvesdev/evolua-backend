@@ -25,7 +25,7 @@ import {
 import { OnboardingFormField } from "@/components/onboarding/onboarding-form-field"
 import { OnboardingRadioChipWithIcon } from "@/components/onboarding/onboarding-radio-chip-with-icon"
 import { OnboardingTermsCheckbox } from "@/components/onboarding/onboarding-terms-checkbox"
-import { registerAction } from "@/actions/auth.actions"
+import * as authApi from "@/lib/api/auth"
 
 const CURRENT_STEP = 6
 const TOTAL_STEPS = 6
@@ -105,19 +105,13 @@ export default function ConclusaoPage() {
       })
 
       // Criar conta no Supabase
-      const result = await registerAction({
-        name: onboardingData.full_name,
-        email: onboardingData.email,
-        password: onboardingData.password,
-      })
+      await authApi.register(
+        onboardingData.email,
+        onboardingData.password,
+        onboardingData.full_name,
+      )
 
-      if (!result.success) {
-        setError(result.error || "Erro ao criar conta")
-        setIsLoading(false)
-        return
-      }
-
-      console.log("Conta criada com sucesso:", result.data)
+      console.log("Conta criada com sucesso")
 
       // Limpar localStorage
       localStorage.removeItem("onboarding_data")

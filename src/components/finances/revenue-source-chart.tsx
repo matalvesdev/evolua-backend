@@ -10,13 +10,13 @@ interface RevenueSourceChartProps {
 
 export function RevenueSourceChart({ sources }: RevenueSourceChartProps) {
   // Calculate conic gradient stops
-  let currentStop = 0;
-  const gradientStops = sources.map(source => {
+  const gradientStops = sources.reduce((acc, source, index, arr) => {
+    const currentStop = arr.slice(0, index).reduce((sum, s) => sum + s.percentage, 0);
     const start = currentStop;
     const end = currentStop + source.percentage;
-    currentStop = end;
-    return `${source.color} ${start}% ${end}%`;
-  }).join(', ');
+    const stop = `${source.color} ${start}% ${end}%`;
+    return acc ? `${acc}, ${stop}` : stop;
+  }, '');
 
   return (
     <div className="lg:col-span-1 glass-card rounded-2xl p-6 flex flex-col">

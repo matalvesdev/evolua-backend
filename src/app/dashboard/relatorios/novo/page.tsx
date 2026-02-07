@@ -9,38 +9,38 @@ import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import type { CreateReportInput, ReportType } from "@/lib/core"
+import type { ReportType } from "@/lib/core"
 
 export default function NovoRelatorioPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const preSelectedPatientId = searchParams.get("patientId")
 
-  const { create, loading, error } = useReportMutations()
+  const { createReport, isCreating } = useReportMutations()
   const { patients, loading: patientsLoading } = usePatients({ limit: 100 })
+  const [error, setError] = React.useState<string | null>(null)
 
-  const [formData, setFormData] = React.useState<Omit<CreateReportInput, "therapistId">>({
+  const [formData, setFormData] = React.useState({
     patientId: preSelectedPatientId || "",
-    type: "evolution",
+    type: "evolution" as ReportType,
     title: "",
     content: "",
-    period: {
-      startDate: "",
-      endDate: "",
-    },
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
 
-    // O therapistId será preenchido pelo backend com o usuário atual
-    const result = await create({
-      ...formData,
-      therapistId: "", // Será preenchido pelo server action
-    })
-
-    if (result.success) {
+    try {
+      await createReport({
+        patientId: formData.patientId,
+        type: formData.type,
+        title: formData.title,
+        content: formData.content,
+      })
       router.push("/dashboard/relatorios")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao criar relatório")
     }
   }
 
@@ -49,17 +49,6 @@ export default function NovoRelatorioPage() {
     value: (typeof formData)[K]
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const updatePeriod = (field: "startDate" | "endDate", value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      period: { 
-        startDate: prev.period?.startDate ?? "",
-        endDate: prev.period?.endDate ?? "",
-        [field]: value 
-      },
-    }))
   }
 
   const reportTypes: { value: ReportType; label: string; description: string }[] = [
@@ -194,7 +183,7 @@ export default function NovoRelatorioPage() {
                       // Sugerir título
                       const patient = patients.find((p) => p.id === e.target.value)
                       if (patient && !formData.title) {
-                        updateField("title", getTitleSuggestion(formData.type, patient.name))
+                        updateField("title", getTitleSuggestion(formData.type, patient.fullName))
                       }
                     }}
                     required
@@ -203,7 +192,7 @@ export default function NovoRelatorioPage() {
                     <option value="">Selecione</option>
                     {patients.map((patient) => (
                       <option key={patient.id} value={patient.id}>
-                        {patient.name}
+                        {patient.fullName}
                       </option>
                     ))}
                   </select>
@@ -235,34 +224,6 @@ export default function NovoRelatorioPage() {
                 ))}
               </div>
             </Card>
-
-            {/* Período */}
-            <Card className="p-6 space-y-4">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Período (opcional)
-              </h2>
-
-              <div className="space-y-3">
-                <div>
-                  <Label htmlFor="startDate">Data inicial</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={formData.period?.startDate}
-                    onChange={(e) => updatePeriod("startDate", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="endDate">Data final</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={formData.period?.endDate}
-                    onChange={(e) => updatePeriod("endDate", e.target.value)}
-                  />
-                </div>
-              </div>
-            </Card>
           </div>
 
           {/* Coluna direita - Conteúdo */}
@@ -280,10 +241,10 @@ export default function NovoRelatorioPage() {
                 {selectedPatient && !formData.title && (
                   <button
                     type="button"
-                    onClick={() => updateField("title", getTitleSuggestion(formData.type, selectedPatient.name))}
+                    onClick={() => updateField("title", getTitleSuggestion(formData.type, selectedPatient.fullName))}
                     className="text-xs text-purple-600 hover:text-purple-700 mt-1"
                   >
-                    Usar sugestão: {getTitleSuggestion(formData.type, selectedPatient.name)}
+                    Usar sugestão: {getTitleSuggestion(formData.type, selectedPatient.fullName)}
                   </button>
                 )}
               </div>
@@ -332,7 +293,7 @@ export default function NovoRelatorioPage() {
               <Button
                 type="submit"
                 variant="outline"
-                disabled={loading}
+                disabled={isCreating}
                 onClick={() => {
                   // Salvar como rascunho (status padrão é draft)
                 }}
@@ -341,10 +302,10 @@ export default function NovoRelatorioPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={loading || !formData.patientId || !formData.title || !formData.content}
+                disabled={isCreating || !formData.patientId || !formData.title || !formData.content}
                 className="bg-purple-600 hover:bg-purple-700"
               >
-                {loading ? "Salvando..." : "Criar Relatório"}
+                {isCreating ? "Salvando..." : "Criar Relatório"}
               </Button>
             </div>
           </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { supabase } from "@/lib/supabase/client"
+import { api } from "@/lib/api/client"
 
 export interface TranscriptionOptions {
   audioSessionId: string
@@ -24,75 +24,17 @@ export function useAudioTranscription() {
       setError(null)
 
       try {
-        // Update status to processing
-        await supabase
-          .from("audio_sessions")
-          .update({
-            transcription_status: "processing",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", options.audioSessionId)
-
-        // Call Hugging Face Whisper model for transcription
-        const response = await fetch("/api/transcribe", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            audioUrl,
-            language: options.language || "pt",
-          }),
+        const data = await api.post<TranscriptionResult>("/audio/transcribe", {
+          audioUrl,
+          audioSessionId: options.audioSessionId,
+          language: options.language || "pt",
         })
 
-        if (!response.ok) {
-          throw new Error("Erro ao transcrever áudio")
-        }
-
-        const data = await response.json()
-
-        if (!data.success) {
-          throw new Error(data.error || "Erro ao transcrever áudio")
-        }
-
-        // Update database with transcription
-        const { error: updateError } = await supabase
-          .from("audio_sessions")
-          .update({
-            transcription: data.transcription,
-            transcription_status: "completed",
-            transcribed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", options.audioSessionId)
-
-        if (updateError) {
-          throw updateError
-        }
-
-        return {
-          success: true,
-          transcription: data.transcription,
-        }
+        return { success: true, transcription: data.transcription }
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Erro ao transcrever áudio"
-        setError(errorMessage)
-
-        // Update status to failed
-        await supabase
-          .from("audio_sessions")
-          .update({
-            transcription_status: "failed",
-            transcription_error: errorMessage,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", options.audioSessionId)
-
-        return {
-          success: false,
-          error: errorMessage,
-        }
+        const msg = err instanceof Error ? err.message : "Erro ao transcrever áudio"
+        setError(msg)
+        return { success: false, error: msg }
       } finally {
         setTranscribing(false)
       }
@@ -102,27 +44,14 @@ export function useAudioTranscription() {
 
   const getTranscription = React.useCallback(async (audioSessionId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("audio_sessions")
-        .select("transcription, transcription_status")
-        .eq("id", audioSessionId)
-        .single()
-
-      if (error) {
-        throw error
-      }
-
-      return data
+      return await api.get<{ transcription: string; transcriptionStatus: string }>(
+        `/audio/sessions/${audioSessionId}/transcription`
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao buscar transcrição")
       return null
     }
   }, [])
 
-  return {
-    transcribeAudio,
-    getTranscription,
-    transcribing,
-    error,
-  }
+  return { transcribeAudio, getTranscription, transcribing, error }
 }

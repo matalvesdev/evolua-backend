@@ -19,7 +19,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { PatientStatusType, PatientStatusValues } from "@/lib/patient-management/domain/value-objects/PatientStatus"
+import { type PatientStatusType, PatientStatusValues } from "@/lib/core/domain/types"
 
 export interface StatusTransitionDialogProps {
   open: boolean

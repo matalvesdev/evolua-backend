@@ -1,4 +1,3 @@
-// React Query Hooks - Exports
-export * from "./use-patients-query"
-export * from "./use-appointments-query"
-export * from "./use-reports-query"
+export { usePatientsQuery } from "./use-patients-query"
+export { useAppointmentsQuery } from "./use-appointments-query"
+export { useReportsQuery } from "./use-reports-query"

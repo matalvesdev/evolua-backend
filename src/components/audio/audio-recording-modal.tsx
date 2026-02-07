@@ -23,6 +23,7 @@ export function AudioRecordingModal({
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [audioChunks, setAudioChunks] = useState<BlobPart[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Timer effect
@@ -112,18 +113,20 @@ export function AudioRecordingModal({
       // Provide specific error messages
       let errorMessage = "Não foi possível acessar o microfone.";
       
-      if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
-        errorMessage = "Permissão de microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.";
-      } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
-        errorMessage = "Nenhum microfone foi encontrado. Conecte um microfone e tente novamente.";
-      } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
-        errorMessage = "O microfone está sendo usado por outro aplicativo. Feche outros programas e tente novamente.";
-      } else if (error.name === "OverconstrainedError") {
-        errorMessage = "As configurações de áudio não são suportadas pelo seu dispositivo.";
-      } else if (error.name === "TypeError") {
-        errorMessage = "Erro ao inicializar gravação. Verifique se está usando HTTPS ou localhost.";
-      } else if (error.message) {
-        errorMessage = error.message;
+      if (error instanceof Error) {
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          errorMessage = "Permissão de microfone negada. Por favor, permita o acesso ao microfone nas configurações do navegador e tente novamente.";
+        } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+          errorMessage = "Nenhum microfone foi encontrado. Conecte um microfone e tente novamente.";
+        } else if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+          errorMessage = "O microfone está sendo usado por outro aplicativo. Feche outros programas e tente novamente.";
+        } else if (error.name === "OverconstrainedError") {
+          errorMessage = "As configurações de áudio não são suportadas pelo seu dispositivo.";
+        } else if (error.name === "TypeError") {
+          errorMessage = "Erro ao inicializar gravação. Verifique se está usando HTTPS ou localhost.";
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
       }
       
       setError(errorMessage);

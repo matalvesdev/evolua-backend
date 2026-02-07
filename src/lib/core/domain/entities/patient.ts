@@ -1,40 +1,44 @@
-// ============================================================================
-// PATIENT ENTITY
-// ============================================================================
-
 import type { PatientStatus } from "../types"
 
 export interface Patient {
   id: string
   clinicId: string
-  name: string
+  fullName: string
   email?: string
   phone?: string
-  birthDate?: Date
   cpf?: string
+  dateOfBirth?: string
+  gender?: string
   status: PatientStatus
-  guardianName?: string
-  guardianPhone?: string
-  guardianRelationship?: string
-  address?: {
-    street?: string
-    number?: string
-    complement?: string
-    neighborhood?: string
-    city?: string
-    state?: string
-    zipCode?: string
-  }
-  medicalHistory?: {
-    diagnosis?: string[]
-    medications?: string[]
-    allergies?: string[]
-    notes?: string
-  }
   therapistId?: string
-  startDate?: Date
-  dischargeDate?: Date
-  dischargeReason?: string
-  createdAt: Date
-  updatedAt: Date
+  address?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  emergencyContact?: string
+  emergencyPhone?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreatePatientInput {
+  fullName: string
+  email?: string
+  phone?: string
+  cpf?: string
+  dateOfBirth?: string
+  gender?: string
+  therapistId?: string
+  address?: string
+  city?: string
+  state?: string
+  zipCode?: string
+  emergencyContact?: string
+  emergencyPhone?: string
+  notes?: string
+}
+
+export interface UpdatePatientInput extends Partial<CreatePatientInput> {
+  id: string
 }

@@ -16,7 +16,7 @@ export default function TarefasPage() {
   const { tasks, statistics } = useTasks();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f6f8fb] via-[#e8edf5] to-[#dce5f0] p-6">
+    <div className="min-h-screen bg-linear-to-br from-[#f6f8fb] via-[#e8edf5] to-[#dce5f0] p-6">
       <div className="max-w-[1400px] mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -29,7 +29,7 @@ export default function TarefasPage() {
           <Button
             onClick={() => setIsFormOpen(true)}
             size="lg"
-            className="bg-gradient-to-r from-primary to-primary-dark shadow-md hover:shadow-lg"
+            className="bg-linear-to-r from-primary to-primary-dark shadow-md hover:shadow-lg"
           >
             <Plus className="mr-2 h-5 w-5" />
             Nova Tarefa
@@ -164,8 +164,8 @@ export default function TarefasPage() {
                   tasks={tasks.filter(
                     (t) =>
                       t.status === 'pending' &&
-                      t.due_date &&
-                      new Date(t.due_date) < new Date()
+                      t.dueDate &&
+                      new Date(t.dueDate) < new Date()
                   )}
                   showFilters={false}
                 />

@@ -7,15 +7,14 @@ import Link from "next/link"
 
 export function DashboardTodoList() {
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const { tasks, loading, updateTaskStatus } = useTasks({ 
+  const { tasks, loading, toggleTaskStatus } = useTasks({ 
     type: 'task',
-    status: ['pending'],
-    limit: 5
+    status: 'pending',
+    limit: 5,
   })
 
-  const toggleTask = async (taskId: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed'
-    await updateTaskStatus(taskId, newStatus)
+  const toggleTask = async (taskId: string) => {
+    await toggleTaskStatus(taskId)
   }
 
   return (
@@ -59,7 +58,7 @@ export function DashboardTodoList() {
                     type="checkbox"
                     className={`mt-1 rounded border-gray-300 text-primary focus:ring-primary w-4 h-4 ${task.status === 'completed' ? "opacity-50" : ""}`}
                     checked={task.status === 'completed'}
-                    onChange={() => toggleTask(task.id, task.status)}
+                    onChange={() => toggleTask(task.id)}
                   />
                   <span className={`text-sm transition-colors ${task.status === 'completed' ? "text-gray-400 line-through" : "text-gray-600 group-hover:text-gray-900"}`}>
                     {task.title}

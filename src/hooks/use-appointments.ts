@@ -1,356 +1,104 @@
-"use client"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import * as appointmentsApi from "@/lib/api/appointments"
+import type { Appointment, CreateAppointmentInput } from "@/lib/api/appointments"
 
-import * as React from "react"
-import {
-  listAppointmentsAction,
-  getAppointmentAction,
-  createAppointmentAction,
-  cancelAppointmentAction,
-  completeAppointmentAction,
-  confirmAppointmentAction,
-  startAppointmentAction,
-  rescheduleAppointmentAction,
-  getTodayAppointmentsAction,
-  getWeekAppointmentsAction,
-} from "@/actions"
-import type {
-  CreateAppointmentInput,
-} from "@/lib/core"
-import type { Appointment } from "@/lib/core/domain/entities/appointment"
+export type { Appointment }
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-type AppointmentFilters = {
+export function useAppointments(params?: {
   patientId?: string
   therapistId?: string
-  clinicId?: string
   status?: string
   type?: string
-  dateFrom?: string
-  dateTo?: string
+  startDate?: string
+  endDate?: string
   page?: number
   limit?: number
-}
-
-type SessionNotes = {
-  objectives?: string
-  activities?: string
-  observations?: string
-  patientResponse?: string
-  homeExercises?: string
-  nextSessionPlanning?: string
-}
-
-// ============================================================================
-// USE APPOINTMENTS HOOK
-// Lista de agendamentos com paginação e filtros
-// ============================================================================
-
-export function useAppointments(initialFilters?: AppointmentFilters) {
-  const [appointments, setAppointments] = React.useState<Appointment[]>([])
-  const [total, setTotal] = React.useState(0)
-  const [page, setPage] = React.useState(initialFilters?.page ?? 1)
-  const [limit, setLimit] = React.useState(initialFilters?.limit ?? 10)
-  const [totalPages, setTotalPages] = React.useState(0)
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
-  const [filters, setFilters] = React.useState<AppointmentFilters>(
-    initialFilters ?? {}
-  )
-
-  const fetchAppointments = React.useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    const result = await listAppointmentsAction({
-      ...filters,
-      page,
-      limit,
-    })
-
-    if (result.success) {
-      setAppointments(result.data.data)
-      setTotal(result.data.total)
-      setTotalPages(result.data.totalPages)
-    } else {
-      setError(result.error)
-    }
-
-    setLoading(false)
-  }, [filters, page, limit])
-
-  React.useEffect(() => {
-    fetchAppointments()
-  }, [fetchAppointments])
-
-  const updateFilters = React.useCallback((newFilters: AppointmentFilters) => {
-    setFilters(prev => ({ ...prev, ...newFilters }))
-    setPage(1)
-  }, [])
+}) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["appointments", params],
+    queryFn: () => appointmentsApi.listAppointments(params),
+  })
 
   return {
-    appointments,
-    total,
-    page,
-    limit,
-    totalPages,
-    loading,
+    appointments: data?.data ?? [],
+    total: data?.total ?? 0,
+    loading: isLoading,
     error,
-    filters,
-    setPage,
-    setLimit,
-    updateFilters,
-    refetch: fetchAppointments,
+    refetch,
   }
 }
 
-// ============================================================================
-// USE APPOINTMENT HOOK
-// Detalhes de um agendamento específico
-// ============================================================================
+export function useAppointment(id: string) {
+  const { data: appointment, isLoading, error } = useQuery({
+    queryKey: ["appointment", id],
+    queryFn: () => appointmentsApi.getAppointment(id),
+    enabled: !!id,
+  })
 
-export function useAppointment(id: string | null) {
-  const [appointment, setAppointment] = React.useState<AppointmentOutput | null>(
-    null
-  )
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
-
-  const fetchAppointment = React.useCallback(async () => {
-    if (!id) {
-      setAppointment(null)
-      return
-    }
-
-    setLoading(true)
-    setError(null)
-
-    const result = await getAppointmentAction(id)
-
-    if (result.success) {
-      setAppointment(result.data)
-    } else {
-      setError(result.error)
-    }
-
-    setLoading(false)
-  }, [id])
-
-  React.useEffect(() => {
-    fetchAppointment()
-  }, [fetchAppointment])
-
-  return {
-    appointment,
-    loading,
-    error,
-    refetch: fetchAppointment,
-  }
+  return { appointment, loading: isLoading, error }
 }
 
-// ============================================================================
-// USE TODAY APPOINTMENTS HOOK
-// Agendamentos de hoje
-// ============================================================================
+export function useTodayAppointments() {
+  const today = new Date()
+  const startDate = new Date(today.getFullYear(), today.getMonth(), today.getDate()).toISOString()
+  const endDate = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59).toISOString()
 
-export function useTodayAppointments(therapistId?: string) {
-  const [appointments, setAppointments] = React.useState<AppointmentOutput[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
-
-  const fetchAppointments = React.useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    const result = await getTodayAppointmentsAction(therapistId)
-
-    if (result.success) {
-      setAppointments(result.data)
-    } else {
-      setError(result.error)
-    }
-
-    setLoading(false)
-  }, [therapistId])
-
-  React.useEffect(() => {
-    fetchAppointments()
-  }, [fetchAppointments])
-
-  return {
-    appointments,
-    loading,
-    error,
-    refetch: fetchAppointments,
-  }
+  return useAppointments({ startDate, endDate })
 }
 
-// ============================================================================
-// USE WEEK APPOINTMENTS HOOK
-// Agendamentos da semana
-// ============================================================================
+export function useWeekAppointments() {
+  const today = new Date()
+  const dayOfWeek = today.getDay()
+  const startOfWeek = new Date(today)
+  startOfWeek.setDate(today.getDate() - dayOfWeek)
+  startOfWeek.setHours(0, 0, 0, 0)
 
-export function useWeekAppointments(startDate: Date, therapistId?: string) {
-  const [appointments, setAppointments] = React.useState<AppointmentOutput[]>([])
-  const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(startOfWeek.getDate() + 6)
+  endOfWeek.setHours(23, 59, 59, 999)
 
-  const fetchAppointments = React.useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    const result = await getWeekAppointmentsAction(startDate, therapistId)
-
-    if (result.success) {
-      setAppointments(result.data)
-    } else {
-      setError(result.error)
-    }
-
-    setLoading(false)
-  }, [startDate, therapistId])
-
-  React.useEffect(() => {
-    fetchAppointments()
-  }, [fetchAppointments])
-
-  return {
-    appointments,
-    loading,
-    error,
-    refetch: fetchAppointments,
-  }
+  return useAppointments({
+    startDate: startOfWeek.toISOString(),
+    endDate: endOfWeek.toISOString(),
+  })
 }
-
-// ============================================================================
-// USE APPOINTMENT MUTATIONS HOOK
-// Criar, atualizar, cancelar agendamentos
-// ============================================================================
 
 export function useAppointmentMutations() {
-  const [loading, setLoading] = React.useState(false)
-  const [error, setError] = React.useState<string | null>(null)
+  const queryClient = useQueryClient()
 
-  const create = React.useCallback(async (input: CreateAppointmentInput) => {
-    setLoading(true)
-    setError(null)
+  const createMutation = useMutation({
+    mutationFn: (input: CreateAppointmentInput) => appointmentsApi.createAppointment(input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+  })
 
-    const result = await createAppointmentAction(input)
+  const confirmMutation = useMutation({
+    mutationFn: (id: string) => appointmentsApi.confirmAppointment(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+  })
 
-    setLoading(false)
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, reason, cancelledBy, notes }: { id: string; reason: string; cancelledBy: string; notes?: string }) =>
+      appointmentsApi.cancelAppointment(id, reason, cancelledBy, notes),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+  })
 
-    if (result.success) {
-      return { success: true as const, data: result.data }
-    } else {
-      setError(result.error)
-      return { success: false as const, error: result.error }
-    }
-  }, [])
+  const completeMutation = useMutation({
+    mutationFn: ({ id, sessionNotes }: { id: string; sessionNotes?: string }) =>
+      appointmentsApi.completeAppointment(id, sessionNotes),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+  })
 
-  const cancel = React.useCallback(
-    async (
-      id: string,
-      reason: "patient_request" | "therapist_request" | "illness" | "emergency" | "schedule_conflict" | "no_show" | "other",
-      cancelledBy: "patient" | "therapist",
-      note?: string
-    ) => {
-      setLoading(true)
-      setError(null)
-
-      const result = await cancelAppointmentAction(id, reason, cancelledBy, note)
-
-      setLoading(false)
-
-      if (result.success) {
-        return { success: true as const, data: result.data }
-      } else {
-        setError(result.error)
-        return { success: false as const, error: result.error }
-      }
-    },
-    []
-  )
-
-  const complete = React.useCallback(
-    async (id: string, sessionNotes?: SessionNotes) => {
-      setLoading(true)
-      setError(null)
-
-      const result = await completeAppointmentAction(id, sessionNotes)
-
-      setLoading(false)
-
-      if (result.success) {
-        return { success: true as const, data: result.data }
-      } else {
-        setError(result.error)
-        return { success: false as const, error: result.error }
-      }
-    },
-    []
-  )
-
-  const reschedule = React.useCallback(
-    async (id: string, newDateTime: Date) => {
-      setLoading(true)
-      setError(null)
-
-      const result = await rescheduleAppointmentAction(id, newDateTime)
-
-      setLoading(false)
-
-      if (result.success) {
-        return { success: true as const, data: result.data }
-      } else {
-        setError(result.error)
-        return { success: false as const, error: result.error }
-      }
-    },
-    []
-  )
-
-  const confirm = React.useCallback(async (id: string) => {
-    setLoading(true)
-    setError(null)
-
-    const result = await confirmAppointmentAction(id)
-
-    setLoading(false)
-
-    if (result.success) {
-      return { success: true as const, data: result.data }
-    } else {
-      setError(result.error)
-      return { success: false as const, error: result.error }
-    }
-  }, [])
-
-  const start = React.useCallback(async (id: string) => {
-    setLoading(true)
-    setError(null)
-
-    const result = await startAppointmentAction(id)
-
-    setLoading(false)
-
-    if (result.success) {
-      return { success: true as const, data: result.data }
-    } else {
-      setError(result.error)
-      return { success: false as const, error: result.error }
-    }
-  }, [])
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => appointmentsApi.deleteAppointment(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+  })
 
   return {
-    loading,
-    error,
-    create,
-    cancel,
-    complete,
-    reschedule,
-    confirm,
-    start,
+    createAppointment: createMutation.mutateAsync,
+    confirmAppointment: confirmMutation.mutateAsync,
+    cancelAppointment: cancelMutation.mutateAsync,
+    completeAppointment: completeMutation.mutateAsync,
+    deleteAppointment: deleteMutation.mutateAsync,
+    isCreating: createMutation.isPending,
   }
 }

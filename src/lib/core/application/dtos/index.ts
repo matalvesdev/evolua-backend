@@ -1,8 +1,4 @@
-// ============================================================================
-// DTOs BARREL EXPORT
-// ============================================================================
-
-export * from "./auth.dto"
-export * from "./patient.dto"
-export * from "./appointment.dto"
-export * from "./report.dto"
+export type { PatientListItemDto, PatientDetailDto } from "./patient.dto"
+export type { AppointmentListItemDto } from "./appointment.dto"
+export type { LoginDto, RegisterDto } from "./auth.dto"
+export type { ReportListItemDto } from "./report.dto"

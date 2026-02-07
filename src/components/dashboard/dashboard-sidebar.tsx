@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { signout } from "@/lib/supabase/actions"
+import { LogoutButton } from "./logout-button"
 
 const navItems = [
   { href: "/dashboard", icon: "dashboard", label: "Dashboard" },
@@ -60,15 +60,7 @@ export function DashboardSidebar() {
           <span className="material-symbols-outlined">person</span>
           <span className="hidden lg:block font-medium">Perfil</span>
         </Link>
-        <form action={signout}>
-          <button
-            type="submit"
-            className="flex items-center gap-3 p-3 rounded-xl text-red-400 hover:bg-red-50 hover:text-red-500 transition-colors w-full"
-          >
-            <span className="material-symbols-outlined">logout</span>
-            <span className="hidden lg:block font-medium">Sair</span>
-          </button>
-        </form>
+        <LogoutButton />
       </div>
     </aside>
   )

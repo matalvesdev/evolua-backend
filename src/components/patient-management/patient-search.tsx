@@ -91,7 +91,7 @@ export function PatientSearch({ onSearch, isLoading = false }: PatientSearchProp
                 onChange={(e) =>
                   setAdvancedCriteria({
                     ...advancedCriteria,
-                    status: e.target.value as any || undefined
+                    status: (e.target.value as "new" | "active" | "on_hold" | "discharged" | "inactive") || undefined
                   })
                 }
                 className="w-full h-10 px-3 border border-gray-300 rounded-md"
@@ -115,7 +115,7 @@ export function PatientSearch({ onSearch, isLoading = false }: PatientSearchProp
                 onChange={(e) =>
                   setAdvancedCriteria({
                     ...advancedCriteria,
-                    gender: e.target.value as any || undefined
+                    gender: (e.target.value as "male" | "female" | "other") || undefined
                   })
                 }
                 className="w-full h-10 px-3 border border-gray-300 rounded-md"

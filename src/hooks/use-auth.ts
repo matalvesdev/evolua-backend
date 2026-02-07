@@ -1,154 +1,59 @@
 "use client"
 
 import * as React from "react"
+import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import {
-  loginAction,
-  registerAction,
-  getCurrentUserAction,
-  logoutAction,
-  changePasswordAction,
-} from "@/actions"
-import type { LoginInput, RegisterInput, AuthenticatedUser } from "@/lib/core"
-
-// ============================================================================
-// USE AUTH HOOK
-// ============================================================================
+import * as authApi from "@/lib/api/auth"
+import type { User } from "@supabase/supabase-js"
 
 export function useAuth() {
-  const router = useRouter()
-  const [user, setUser] = React.useState<AuthenticatedUser | null>(null)
+  const [user, setUser] = React.useState<User | null>(null)
   const [loading, setLoading] = React.useState(true)
-  const [error, setError] = React.useState<string | null>(null)
+  const router = useRouter()
 
-  // Buscar usuário atual
-  const fetchUser = React.useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  React.useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
+      setLoading(false)
+    })
 
-    const result = await getCurrentUserAction()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
 
-    if (result.success) {
-      setUser(result.data)
-    } else {
-      setError(result.error)
-      setUser(null)
-    }
-
-    setLoading(false)
+    return () => subscription.unsubscribe()
   }, [])
 
-  React.useEffect(() => {
-    fetchUser()
-  }, [fetchUser])
+  const login = React.useCallback(async (email: string, password: string) => {
+    const data = await authApi.login(email, password)
+    setUser(data.user)
+    return data
+  }, [])
 
-  // Login
-  const login = React.useCallback(
-    async (input: LoginInput) => {
-      setLoading(true)
-      setError(null)
+  const register = React.useCallback(async (email: string, password: string, fullName: string) => {
+    return authApi.register(email, password, fullName)
+  }, [])
 
-      const result = await loginAction(input)
-
-      if (result.success) {
-        // AuthOutput.user has: id, email, name, role, avatarUrl
-        // We need to fetch full user with getCurrentUserAction to get clinicId and crfa
-        await fetchUser()
-        router.push("/dashboard")
-        router.refresh()
-        return { success: true as const }
-      } else {
-        setError(result.error)
-        setLoading(false)
-        return { success: false as const, error: result.error }
-      }
-    },
-    [router, fetchUser]
-  )
-
-  // Register
-  const register = React.useCallback(
-    async (input: RegisterInput) => {
-      setLoading(true)
-      setError(null)
-
-      const result = await registerAction(input)
-
-      if (result.success) {
-        if (result.data.session) {
-          await fetchUser()
-          router.push("/dashboard")
-          router.refresh()
-        }
-        return { success: true as const, needsEmailVerification: !result.data.session }
-      } else {
-        setError(result.error)
-        setLoading(false)
-        return { success: false as const, error: result.error }
-      }
-    },
-    [router, fetchUser]
-  )
-
-  // Logout
   const logout = React.useCallback(async () => {
-    setLoading(true)
-
-    const result = await logoutAction()
-
-    if (result.success) {
-      setUser(null)
-      router.push("/auth/login")
-      router.refresh()
-    }
-
-    setLoading(false)
+    await authApi.logout()
+    setUser(null)
+    router.push("/auth/login")
   }, [router])
 
-  // Change password
-  const changePassword = React.useCallback(
-    async (input: { currentPassword: string; newPassword: string }) => {
-      setError(null)
-
-      const result = await changePasswordAction(input)
-
-      if (result.success) {
-        return { success: true as const }
-      } else {
-        setError(result.error)
-        return { success: false as const, error: result.error }
-      }
-    },
-    []
-  )
-
-  return {
-    user,
-    loading,
-    error,
-    isAuthenticated: !!user,
-    login,
-    register,
-    logout,
-    changePassword,
-    refetch: fetchUser,
-  }
+  return { user, loading, login, register, logout }
 }
 
-// ============================================================================
-// USE REQUIRE AUTH HOOK
-// Redireciona para login se não autenticado
-// ============================================================================
-
-export function useRequireAuth(redirectTo = "/auth/login") {
-  const auth = useAuth()
+export function useRequireAuth() {
+  const { user, loading } = useAuth()
   const router = useRouter()
 
   React.useEffect(() => {
-    if (!auth.loading && !auth.isAuthenticated) {
-      router.push(redirectTo)
+    if (!loading && !user) {
+      router.push("/auth/login")
     }
-  }, [auth.loading, auth.isAuthenticated, router, redirectTo])
+  }, [user, loading, router])
 
-  return auth
+  return { user, loading }
 }

@@ -11,7 +11,7 @@ export function AudioWaveform({ isRecording, barCount = 15 }: AudioWaveformProps
       {Array.from({ length: barCount }).map((_, i) => (
         <div
           key={i}
-          className={`w-1.5 md:w-2 bg-gradient-to-t from-[#820AD1]/30 to-[#820AD1] rounded-full transition-all ${
+          className={`w-1.5 md:w-2 bg-linear-to-t from-[#820AD1]/30 to-[#820AD1] rounded-full transition-all ${
             isRecording ? "wave-bar" : "h-1/4 opacity-30"
           }`}
           style={{

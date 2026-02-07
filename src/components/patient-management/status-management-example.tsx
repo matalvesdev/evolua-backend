@@ -4,7 +4,7 @@ import { useState } from "react"
 import { StatusTransitionDialog } from "./status-transition-dialog"
 import { PatientStatusDashboard } from "./patient-status-dashboard"
 import { StatusFilterBar } from "./status-filter-bar"
-import { PatientStatusType } from "@/lib/patient-management/domain/value-objects/PatientStatus"
+import type { PatientStatusType } from "@/lib/core/domain/types"
 import type { StatusStatistics, StatusTransitionItem } from "./patient-status-dashboard"
 
 /**

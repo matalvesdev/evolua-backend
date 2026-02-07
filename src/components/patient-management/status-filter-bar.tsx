@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { PatientStatusType } from "@/lib/patient-management/domain/value-objects/PatientStatus"
+import type { PatientStatusType } from "@/lib/core/domain/types"
 
 export interface StatusFilterBarProps {
   statusCounts: Record<PatientStatusType, number>

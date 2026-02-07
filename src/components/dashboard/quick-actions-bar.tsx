@@ -33,61 +33,57 @@ export function QuickActionsBar() {
   const router = useRouter()
   const [openModal, setOpenModal] = React.useState<ModalType>(null)
 
-  const { create: createPatient, loading: patientLoading } = usePatientMutations()
-  const { create: createAppointment, loading: appointmentLoading } = useAppointmentMutations()
-  const { create: createReport, loading: reportLoading } = useReportMutations()
+  const { createPatient, isCreating: patientLoading } = usePatientMutations()
+  const { createAppointment, isCreating: appointmentLoading } = useAppointmentMutations()
+  const { createReport, isCreating: reportLoading } = useReportMutations()
   const { patients } = usePatients({ limit: 100 })
 
   const [patientData, setPatientData] = React.useState({ name: "", email: "", phone: "" })
   const [appointmentData, setAppointmentData] = React.useState({ patientId: "", dateTime: "", duration: 50 })
-  const [reportData, setReportData] = React.useState({ patientId: "", type: "evolution" as const, title: "", content: "" })
+  const [reportData, setReportData] = React.useState<{ patientId: string; type: "evolution" | "evaluation" | "discharge" | "monthly"; title: string; content: string }>({ patientId: "", type: "evolution", title: "", content: "" })
 
   const handleCreatePatient = async (e: React.FormEvent) => {
     e.preventDefault()
-    const result = await createPatient({
-      ...patientData,
-      birthDate: "",
-      cpf: "",
-      address: { street: "", number: "", neighborhood: "", city: "", state: "", zipCode: "" },
-      medicalHistory: { diagnosis: [], medications: [], allergies: [], notes: "" },
-    })
-    
-    if (result.success) {
+    try {
+      const patient = await createPatient({
+        fullName: patientData.name,
+        email: patientData.email || undefined,
+        phone: patientData.phone || undefined,
+      })
       setOpenModal(null)
       setPatientData({ name: "", email: "", phone: "" })
-      router.push(`/dashboard/pacientes/${result.data?.id}`)
-    }
+      router.push(`/dashboard/pacientes/${patient.id}`)
+    } catch { /* handled by mutation */ }
   }
 
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault()
-    const result = await createAppointment({
-      ...appointmentData,
-      therapistId: "",
-      type: "regular",
-      notes: "",
-    })
-    
-    if (result.success) {
+    try {
+      await createAppointment({
+        patientId: appointmentData.patientId,
+        dateTime: appointmentData.dateTime,
+        duration: appointmentData.duration,
+        type: "regular",
+      })
       setOpenModal(null)
       setAppointmentData({ patientId: "", dateTime: "", duration: 50 })
       router.push("/dashboard/agendamentos")
-    }
+    } catch { /* handled by mutation */ }
   }
 
   const handleCreateReport = async (e: React.FormEvent) => {
     e.preventDefault()
-    const result = await createReport({
-      ...reportData,
-      therapistId: "",
-      period: { startDate: "", endDate: "" },
-    })
-    
-    if (result.success) {
+    try {
+      await createReport({
+        patientId: reportData.patientId,
+        type: reportData.type,
+        title: reportData.title,
+        content: reportData.content,
+      })
       setOpenModal(null)
       setReportData({ patientId: "", type: "evolution", title: "", content: "" })
       router.push("/dashboard/relatorios")
-    }
+    } catch { /* handled by mutation */ }
   }
 
   return (
@@ -176,7 +172,7 @@ export function QuickActionsBar() {
                 <option value="">Selecione um paciente</option>
                 {patients.map((patient) => (
                   <option key={patient.id} value={patient.id}>
-                    {patient.name}
+                    {patient.fullName}
                   </option>
                 ))}
               </select>
@@ -235,7 +231,7 @@ export function QuickActionsBar() {
                 <option value="">Selecione um paciente</option>
                 {patients.map((patient) => (
                   <option key={patient.id} value={patient.id}>
-                    {patient.name}
+                    {patient.fullName}
                   </option>
                 ))}
               </select>
@@ -245,7 +241,7 @@ export function QuickActionsBar() {
               <select
                 id="report-type"
                 value={reportData.type}
-                onChange={(e) => setReportData({ ...reportData, type: e.target.value })}
+                onChange={(e) => setReportData({ ...reportData, type: e.target.value as "evolution" | "evaluation" | "discharge" | "monthly" })}
                 required
                 className="w-full h-10 px-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
               >
@@ -290,3 +286,4 @@ export function QuickActionsBar() {
     </>
   )
 }
+

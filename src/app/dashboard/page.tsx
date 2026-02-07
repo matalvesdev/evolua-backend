@@ -50,14 +50,14 @@ export default function DashboardPage() {
                       key={appointment.id}
                       time={new Date(appointment.dateTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       duration={`${appointment.duration}min`}
-                      patientName={appointment.patient?.name || 'Paciente'}
+                      patientName={'Paciente'}
                       sessionType={appointment.type === 'regular' ? 'Terapia' : appointment.type === 'evaluation' ? 'Avaliação' : 'Sessão'}
                       sessionTypeColor={appointment.type === 'regular' ? 'bg-green-500' : 'bg-orange-400'}
                       badge={appointment.status === 'confirmed' ? 'Confirmado' : appointment.status === 'scheduled' ? 'Agendado' : 'Em andamento'}
                       badgeColor={appointment.status === 'confirmed' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-primary'}
-                      location={appointment.location || 'Presencial'}
-                      locationIcon={appointment.location === 'online' ? 'videocam' : 'location_on'}
-                      locationColor={appointment.location === 'online' ? 'text-blue-500' : 'text-gray-600'}
+                      location="Presencial"
+                      locationIcon="location_on"
+                      locationColor="text-gray-600"
                       isPrimary={new Date(appointment.dateTime).getHours() === new Date().getHours()}
                     />
                   ))

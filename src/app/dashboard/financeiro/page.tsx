@@ -52,7 +52,7 @@ export default function FinanceiroPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#f6f8fb] via-[#e8edf5] to-[#dce5f0] p-6">
+    <div className="min-h-screen bg-linear-to-br from-[#f6f8fb] via-[#e8edf5] to-[#dce5f0] p-6">
       <div className="max-w-[1400px] mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -179,7 +179,7 @@ export default function FinanceiroPage() {
                           {transaction.description || transaction.category}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {formatDate(transaction.due_date)} •{' '}
+                          {formatDate(transaction.dueDate ?? transaction.createdAt)} •{' '}
                           {transaction.category}
                         </p>
                       </div>

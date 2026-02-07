@@ -38,7 +38,7 @@ export default function PatientDetailPage() {
   }
 
   const handleDischarge = async () => {
-    const result = await discharge(patientId, new Date())
+    const result = await discharge(patientId, "Alta médica")
     if (result.success) {
       refetch()
     }
@@ -67,7 +67,7 @@ export default function PatientDetailPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="p-8 text-center max-w-md">
           <p className="text-red-600 dark:text-red-400 mb-4">
-            {error || "Paciente não encontrado"}
+            {error?.message || "Paciente não encontrado"}
           </p>
           <Link href="/pacientes">
             <Button variant="outline">Voltar para lista</Button>
@@ -93,12 +93,12 @@ export default function PatientDetailPage() {
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
             <span className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {patient.name.charAt(0).toUpperCase()}
+              {patient.fullName.charAt(0).toUpperCase()}
             </span>
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-              {patient.name}
+              {patient.fullName}
             </h1>
             <div className="flex items-center gap-2 mt-1">
               <span className={`px-2 py-1 text-xs font-medium rounded-full ${status.color}`}>
@@ -171,31 +171,31 @@ export default function PatientDetailPage() {
               Dados Pessoais
             </h3>
             <div className="space-y-3">
-              <InfoRow label="Nome" value={patient.name} />
+              <InfoRow label="Nome" value={patient.fullName} />
               <InfoRow label="Email" value={patient.email || "Não informado"} />
               <InfoRow label="Telefone" value={patient.phone || "Não informado"} />
               <InfoRow
                 label="Data de Nascimento"
                 value={
-                  patient.birthDate
-                    ? new Date(patient.birthDate).toLocaleDateString("pt-BR")
+                  patient.dateOfBirth
+                    ? new Date(patient.dateOfBirth).toLocaleDateString("pt-BR")
                     : "Não informado"
                 }
               />
               <InfoRow label="CPF" value={patient.cpf || "Não informado"} />
+              <InfoRow label="Gênero" value={patient.gender || "Não informado"} />
             </div>
           </Card>
 
-          {/* Responsável */}
-          {(patient.guardianName || patient.guardianPhone) && (
+          {/* Contato de Emergência */}
+          {(patient.emergencyContact || patient.emergencyPhone) && (
             <Card className="p-6">
               <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
-                Responsável
+                Contato de Emergência
               </h3>
               <div className="space-y-3">
-                <InfoRow label="Nome" value={patient.guardianName || "Não informado"} />
-                <InfoRow label="Telefone" value={patient.guardianPhone || "Não informado"} />
-                <InfoRow label="Parentesco" value={patient.guardianRelationship || "Não informado"} />
+                <InfoRow label="Nome" value={patient.emergencyContact || "Não informado"} />
+                <InfoRow label="Telefone" value={patient.emergencyPhone || "Não informado"} />
               </div>
             </Card>
           )}
@@ -207,73 +207,21 @@ export default function PatientDetailPage() {
                 Endereço
               </h3>
               <div className="space-y-3">
-                <InfoRow
-                  label="Endereço"
-                  value={
-                    patient.address.street
-                      ? `${patient.address.street}, ${patient.address.number || "S/N"}`
-                      : "Não informado"
-                  }
-                />
-                <InfoRow label="Bairro" value={patient.address.neighborhood || "Não informado"} />
-                <InfoRow
-                  label="Cidade/Estado"
-                  value={
-                    patient.address.city
-                      ? `${patient.address.city} - ${patient.address.state || ""}`
-                      : "Não informado"
-                  }
-                />
-                <InfoRow label="CEP" value={patient.address.zipCode || "Não informado"} />
+                <InfoRow label="Endereço" value={patient.address} />
+                <InfoRow label="Cidade" value={patient.city || "Não informado"} />
+                <InfoRow label="Estado" value={patient.state || "Não informado"} />
+                <InfoRow label="CEP" value={patient.zipCode || "Não informado"} />
               </div>
             </Card>
           )}
 
-          {/* Histórico Médico */}
-          {patient.medicalHistory && (
+          {/* Observações */}
+          {patient.notes && (
             <Card className="p-6">
               <h3 className="font-semibold text-gray-900 dark:text-white mb-4">
-                Histórico Médico
+                Observações
               </h3>
-              <div className="space-y-3">
-                {patient.medicalHistory.diagnosis && patient.medicalHistory.diagnosis.length > 0 && (
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Diagnósticos</p>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {patient.medicalHistory.diagnosis.map((d, i) => (
-                        <span
-                          key={i}
-                          className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full"
-                        >
-                          {d}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {patient.medicalHistory.medications && patient.medicalHistory.medications.length > 0 && (
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Medicamentos</p>
-                    <p className="text-gray-900 dark:text-white">
-                      {patient.medicalHistory.medications.join(", ")}
-                    </p>
-                  </div>
-                )}
-                {patient.medicalHistory.allergies && patient.medicalHistory.allergies.length > 0 && (
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Alergias</p>
-                    <p className="text-red-600 dark:text-red-400">
-                      {patient.medicalHistory.allergies.join(", ")}
-                    </p>
-                  </div>
-                )}
-                {patient.medicalHistory.notes && (
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Observações</p>
-                    <p className="text-gray-900 dark:text-white">{patient.medicalHistory.notes}</p>
-                  </div>
-                )}
-              </div>
+              <p className="text-gray-900 dark:text-white whitespace-pre-wrap">{patient.notes}</p>
             </Card>
           )}
 
@@ -292,7 +240,7 @@ export default function PatientDetailPage() {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Confirmar Alta</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Tem certeza que deseja dar alta para {patient.name}? Você poderá reativar o
+                        Tem certeza que deseja dar alta para {patient.fullName}? Você poderá reativar o
                         paciente posteriormente.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
@@ -320,7 +268,7 @@ export default function PatientDetailPage() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Tem certeza que deseja excluir {patient.name}? Esta ação não pode ser desfeita
+                      Tem certeza que deseja excluir {patient.fullName}? Esta ação não pode ser desfeita
                       e todos os dados do paciente serão perdidos.
                     </AlertDialogDescription>
                   </AlertDialogHeader>

@@ -51,13 +51,13 @@ export function DashboardHeader() {
         </button>
         <div className="flex items-center gap-3 md:pl-3">
           <div className="hidden md:block text-right">
-            <p className="text-sm font-bold text-gray-800">{user?.name || 'Usuário'}</p>
+            <p className="text-sm font-bold text-gray-800">{user?.user_metadata?.name || user?.user_metadata?.full_name || 'Usuário'}</p>
             <p className="text-[10px] text-gray-500 uppercase tracking-wide font-bold">
-              {user?.role === 'therapist' ? 'FONOAUDIÓLOGO/A' : 'PROFISSIONAL'}
+              {user?.user_metadata?.role === 'therapist' ? 'FONOAUDIÓLOGO/A' : 'PROFISSIONAL'}
             </p>
           </div>
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white font-bold shadow-md">
-            {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+            {user?.user_metadata?.name ? user.user_metadata.name.charAt(0).toUpperCase() : user?.user_metadata?.full_name ? user.user_metadata.full_name.charAt(0).toUpperCase() : 'U'}
           </div>
         </div>
       </div>

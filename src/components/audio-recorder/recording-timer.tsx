@@ -15,6 +15,15 @@ export function RecordingTimer({
 }: RecordingTimerProps) {
   const [seconds, setSeconds] = useState(0)
 
+  // Reset timer when recording stops
+  useEffect(() => {
+    if (!isRecording) {
+      return () => {
+        setSeconds(0)
+      }
+    }
+  }, [isRecording])
+
   useEffect(() => {
     if (!isRecording || isPaused) return
 
@@ -28,12 +37,6 @@ export function RecordingTimer({
 
     return () => clearInterval(interval)
   }, [isRecording, isPaused, onTimeUpdate])
-
-  useEffect(() => {
-    if (!isRecording) {
-      setSeconds(0)
-    }
-  }, [isRecording])
 
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60)

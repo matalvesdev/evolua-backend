@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { PatientStatusType } from "@/lib/patient-management/domain/value-objects/PatientStatus"
+import type { PatientStatusType } from "@/lib/core/domain/types"
 
 export interface StatusStatistics {
   totalPatients: number

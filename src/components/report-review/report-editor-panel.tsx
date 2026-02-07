@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ReportEditableSection } from './report-editable-section';
 
 interface ReportSection {
@@ -26,16 +26,18 @@ export function ReportEditorPanel({ sections, onSectionsChange }: ReportEditorPa
     const historySections = history[historyIndex] ? JSON.stringify(history[historyIndex]) : '';
     
     if (currentSections !== historySections) {
-      const newHistory = history.slice(0, historyIndex + 1);
-      newHistory.push(sections);
-      // Limit history to last 50 entries
-      if (newHistory.length > 50) {
-        newHistory.shift();
-      }
-      setHistory(newHistory);
-      setHistoryIndex(newHistory.length - 1);
+      setHistory(prevHistory => {
+        const newHistory = prevHistory.slice(0, historyIndex + 1);
+        newHistory.push(sections);
+        // Limit history to last 50 entries
+        if (newHistory.length > 50) {
+          newHistory.shift();
+        }
+        return newHistory;
+      });
+      setHistoryIndex(prev => prev + 1);
     }
-  }, [sections]);
+  }, [sections, history, historyIndex]);
 
   const handleUndo = () => {
     if (canUndo) {

@@ -57,9 +57,9 @@ export function RemindersPanel() {
                   {reminder.description && (
                     <p className="text-[11px] text-gray-500 mb-2">{reminder.description}</p>
                   )}
-                  {reminder.dueDate && (
+                  {reminder.due_date && (
                     <p className="text-[11px] text-gray-400 mb-2">
-                      {new Date(reminder.dueDate).toLocaleDateString('pt-BR')}
+                      {new Date(reminder.due_date).toLocaleDateString('pt-BR')}
                     </p>
                   )}
                 </div>

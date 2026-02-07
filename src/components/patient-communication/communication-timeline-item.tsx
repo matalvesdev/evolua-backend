@@ -96,7 +96,7 @@ export function CommunicationTimelineItem({
 
         {isSystemMessage ? (
           <p className="text-gray-600 text-sm italic bg-gray-50 p-3 rounded-lg border border-gray-100">
-            "{message}"
+            &ldquo;{message}&rdquo;
           </p>
         ) : (
           <p className={`text-sm leading-relaxed mb-3 ${isReceived ? 'text-gray-900 font-medium' : 'text-gray-900'}`}>

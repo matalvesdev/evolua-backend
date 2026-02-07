@@ -1,8 +1,4 @@
-// ============================================================================
-// ENTITIES BARREL EXPORT
-// ============================================================================
-
-export * from "./user"
-export * from "./patient"
-export * from "./appointment"
-export * from "./report"
+export type { Patient, CreatePatientInput, UpdatePatientInput } from "./patient"
+export type { Appointment, CreateAppointmentInput } from "./appointment"
+export type { Report, CreateReportInput, UpdateReportInput } from "./report"
+export type { AuthenticatedUser } from "./user"

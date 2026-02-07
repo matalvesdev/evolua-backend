@@ -27,6 +27,9 @@ export default function RelatoriosPage() {
   const [isRecordingModalOpen, setIsRecordingModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [currentTranscription, setCurrentTranscription] = useState('');
+  const [selectedPatientForRecording, setSelectedPatientForRecording] = useState('');
+  const [selectedPatientId, setSelectedPatientId] = useState('');
+  const [currentAudioUrl, setCurrentAudioUrl] = useState('');
 
   const reports: Report[] = [
     {
@@ -356,19 +359,33 @@ export default function RelatoriosPage() {
           <div className="px-6 py-4 border-t border-[#f3f0f4] dark:border-white/5 flex items-center justify-between">
             <p className="text-xs text-[#7c6189] dark:text-gray-400">Mostrando 4 de 12 relatórios</p>
             <div className="flex gap-1">
-              <button className="p-1 rounded hover:bg-primary/10 text-[#7c6189] hover:text-primary transition-colors disabled:opacity-50">
+              <button 
+                className="p-1 rounded hover:bg-primary/10 text-[#7c6189] hover:text-primary transition-colors disabled:opacity-50"
+                disabled
+                aria-label="Página anterior"
+              >
                 <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
                   chevron_left
                 </span>
               </button>
               <button className="px-2.5 py-1 rounded bg-primary text-white text-xs font-bold">1</button>
-              <button className="px-2.5 py-1 rounded hover:bg-primary/10 text-[#7c6189] hover:text-primary text-xs font-bold transition-colors">
+              <button 
+                className="px-2.5 py-1 rounded hover:bg-primary/10 text-[#7c6189] hover:text-primary text-xs font-bold transition-colors"
+                onClick={() => console.log('Página 2')}
+              >
                 2
               </button>
-              <button className="px-2.5 py-1 rounded hover:bg-primary/10 text-[#7c6189] hover:text-primary text-xs font-bold transition-colors">
+              <button 
+                className="px-2.5 py-1 rounded hover:bg-primary/10 text-[#7c6189] hover:text-primary text-xs font-bold transition-colors"
+                onClick={() => console.log('Página 3')}
+              >
                 3
               </button>
-              <button className="p-1 rounded hover:bg-primary/10 text-[#7c6189] hover:text-primary transition-colors">
+              <button 
+                className="p-1 rounded hover:bg-primary/10 text-[#7c6189] hover:text-primary transition-colors"
+                onClick={() => console.log('Próxima página')}
+                aria-label="Próxima página"
+              >
                 <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>
                   chevron_right
                 </span>

@@ -1,5 +1,5 @@
 interface PatientStatusBadgeProps {
-  status: "active" | "inactive" | "discharged"
+  status: "active" | "inactive" | "discharged" | "on_hold" | "new"
 }
 
 export function PatientStatusBadge({ status }: PatientStatusBadgeProps) {
@@ -15,6 +15,14 @@ export function PatientStatusBadge({ status }: PatientStatusBadgeProps) {
     discharged: {
       label: "Alta",
       className: "bg-blue-100 text-blue-700 border-blue-200"
+    },
+    on_hold: {
+      label: "Em Espera",
+      className: "bg-yellow-100 text-yellow-700 border-yellow-200"
+    },
+    new: {
+      label: "Novo",
+      className: "bg-purple-100 text-purple-700 border-purple-200"
     }
   }
 
