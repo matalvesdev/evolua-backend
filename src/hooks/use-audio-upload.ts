@@ -41,9 +41,20 @@ export function useAudioUpload() {
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from("audio-sessions")
-          .upload(fileName, file, { cacheControl: "3600", upsert: false })
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.type,
+          })
 
-        if (uploadError) throw uploadError
+        if (uploadError) {
+          if (uploadError.message?.includes("Bucket not found") || uploadError.message?.includes("not found")) {
+            throw new Error(
+              'O bucket "audio-sessions" não existe no Supabase. Execute o script SQL de setup (backend/prisma/setup-storage-bucket.sql) no Supabase Dashboard.'
+            )
+          }
+          throw new Error(uploadError.message || "Erro ao fazer upload do áudio")
+        }
 
         const { data: { publicUrl } } = supabase.storage
           .from("audio-sessions")

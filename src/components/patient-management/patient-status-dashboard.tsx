@@ -28,7 +28,7 @@ export interface PatientStatusDashboardProps {
   onTransitionClick?: (transition: StatusTransitionItem) => void
 }
 
-const statusConfig: Record<PatientStatusType, { 
+const statusConfig: Record<string, { 
   label: string
   color: string
   bgColor: string
@@ -101,7 +101,7 @@ export function PatientStatusDashboard({
   onStatusClick,
   onTransitionClick,
 }: PatientStatusDashboardProps) {
-  const statusOrder: PatientStatusType[] = ["new", "active", "on_hold", "discharged", "inactive"]
+  const statusOrder: string[] = ["new", "active", "on_hold", "on-hold", "discharged", "inactive"]
 
   return (
     <div className="space-y-6">
@@ -126,17 +126,17 @@ export function PatientStatusDashboard({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {statusOrder.map((status) => {
           const config = statusConfig[status]
-          const count = statistics.statusCounts[status] || 0
+          const count = (statistics.statusCounts as Record<string, number>)[status] || 0
           const percentage = statistics.totalPatients > 0 
             ? Math.round((count / statistics.totalPatients) * 100) 
             : 0
-          const avgTime = statistics.averageTimeInStatus?.[status]
+          const avgTime = (statistics.averageTimeInStatus as Record<string, number> | undefined)?.[status]
 
           return (
             <Card
               key={status}
               className={`cursor-pointer transition-all hover:shadow-lg hover:scale-105 ${config.bgColor} border-2`}
-              onClick={() => onStatusClick?.(status)}
+              onClick={() => onStatusClick?.(status as PatientStatusType)}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">

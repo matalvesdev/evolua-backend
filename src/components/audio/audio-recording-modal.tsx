@@ -14,6 +14,7 @@ export function AudioRecordingModal({
   isOpen,
   onClose,
   patientName = "Paciente",
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   patientId,
   onTranscriptionComplete,
 }: AudioRecordingModalProps) {
@@ -23,6 +24,7 @@ export function AudioRecordingModal({
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [audioChunks, setAudioChunks] = useState<BlobPart[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -77,21 +79,16 @@ export function AudioRecordingModal({
         setAudioChunks(chunks);
         
         // Process audio if callback provided
-        if (onTranscriptionComplete && patientId) {
+        if (onTranscriptionComplete) {
           setIsProcessing(true);
           try {
-            // TODO: Implementar upload e transcrição quando a API estiver pronta
-            // const result = await uploadAndTranscribe(audioBlob, patientId);
-            // onTranscriptionComplete(result.transcription, result.audioUrl);
-            
-            // Por enquanto, simular processamento
-            setTimeout(() => {
-              onTranscriptionComplete(
-                "Transcrição simulada do áudio gravado...",
-                URL.createObjectURL(audioBlob)
-              );
-              setIsProcessing(false);
-            }, 2000);
+            const audioUrl = URL.createObjectURL(audioBlob);
+            // Pass the blob URL - the parent component handles upload + transcription
+            onTranscriptionComplete(
+              "", // Empty transcription - parent will handle actual transcription
+              audioUrl
+            );
+            setIsProcessing(false);
           } catch (error) {
             console.error("Error processing audio:", error);
             setError("Erro ao processar o áudio. Tente novamente.");
@@ -205,7 +202,7 @@ export function AudioRecordingModal({
 
       <div className="w-full max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl flex flex-col md:flex-row max-w-4xl">
         {/* Left Section - Illustration */}
-        <section className="relative w-full md:w-1/2 min-h-[250px] md:min-h-[450px] bg-gradient-to-br from-[#F3E5F5] via-[#E1BEE7] to-[#D1C4E9] overflow-hidden flex items-center justify-center p-6">
+        <section className="relative w-full md:w-1/2 min-h-[250px] md:min-h-[450px] bg-linear-to-br from-[#F3E5F5] via-[#E1BEE7] to-[#D1C4E9] overflow-hidden flex items-center justify-center p-6">
           <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-white/40 rounded-full blur-[100px]" />
           <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-purple-300/30 rounded-full blur-[80px]" />
           
@@ -215,7 +212,7 @@ export function AudioRecordingModal({
                 className="w-full h-full bg-center bg-cover"
                 style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuDBFeqDAdUO0uJ-ajqPTEPa9CAXfxsSQg-L9JNlLj7Qy9Sp5djMgF-AphZgtNFEI8z5jKTEXbp1r7qx7AdQd2vNuznbyG8AfPRXpiQbuzwKbJYznq9HmLCxwQVT_MYlwa6xVwTsRIEo5GfOXmzQZrj1vCjnSlkr-QnCRTWl6X4J2627yr7-EFc36bWjiTprB7qGXm8upIIhEc1xKzk2aaQp_etne_yMkwumBduYu7pGJ-3ojLshtEat21D6OkgfXsCF_LXW5tFkNiNd')" }}
               >
-                <div className="absolute inset-0 bg-gradient-to-t from-[#4A148C] via-transparent to-transparent opacity-90" />
+                <div className="absolute inset-0 bg-linear-to-t from-[#4A148C] via-transparent to-transparent opacity-90" />
               </div>
               <div className="absolute bottom-6 left-6 right-6 text-white">
                 <h2 className="text-2xl font-bold mb-1.5 leading-tight">Fluxo Criativo</h2>
@@ -263,7 +260,7 @@ export function AudioRecordingModal({
             {/* Error Alert */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-                <span className="material-symbols-outlined text-red-500 text-xl flex-shrink-0">
+                <span className="material-symbols-outlined text-red-500 text-xl shrink-0">
                   error
                 </span>
                 <div className="flex-1">
@@ -276,7 +273,7 @@ export function AudioRecordingModal({
                 </div>
                 <button
                   onClick={() => setError(null)}
-                  className="flex-shrink-0 text-red-400 hover:text-red-600 transition-colors"
+                  className="shrink-0 text-red-400 hover:text-red-600 transition-colors"
                 >
                   <span className="material-symbols-outlined text-lg">close</span>
                 </button>
@@ -300,7 +297,7 @@ export function AudioRecordingModal({
                 {[...Array(15)].map((_, i) => (
                   <div
                     key={i}
-                    className={`w-1.5 md:w-2 bg-gradient-to-t from-primary/30 to-primary wave-bar ${
+                    className={`w-1.5 md:w-2 bg-linear-to-t from-primary/30 to-primary wave-bar ${
                       isRecording && !isPaused ? "" : "opacity-30"
                     }`}
                     style={{

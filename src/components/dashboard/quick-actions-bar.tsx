@@ -46,7 +46,7 @@ export function QuickActionsBar() {
     e.preventDefault()
     try {
       const patient = await createPatient({
-        fullName: patientData.name,
+        name: patientData.name,
         email: patientData.email || undefined,
         phone: patientData.phone || undefined,
       })
@@ -172,7 +172,7 @@ export function QuickActionsBar() {
                 <option value="">Selecione um paciente</option>
                 {patients.map((patient) => (
                   <option key={patient.id} value={patient.id}>
-                    {patient.fullName}
+                    {patient.name}
                   </option>
                 ))}
               </select>
@@ -193,7 +193,7 @@ export function QuickActionsBar() {
                 id="appointment-duration"
                 type="number"
                 value={appointmentData.duration}
-                onChange={(e) => setAppointmentData({ ...appointmentData, duration: parseInt(e.target.value) })}
+                onChange={(e) => setAppointmentData({ ...appointmentData, duration: parseInt(e.target.value) || 0 })}
                 required
                 min="15"
                 step="15"
@@ -231,7 +231,7 @@ export function QuickActionsBar() {
                 <option value="">Selecione um paciente</option>
                 {patients.map((patient) => (
                   <option key={patient.id} value={patient.id}>
-                    {patient.fullName}
+                    {patient.name}
                   </option>
                 ))}
               </select>
@@ -286,4 +286,5 @@ export function QuickActionsBar() {
     </>
   )
 }
+
 

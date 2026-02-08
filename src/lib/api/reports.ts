@@ -16,11 +16,15 @@ export interface Report {
   id: string
   clinicId: string
   patientId: string
+  patientName: string
   therapistId: string
+  therapistName: string
   type: string
   status: string
   title: string
   content?: string
+  sentAt?: string | null
+  sentTo?: string[]
   createdAt: string
   updatedAt: string
 }
@@ -28,8 +32,9 @@ export interface Report {
 export interface CreateReportInput {
   patientId: string
   type: string
-  title: string
+  title?: string
   content?: string
+  appointmentId?: string
 }
 
 export interface UpdateReportInput {
@@ -51,6 +56,7 @@ export async function getReport(id: string): Promise<Report> {
 }
 
 export async function listReports(params?: {
+  search?: string
   patientId?: string
   therapistId?: string
   type?: string
@@ -61,6 +67,7 @@ export async function listReports(params?: {
   limit?: number
 }): Promise<PaginatedResponse<Report>> {
   const query = new URLSearchParams()
+  if (params?.search) query.set("search", params.search)
   if (params?.patientId) query.set("patientId", params.patientId)
   if (params?.therapistId) query.set("therapistId", params.therapistId)
   if (params?.type) query.set("type", params.type)

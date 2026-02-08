@@ -1,42 +1,53 @@
 import type { PatientStatus } from "../types"
 
-export interface Patient {
-  id: string
-  clinicId: string
-  fullName: string
-  email?: string
-  phone?: string
-  cpf?: string
-  dateOfBirth?: string
-  gender?: string
-  status: PatientStatus
-  therapistId?: string
-  address?: string
+export interface PatientAddress {
+  street?: string
+  number?: string
+  complement?: string
+  neighborhood?: string
   city?: string
   state?: string
   zipCode?: string
-  emergencyContact?: string
-  emergencyPhone?: string
+}
+
+export interface PatientMedicalHistory {
+  diagnosis?: string[]
+  medications?: string[]
+  allergies?: string[]
   notes?: string
+}
+
+export interface Patient {
+  id: string
+  clinicId: string
+  name: string
+  email?: string
+  phone?: string
+  cpf?: string
+  birthDate?: string
+  status: PatientStatus
+  guardianName?: string
+  guardianPhone?: string
+  guardianRelationship?: string
+  therapistId?: string
+  address?: PatientAddress | null
+  medicalHistory?: PatientMedicalHistory | null
   createdAt: string
   updatedAt: string
 }
 
 export interface CreatePatientInput {
-  fullName: string
+  name: string
   email?: string
   phone?: string
   cpf?: string
-  dateOfBirth?: string
-  gender?: string
+  birthDate?: string
+  guardianName?: string
+  guardianPhone?: string
+  guardianRelationship?: string
   therapistId?: string
-  address?: string
-  city?: string
-  state?: string
-  zipCode?: string
-  emergencyContact?: string
-  emergencyPhone?: string
-  notes?: string
+  address?: PatientAddress
+  medicalHistory?: PatientMedicalHistory
 }
 
 export interface UpdatePatientInput extends Partial<CreatePatientInput> {

@@ -6,12 +6,8 @@ export type { Transaction, CreateTransactionInput, UpdateTransactionInput }
 
 export interface FinancialStats {
   totalIncome: number
-  totalExpenses: number
+  totalExpense: number
   balance: number
-  pendingReceivables: number
-  pendingPayables: number
-  monthlyIncome: number
-  monthlyExpenses: number
 }
 
 interface UseTransactionsOptions {
@@ -62,8 +58,8 @@ export function useTransactions(options?: UseTransactionsOptions) {
   const markAsPaid = useMutation({
     mutationFn: (id: string) =>
       financesApi.updateTransaction(id, {
-        status: "paid",
-        paidDate: new Date().toISOString(),
+        status: "completed",
+        paidAt: new Date().toISOString(),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
@@ -94,12 +90,8 @@ export function useFinancialStats() {
   const stats: FinancialStats | undefined = summary
     ? {
         totalIncome: summary.totalIncome,
-        totalExpenses: summary.totalExpenses,
+        totalExpense: summary.totalExpense,
         balance: summary.balance,
-        pendingReceivables: summary.pendingReceivables,
-        pendingPayables: summary.pendingPayables,
-        monthlyIncome: 0,
-        monthlyExpenses: 0,
       }
     : undefined
 

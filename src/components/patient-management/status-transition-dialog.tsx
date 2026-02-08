@@ -19,7 +19,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { type PatientStatusType, PatientStatusValues } from "@/lib/core/domain/types"
+import { type PatientStatusType } from "@/lib/core/domain/types"
 
 export interface StatusTransitionDialogProps {
   open: boolean
@@ -30,30 +30,27 @@ export interface StatusTransitionDialogProps {
   onStatusChange: (newStatus: PatientStatusType, reason?: string) => Promise<void>
 }
 
-const statusConfig: Record<PatientStatusType, { label: string; color: string; icon: string }> = {
-  new: { label: "Novo", color: "text-blue-700", icon: "person_add" },
+const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
   active: { label: "Ativo", color: "text-green-700", icon: "check_circle" },
-  on_hold: { label: "Em Espera", color: "text-yellow-700", icon: "pause_circle" },
+  "on-hold": { label: "Em Espera", color: "text-yellow-700", icon: "pause_circle" },
   discharged: { label: "Alta", color: "text-gray-700", icon: "task_alt" },
   inactive: { label: "Inativo", color: "text-red-700", icon: "cancel" },
 }
 
 // Status transition rules - which statuses can transition to which
-const allowedTransitions: Record<PatientStatusType, PatientStatusType[]> = {
-  new: [PatientStatusValues.ACTIVE, PatientStatusValues.INACTIVE],
-  active: [PatientStatusValues.ON_HOLD, PatientStatusValues.DISCHARGED, PatientStatusValues.INACTIVE],
-  on_hold: [PatientStatusValues.ACTIVE, PatientStatusValues.DISCHARGED, PatientStatusValues.INACTIVE],
-  discharged: [PatientStatusValues.ACTIVE, PatientStatusValues.INACTIVE],
-  inactive: [PatientStatusValues.ACTIVE],
+const allowedTransitions: Record<string, PatientStatusType[]> = {
+  active: ["on-hold", "discharged", "inactive"],
+  "on-hold": ["active", "discharged", "inactive"],
+  discharged: ["active", "inactive"],
+  inactive: ["active"],
 }
 
 // Statuses that require a reason for transition
-const requiresReason: Record<PatientStatusType, PatientStatusType[]> = {
-  new: [PatientStatusValues.INACTIVE],
-  active: [PatientStatusValues.ON_HOLD, PatientStatusValues.DISCHARGED, PatientStatusValues.INACTIVE],
-  on_hold: [PatientStatusValues.DISCHARGED, PatientStatusValues.INACTIVE],
-  discharged: [PatientStatusValues.ACTIVE],
-  inactive: [PatientStatusValues.ACTIVE],
+const requiresReason: Record<string, PatientStatusType[]> = {
+  active: ["on-hold", "discharged", "inactive"],
+  "on-hold": ["discharged", "inactive"],
+  discharged: ["active"],
+  inactive: ["active"],
 }
 
 export function StatusTransitionDialog({
@@ -68,6 +65,7 @@ export function StatusTransitionDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const currentConfig = statusConfig[currentStatus] || { label: currentStatus, color: "text-gray-700", icon: "help" }
   const allowedStatuses = allowedTransitions[currentStatus] || []
   const needsReason = selectedStatus && requiresReason[currentStatus]?.includes(selectedStatus as PatientStatusType)
 
@@ -125,10 +123,10 @@ export function StatusTransitionDialog({
             <div className="flex-1">
               <p className="text-xs text-muted-foreground">Status Atual</p>
               <div className="flex items-center gap-2 mt-1">
-                <span className={`material-symbols-outlined text-lg ${statusConfig[currentStatus].color}`}>
-                  {statusConfig[currentStatus].icon}
+                <span className={`material-symbols-outlined text-lg ${currentConfig.color}`}>
+                  {currentConfig.icon}
                 </span>
-                <span className="font-semibold">{statusConfig[currentStatus].label}</span>
+                <span className="font-semibold">{currentConfig.label}</span>
               </div>
             </div>
           </div>
@@ -141,16 +139,19 @@ export function StatusTransitionDialog({
                 <SelectValue placeholder="Selecione o novo status" />
               </SelectTrigger>
               <SelectContent>
-                {allowedStatuses.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    <div className="flex items-center gap-2">
-                      <span className={`material-symbols-outlined text-base ${statusConfig[status].color}`}>
-                        {statusConfig[status].icon}
-                      </span>
-                      <span>{statusConfig[status].label}</span>
-                    </div>
-                  </SelectItem>
-                ))}
+                {allowedStatuses.map((status) => {
+                  const config = statusConfig[status] || { label: status, color: "text-gray-700", icon: "help" }
+                  return (
+                    <SelectItem key={status} value={status}>
+                      <div className="flex items-center gap-2">
+                        <span className={`material-symbols-outlined text-base ${config.color}`}>
+                          {config.icon}
+                        </span>
+                        <span>{config.label}</span>
+                      </div>
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           </div>

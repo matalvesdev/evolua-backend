@@ -16,8 +16,9 @@ export interface Report {
 export interface CreateReportInput {
   patientId: string
   type: ReportType
-  title: string
+  title?: string
   content?: string
+  appointmentId?: string
 }
 
 export interface UpdateReportInput {

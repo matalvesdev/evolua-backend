@@ -26,6 +26,7 @@ export function ReportEditorPanel({ sections, onSectionsChange }: ReportEditorPa
     const historySections = history[historyIndex] ? JSON.stringify(history[historyIndex]) : '';
     
     if (currentSections !== historySections) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setHistory(prevHistory => {
         const newHistory = prevHistory.slice(0, historyIndex + 1);
         newHistory.push(sections);
@@ -104,7 +105,7 @@ export function ReportEditorPanel({ sections, onSectionsChange }: ReportEditorPa
       </div>
 
       {/* Gradient Fade at Bottom */}
-      <div className="h-8 bg-gradient-to-t from-white/90 to-transparent absolute bottom-0 w-full pointer-events-none rounded-b-2xl" />
+      <div className="h-8 bg-linear-to-t from-white/90 to-transparent absolute bottom-0 w-full pointer-events-none rounded-b-2xl" />
     </div>
   );
 }

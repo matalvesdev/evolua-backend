@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useReportMutations, usePatients } from "@/hooks"
@@ -11,10 +12,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import type { ReportType } from "@/lib/core"
 
-export default function NovoRelatorioPage() {
+function NovoRelatorioContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const preSelectedPatientId = searchParams.get("patientId")
+  const preFilledContent = searchParams.get("content")
 
   const { createReport, isCreating } = useReportMutations()
   const { patients, loading: patientsLoading } = usePatients({ limit: 100 })
@@ -24,7 +26,7 @@ export default function NovoRelatorioPage() {
     patientId: preSelectedPatientId || "",
     type: "evolution" as ReportType,
     title: "",
-    content: "",
+    content: preFilledContent || "",
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -183,7 +185,7 @@ export default function NovoRelatorioPage() {
                       // Sugerir título
                       const patient = patients.find((p) => p.id === e.target.value)
                       if (patient && !formData.title) {
-                        updateField("title", getTitleSuggestion(formData.type, patient.fullName))
+                        updateField("title", getTitleSuggestion(formData.type, patient.name))
                       }
                     }}
                     required
@@ -192,7 +194,7 @@ export default function NovoRelatorioPage() {
                     <option value="">Selecione</option>
                     {patients.map((patient) => (
                       <option key={patient.id} value={patient.id}>
-                        {patient.fullName}
+                        {patient.name}
                       </option>
                     ))}
                   </select>
@@ -241,10 +243,10 @@ export default function NovoRelatorioPage() {
                 {selectedPatient && !formData.title && (
                   <button
                     type="button"
-                    onClick={() => updateField("title", getTitleSuggestion(formData.type, selectedPatient.fullName))}
+                    onClick={() => updateField("title", getTitleSuggestion(formData.type, selectedPatient.name))}
                     className="text-xs text-purple-600 hover:text-purple-700 mt-1"
                   >
-                    Usar sugestão: {getTitleSuggestion(formData.type, selectedPatient.fullName)}
+                    Usar sugestão: {getTitleSuggestion(formData.type, selectedPatient.name)}
                   </button>
                 )}
               </div>
@@ -314,3 +316,12 @@ export default function NovoRelatorioPage() {
     </div>
   )
 }
+
+export default function NovoRelatorioPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-12">Carregando...</div>}>
+      <NovoRelatorioContent />
+    </Suspense>
+  )
+}
+

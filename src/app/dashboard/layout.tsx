@@ -1,10 +1,27 @@
+"use client"
+
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
+import { useRequireAuth } from "@/hooks/use-auth"
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { user, loading } = useRequireAuth()
+
+  if (loading) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-bg-page">
+        <div className="animate-pulse text-gray-400">Carregando...</div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null // useRequireAuth will redirect to login
+  }
+
   return (
     <div className="bg-bg-page font-display text-gray-800 overflow-hidden h-screen w-screen flex relative">
       {/* Orbes de fundo */}

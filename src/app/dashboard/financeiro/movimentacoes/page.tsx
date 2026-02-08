@@ -110,7 +110,7 @@ export default function MovimentacoesPage() {
   return (
     <div className="relative min-h-screen">
       {/* Background Effects */}
-      <div className="absolute top-0 left-0 w-full h-96 bg-gradient-to-b from-purple-50/50 to-transparent dark:from-purple-900/10 dark:to-transparent -z-10 pointer-events-none"></div>
+      <div className="absolute top-0 left-0 w-full h-96 bg-linear-to-b from-purple-50/50 to-transparent dark:from-purple-900/10 dark:to-transparent -z-10 pointer-events-none"></div>
 
       <div className="max-w-[1200px] mx-auto flex flex-col gap-8 p-6 lg:p-10">
         {/* Header */}

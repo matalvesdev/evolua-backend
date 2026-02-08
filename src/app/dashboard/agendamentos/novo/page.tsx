@@ -94,7 +94,7 @@ export default function NovoAgendamentoPage() {
   // Convert Supabase patients to UI format
   const uiPatients: Patient[] = allPatients.map(patient => ({
     id: patient.id,
-    name: patient.fullName,
+    name: patient.name,
     email: patient.email || '',
     avatar: '', // Default avatar
   }));
@@ -232,3 +232,4 @@ export default function NovoAgendamentoPage() {
     </div>
   );
 }
+

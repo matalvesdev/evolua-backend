@@ -5,6 +5,7 @@ import type { Report, CreateReportInput, UpdateReportInput } from "@/lib/api/rep
 export type { Report }
 
 export function useReports(params?: {
+  search?: string
   patientId?: string
   therapistId?: string
   type?: string

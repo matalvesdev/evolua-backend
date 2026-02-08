@@ -86,9 +86,9 @@ export default function FinanceiroPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Receitas (mês)</p>
+                  <p className="text-sm text-gray-600 mb-1">Receitas</p>
                   <p className="text-2xl font-bold text-green-600">
-                    {formatCurrency(stats?.monthlyIncome || 0)}
+                    {formatCurrency(stats?.totalIncome || 0)}
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-green-100">
@@ -102,9 +102,9 @@ export default function FinanceiroPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Despesas (mês)</p>
+                  <p className="text-sm text-gray-600 mb-1">Despesas</p>
                   <p className="text-2xl font-bold text-red-600">
-                    {formatCurrency(stats?.monthlyExpenses || 0)}
+                    {formatCurrency(stats?.totalExpense || 0)}
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-red-100">
@@ -118,9 +118,9 @@ export default function FinanceiroPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">A Receber</p>
+                  <p className="text-sm text-gray-600 mb-1">Pendente</p>
                   <p className="text-2xl font-bold text-purple-600">
-                    {formatCurrency(stats?.pendingReceivables || 0)}
+                    {formatCurrency(0)}
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-purple-100">

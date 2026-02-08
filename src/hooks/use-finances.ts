@@ -64,8 +64,8 @@ export function useFinances() {
       setBalanceData({
         balance: summary.balance,
         income: summary.totalIncome,
-        expenses: summary.totalExpenses,
-        pending: summary.pendingReceivables + summary.pendingPayables,
+        expenses: summary.totalExpense,
+        pending: 0,
       })
 
       const now = new Date()
@@ -79,14 +79,14 @@ export function useFinances() {
         const monthIncome = txs
           .filter((t) => {
             const txDate = new Date(t.createdAt)
-            return t.type === "income" && t.status === "paid" && txDate >= monthStart && txDate <= monthEnd
+            return t.type === "income" && t.status === "completed" && txDate >= monthStart && txDate <= monthEnd
           })
           .reduce((sum, t) => sum + t.amount, 0)
 
         const monthExpenses = txs
           .filter((t) => {
             const txDate = new Date(t.createdAt)
-            return t.type === "expense" && t.status === "paid" && txDate >= monthStart && txDate <= monthEnd
+            return t.type === "expense" && t.status === "completed" && txDate >= monthStart && txDate <= monthEnd
           })
           .reduce((sum, t) => sum + t.amount, 0)
 
@@ -99,7 +99,7 @@ export function useFinances() {
       setMonthlyData(months)
 
       const incomeByCategory = txs
-        .filter((t) => t.type === "income" && t.status === "paid")
+        .filter((t) => t.type === "income" && t.status === "completed")
         .reduce((acc, t) => {
           acc[t.category] = (acc[t.category] || 0) + t.amount
           return acc

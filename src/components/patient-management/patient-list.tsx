@@ -6,11 +6,10 @@ import { Button } from "@/components/ui/button"
 
 export interface PatientListItem {
   id: string
-  fullName: string
-  dateOfBirth: string
-  gender: string
-  cpf: string
-  primaryPhone: string
+  name: string
+  birthDate?: string
+  cpf?: string
+  phone?: string
   email?: string
   status: "new" | "active" | "on_hold" | "discharged" | "inactive"
   lastAppointment?: string
@@ -69,12 +68,12 @@ export function PatientList({
     )
   }
 
-  const calculateAge = (dateOfBirth: string) => {
+  const calculateAge = (birthDateStr: string) => {
     const today = new Date()
-    const birthDate = new Date(dateOfBirth)
-    let age = today.getFullYear() - birthDate.getFullYear()
-    const monthDiff = today.getMonth() - birthDate.getMonth()
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    const birth = new Date(birthDateStr)
+    let age = today.getFullYear() - birth.getFullYear()
+    const monthDiff = today.getMonth() - birth.getMonth()
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
       age--
     }
     return age
@@ -136,9 +135,9 @@ export function PatientList({
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
             {/* Patient Info */}
             <div className="col-span-4 flex items-center gap-4">
-              <div className="relative flex-shrink-0">
-                <div className={`w-12 h-12 rounded-full bg-gradient-to-br ${getAvatarColor(patient.fullName)} flex items-center justify-center font-bold text-lg border-2 border-white shadow-sm`}>
-                  {getInitials(patient.fullName)}
+              <div className="relative shrink-0">
+                <div className={`w-12 h-12 rounded-full bg-linear-to-br ${getAvatarColor(patient.name)} flex items-center justify-center font-bold text-lg border-2 border-white shadow-sm`}>
+                  {getInitials(patient.name)}
                 </div>
                 <div
                   className={`absolute -bottom-1 -right-1 w-4 h-4 ${
@@ -149,10 +148,10 @@ export function PatientList({
               </div>
               <div>
                 <h3 className="font-bold text-gray-900 text-lg leading-tight group-hover:text-primary transition-colors">
-                  {patient.fullName}
+                  {patient.name}
                 </h3>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <span>{calculateAge(patient.dateOfBirth)} anos</span>
+                  {patient.birthDate ? `${calculateAge(patient.birthDate)} anos` : ""}
                   <span className="w-1 h-1 bg-gray-300 rounded-full" />
                   <span>CPF: {patient.cpf}</span>
                 </div>
@@ -164,7 +163,7 @@ export function PatientList({
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2 text-gray-700">
                   <span className="material-symbols-outlined text-base text-gray-400">phone</span>
-                  <span>{patient.primaryPhone}</span>
+                  <span>{patient.phone}</span>
                 </div>
                 {patient.email && (
                   <div className="flex items-center gap-2 text-gray-500">
@@ -233,3 +232,5 @@ export function PatientList({
     </div>
   )
 }
+
+

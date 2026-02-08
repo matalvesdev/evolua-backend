@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 
 export interface PatientRegistrationData {
   personalInfo: {
-    fullName: string
+    name: string
     dateOfBirth: string
     gender: string
     cpf: string
@@ -61,7 +61,7 @@ export function PatientRegistrationForm({
   const [step, setStep] = React.useState(1)
   const [formData, setFormData] = React.useState<PatientRegistrationData>({
     personalInfo: {
-      fullName: initialData?.personalInfo?.fullName || "",
+      name: initialData?.personalInfo?.name || "",
       dateOfBirth: initialData?.personalInfo?.dateOfBirth || "",
       gender: initialData?.personalInfo?.gender || "",
       cpf: initialData?.personalInfo?.cpf || "",
@@ -101,8 +101,8 @@ export function PatientRegistrationForm({
     const errors: Record<string, string> = {}
 
     if (currentStep === 1) {
-      if (!formData.personalInfo.fullName.trim()) {
-        errors["personalInfo.fullName"] = "Nome completo é obrigatório"
+      if (!formData.personalInfo.name.trim()) {
+        errors["personalInfo.name"] = "Nome completo é obrigatório"
       }
       if (!formData.personalInfo.dateOfBirth) {
         errors["personalInfo.dateOfBirth"] = "Data de nascimento é obrigatória"
@@ -275,16 +275,16 @@ export function PatientRegistrationForm({
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="fullName">Nome Completo *</Label>
+                <Label htmlFor="name">Nome Completo *</Label>
                 <Input
-                  id="fullName"
-                  value={formData.personalInfo.fullName}
-                  onChange={(e) => updatePersonalInfo("fullName", e.target.value)}
+                  id="name"
+                  value={formData.personalInfo.name}
+                  onChange={(e) => updatePersonalInfo("name", e.target.value)}
                   placeholder="Nome completo do paciente"
-                  className={validationErrors["personalInfo.fullName"] ? "border-red-500" : ""}
+                  className={validationErrors["personalInfo.name"] ? "border-red-500" : ""}
                 />
-                {validationErrors["personalInfo.fullName"] && (
-                  <p className="text-sm text-red-500 mt-1">{validationErrors["personalInfo.fullName"]}</p>
+                {validationErrors["personalInfo.name"] && (
+                  <p className="text-sm text-red-500 mt-1">{validationErrors["personalInfo.name"]}</p>
                 )}
               </div>
 
@@ -677,3 +677,4 @@ export function PatientRegistrationForm({
     </div>
   )
 }
+

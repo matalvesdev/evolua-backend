@@ -14,7 +14,7 @@ export interface StatusFilterBarProps {
   onSearchChange?: (value: string) => void
 }
 
-const statusConfig: Record<PatientStatusType, {
+const statusConfig: Record<string, {
   label: string
   color: string
   bgColor: string
@@ -67,7 +67,7 @@ export function StatusFilterBar({
   searchValue = "",
   onSearchChange,
 }: StatusFilterBarProps) {
-  const statusOrder: PatientStatusType[] = ["active", "new", "on_hold", "discharged", "inactive"]
+  const statusOrder: string[] = ["active", "new", "on_hold", "on-hold", "discharged", "inactive"]
   const hasActiveFilters = selectedStatuses.length > 0
 
   return (
@@ -97,13 +97,13 @@ export function StatusFilterBar({
 
         {statusOrder.map((status) => {
           const config = statusConfig[status]
-          const count = statusCounts[status] || 0
-          const isSelected = selectedStatuses.includes(status)
+          const count = (statusCounts as Record<string, number>)[status] || 0
+          const isSelected = selectedStatuses.includes(status as PatientStatusType)
 
           return (
             <button
               key={status}
-              onClick={() => onStatusToggle(status)}
+              onClick={() => onStatusToggle(status as PatientStatusType)}
               className={`
                 px-4 py-2 rounded-full font-semibold text-sm border-2 transition-all 
                 flex items-center gap-2

@@ -3,80 +3,97 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { usePatientMutations } from "@/hooks"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 
-interface FormData {
-  fullName: string
-  email: string
-  phone: string
-  dateOfBirth: string
-  cpf: string
-  gender: string
-  emergencyContact: string
-  emergencyPhone: string
-  address: string
-  city: string
-  state: string
-  zipCode: string
-  notes: string
-}
+const UF_LIST = [
+  "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS",
+  "MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO",
+] as const
+
+const patientSchema = z.object({
+  name: z.string().min(1, "Nome é obrigatório").max(200),
+  email: z.string().email("Email inválido").optional().or(z.literal("")),
+  phone: z.string().optional(),
+  birthDate: z.string().optional(),
+  cpf: z.string().optional(),
+  guardianName: z.string().optional(),
+  guardianPhone: z.string().optional(),
+  guardianRelationship: z.string().optional(),
+  address: z.object({
+    street: z.string().optional(),
+    number: z.string().optional(),
+    complement: z.string().optional(),
+    neighborhood: z.string().optional(),
+    city: z.string().optional(),
+    state: z.string().optional(),
+    zipCode: z.string().optional(),
+  }).optional(),
+  medicalHistory: z.object({
+    notes: z.string().optional(),
+  }).optional(),
+})
+
+type PatientFormValues = z.infer<typeof patientSchema>
 
 export default function NovoPatientePage() {
   const router = useRouter()
   const { createPatient, isCreating } = usePatientMutations()
   const [error, setError] = React.useState<string | null>(null)
-
-  const [formData, setFormData] = React.useState<FormData>({
-    fullName: "",
-    email: "",
-    phone: "",
-    dateOfBirth: "",
-    cpf: "",
-    gender: "",
-    emergencyContact: "",
-    emergencyPhone: "",
-    address: "",
-    city: "",
-    state: "",
-    zipCode: "",
-    notes: "",
-  })
-
   const [step, setStep] = React.useState(1)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
+  const form = useForm<PatientFormValues>({
+    resolver: zodResolver(patientSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      phone: "",
+      birthDate: "",
+      cpf: "",
+      guardianName: "",
+      guardianPhone: "",
+      guardianRelationship: "",
+      address: { street: "", number: "", complement: "", neighborhood: "", city: "", state: "", zipCode: "" },
+      medicalHistory: { notes: "" },
+    },
+  })
 
+  const onSubmit = async (values: PatientFormValues) => {
+    setError(null)
     try {
+      const addr = values.address
+      const hasAddress = addr && Object.values(addr).some((v) => v && v.trim())
+
       await createPatient({
-        fullName: formData.fullName,
-        email: formData.email || undefined,
-        phone: formData.phone || undefined,
-        dateOfBirth: formData.dateOfBirth || undefined,
-        cpf: formData.cpf || undefined,
-        gender: formData.gender || undefined,
-        emergencyContact: formData.emergencyContact || undefined,
-        emergencyPhone: formData.emergencyPhone || undefined,
-        address: formData.address || undefined,
-        city: formData.city || undefined,
-        state: formData.state || undefined,
-        zipCode: formData.zipCode || undefined,
-        notes: formData.notes || undefined,
+        name: values.name,
+        email: values.email || undefined,
+        phone: values.phone || undefined,
+        birthDate: values.birthDate || undefined,
+        cpf: values.cpf || undefined,
+        guardianName: values.guardianName || undefined,
+        guardianPhone: values.guardianPhone || undefined,
+        guardianRelationship: values.guardianRelationship || undefined,
+        address: hasAddress ? addr : undefined,
+        medicalHistory: values.medicalHistory?.notes ? values.medicalHistory : undefined,
       })
       router.push("/dashboard/pacientes")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao criar paciente")
     }
-  }
-
-  const updateField = (field: keyof FormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
   }
 
   return (
@@ -91,10 +108,12 @@ export default function NovoPatientePage() {
         </Link>
       </div>
 
+      {/* Step indicator */}
       <div className="flex items-center gap-2">
         {[1, 2, 3].map((s) => (
           <React.Fragment key={s}>
             <button
+              type="button"
               onClick={() => setStep(s)}
               className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
                 step === s ? "bg-purple-600 text-white" : step > s ? "bg-green-500 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
@@ -107,118 +126,188 @@ export default function NovoPatientePage() {
         ))}
       </div>
 
-      <form onSubmit={handleSubmit}>
-        {step === 1 && (
-          <Card className="p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Dados Pessoais</h2>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="fullName">Nome completo *</Label>
-                <Input id="fullName" value={formData.fullName} onChange={(e) => updateField("fullName", e.target.value)} placeholder="Nome do paciente" required />
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+
+          {step === 1 && (
+            <Card className="p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Dados Pessoais</h2>
+              <FormField control={form.control} name="name" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Nome completo *</FormLabel>
+                  <FormControl><Input placeholder="Nome do paciente" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl><Input type="email" placeholder="email@exemplo.com" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="phone" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Telefone</FormLabel>
+                    <FormControl><Input type="tel" placeholder="(00) 00000-0000" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={formData.email} onChange={(e) => updateField("email", e.target.value)} placeholder="email@exemplo.com" />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Telefone</Label>
-                  <Input id="phone" value={formData.phone} onChange={(e) => updateField("phone", e.target.value)} placeholder="(00) 00000-0000" />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="dateOfBirth">Data de Nascimento</Label>
-                  <Input id="dateOfBirth" type="date" value={formData.dateOfBirth} onChange={(e) => updateField("dateOfBirth", e.target.value)} />
-                </div>
-                <div>
-                  <Label htmlFor="cpf">CPF</Label>
-                  <Input id="cpf" value={formData.cpf} onChange={(e) => updateField("cpf", e.target.value)} placeholder="000.000.000-00" />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="gender">Gênero</Label>
-                <select id="gender" value={formData.gender} onChange={(e) => updateField("gender", e.target.value)} className="w-full h-10 px-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
-                  <option value="">Selecione</option>
-                  <option value="male">Masculino</option>
-                  <option value="female">Feminino</option>
-                  <option value="other">Outro</option>
-                </select>
+                <FormField control={form.control} name="birthDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Data de Nascimento</FormLabel>
+                    <FormControl><Input type="date" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="cpf" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CPF</FormLabel>
+                    <FormControl><Input inputMode="numeric" placeholder="000.000.000-00" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </div>
               <div className="border-t pt-4">
-                <h3 className="font-medium text-gray-900 dark:text-white mb-3">Contato de Emergência</h3>
+                <h3 className="font-medium text-gray-900 dark:text-white mb-3">Responsável</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="emergencyContact">Nome</Label>
-                    <Input id="emergencyContact" value={formData.emergencyContact} onChange={(e) => updateField("emergencyContact", e.target.value)} placeholder="Nome do contato" />
-                  </div>
-                  <div>
-                    <Label htmlFor="emergencyPhone">Telefone</Label>
-                    <Input id="emergencyPhone" value={formData.emergencyPhone} onChange={(e) => updateField("emergencyPhone", e.target.value)} placeholder="(00) 00000-0000" />
-                  </div>
+                  <FormField control={form.control} name="guardianName" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nome do Responsável</FormLabel>
+                      <FormControl><Input placeholder="Nome do responsável" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="guardianPhone" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Telefone do Responsável</FormLabel>
+                      <FormControl><Input type="tel" placeholder="(00) 00000-0000" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                <div className="mt-4">
+                  <FormField control={form.control} name="guardianRelationship" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Parentesco</FormLabel>
+                      <FormControl>
+                        <select {...field} className="w-full h-10 px-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                          <option value="">Selecione</option>
+                          <option value="Mãe">Mãe</option>
+                          <option value="Pai">Pai</option>
+                          <option value="Avô/Avó">Avô/Avó</option>
+                          <option value="Outro">Outro</option>
+                        </select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                 </div>
               </div>
-            </div>
-            <div className="flex justify-end pt-4">
-              <Button type="button" onClick={() => setStep(2)} className="bg-purple-600 hover:bg-purple-700">Próximo →</Button>
-            </div>
-          </Card>
-        )}
+              <div className="flex justify-end pt-4">
+                <Button type="button" onClick={() => setStep(2)} className="bg-purple-600 hover:bg-purple-700">Próximo →</Button>
+              </div>
+            </Card>
+          )}
 
-        {step === 2 && (
-          <Card className="p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Endereço</h2>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="zipCode">CEP</Label>
-                <Input id="zipCode" value={formData.zipCode} onChange={(e) => updateField("zipCode", e.target.value)} placeholder="00000-000" />
+          {step === 2 && (
+            <Card className="p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Endereço</h2>
+              <FormField control={form.control} name="address.zipCode" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>CEP</FormLabel>
+                  <FormControl><Input inputMode="numeric" placeholder="00000-000" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <FormField control={form.control} name="address.street" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Rua</FormLabel>
+                      <FormControl><Input placeholder="Nome da rua" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                <FormField control={form.control} name="address.number" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Número</FormLabel>
+                    <FormControl><Input placeholder="Nº" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </div>
-              <div>
-                <Label htmlFor="address">Endereço</Label>
-                <Input id="address" value={formData.address} onChange={(e) => updateField("address", e.target.value)} placeholder="Rua, número, complemento" />
-              </div>
+              <FormField control={form.control} name="address.complement" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Complemento</FormLabel>
+                  <FormControl><Input placeholder="Apto, bloco, etc." {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="address.neighborhood" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Bairro</FormLabel>
+                  <FormControl><Input placeholder="Nome do bairro" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="city">Cidade</Label>
-                  <Input id="city" value={formData.city} onChange={(e) => updateField("city", e.target.value)} placeholder="Nome da cidade" />
-                </div>
-                <div>
-                  <Label htmlFor="state">Estado</Label>
-                  <select id="state" value={formData.state} onChange={(e) => updateField("state", e.target.value)} className="w-full h-10 px-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
-                    <option value="">Selecione</option>
-                    {["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"].map((uf) => (
-                      <option key={uf} value={uf}>{uf}</option>
-                    ))}
-                  </select>
-                </div>
+                <FormField control={form.control} name="address.city" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Cidade</FormLabel>
+                    <FormControl><Input placeholder="Nome da cidade" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="address.state" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estado</FormLabel>
+                    <FormControl>
+                      <select {...field} className="w-full h-10 px-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                        <option value="">Selecione</option>
+                        {UF_LIST.map((uf) => (<option key={uf} value={uf}>{uf}</option>))}
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
               </div>
-            </div>
-            <div className="flex justify-between pt-4">
-              <Button type="button" variant="outline" onClick={() => setStep(1)}>← Voltar</Button>
-              <Button type="button" onClick={() => setStep(3)} className="bg-purple-600 hover:bg-purple-700">Próximo →</Button>
-            </div>
-          </Card>
-        )}
+              <div className="flex justify-between pt-4">
+                <Button type="button" variant="outline" onClick={() => setStep(1)}>← Voltar</Button>
+                <Button type="button" onClick={() => setStep(3)} className="bg-purple-600 hover:bg-purple-700">Próximo →</Button>
+              </div>
+            </Card>
+          )}
 
-        {step === 3 && (
-          <Card className="p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Observações</h2>
-            <div>
-              <Label htmlFor="notes">Observações gerais</Label>
-              <Textarea id="notes" value={formData.notes} onChange={(e) => updateField("notes", e.target.value)} placeholder="Observações sobre o paciente, histórico médico, diagnósticos..." rows={6} />
-            </div>
-            {error && (
-              <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-md text-sm">{error}</div>
-            )}
-            <div className="flex justify-between pt-4">
-              <Button type="button" variant="outline" onClick={() => setStep(2)}>← Voltar</Button>
-              <Button type="submit" disabled={isCreating || !formData.fullName} className="bg-purple-600 hover:bg-purple-700">
-                {isCreating ? "Salvando..." : "Salvar Paciente"}
-              </Button>
-            </div>
-          </Card>
-        )}
-      </form>
+          {step === 3 && (
+            <Card className="p-6 space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Observações</h2>
+              <FormField control={form.control} name="medicalHistory.notes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Observações gerais</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="Observações sobre o paciente, histórico médico, diagnósticos..." rows={6} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              {error && (
+                <div className="p-3 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-md text-sm">{error}</div>
+              )}
+              <div className="flex justify-between pt-4">
+                <Button type="button" variant="outline" onClick={() => setStep(2)}>← Voltar</Button>
+                <Button type="submit" disabled={isCreating || !form.getValues("name")} className="bg-purple-600 hover:bg-purple-700">
+                  {isCreating ? "Salvando..." : "Salvar Paciente"}
+                </Button>
+              </div>
+            </Card>
+          )}
+        </form>
+      </Form>
     </div>
   )
 }

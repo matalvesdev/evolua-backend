@@ -1,6 +1,6 @@
 export interface PatientListItemDto {
   id: string
-  fullName: string
+  name: string
   email?: string
   phone?: string
   status: string
@@ -11,21 +11,31 @@ export interface PatientListItemDto {
 export interface PatientDetailDto {
   id: string
   clinicId: string
-  fullName: string
+  name: string
   email?: string
   phone?: string
   cpf?: string
-  dateOfBirth?: string
-  gender?: string
+  birthDate?: string
   status: string
+  guardianName?: string
+  guardianPhone?: string
+  guardianRelationship?: string
   therapistId?: string
-  address?: string
-  city?: string
-  state?: string
-  zipCode?: string
-  emergencyContact?: string
-  emergencyPhone?: string
-  notes?: string
+  address?: {
+    street?: string
+    number?: string
+    complement?: string
+    neighborhood?: string
+    city?: string
+    state?: string
+    zipCode?: string
+  } | null
+  medicalHistory?: {
+    diagnosis?: string[]
+    medications?: string[]
+    allergies?: string[]
+    notes?: string
+  } | null
   createdAt: string
   updatedAt: string
 }

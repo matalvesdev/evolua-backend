@@ -43,7 +43,6 @@ import {
 import { cn } from '@/lib/utils';
 import { useTasks, type Task } from '@/hooks/use-tasks';
 import { usePatients } from '@/hooks/use-patients';
-import { useAppointments } from '@/hooks/use-appointments';
 import { toast } from 'sonner';
 
 // =============================================
@@ -54,9 +53,8 @@ const taskFormSchema = z.object({
   description: z.string().optional(),
   type: z.enum(['task', 'reminder']),
   priority: z.enum(['low', 'medium', 'high']),
-  due_date: z.date().optional(),
-  patient_id: z.string().optional(),
-  appointment_id: z.string().optional(),
+  dueDate: z.date().optional(),
+  patientId: z.string().optional(),
 });
 
 type TaskFormValues = z.infer<typeof taskFormSchema>;
@@ -69,7 +67,6 @@ interface TaskFormProps {
   onOpenChange: (open: boolean) => void;
   task?: Task;
   defaultPatientId?: string;
-  defaultAppointmentId?: string;
 }
 
 // =============================================
@@ -80,11 +77,9 @@ export function TaskForm({
   onOpenChange,
   task,
   defaultPatientId,
-  defaultAppointmentId,
 }: TaskFormProps) {
   const { createTask, updateTask, isCreating, isUpdating } = useTasks();
   const { patients } = usePatients();
-  const { appointments } = useAppointments();
 
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -93,9 +88,8 @@ export function TaskForm({
       description: task?.description || '',
       type: task?.type || 'task',
       priority: task?.priority || 'medium',
-      due_date: task?.due_date ? new Date(task.due_date) : undefined,
-      patient_id: task?.patient_id || defaultPatientId || '',
-      appointment_id: task?.appointment_id || defaultAppointmentId || '',
+      dueDate: task?.dueDate ? new Date(task.dueDate) : undefined,
+      patientId: task?.patientId || defaultPatientId || '',
     },
   });
 
@@ -106,9 +100,8 @@ export function TaskForm({
     try {
       const data = {
         ...values,
-        due_date: values.due_date?.toISOString(),
-        patient_id: values.patient_id || undefined,
-        appointment_id: values.appointment_id || undefined,
+        dueDate: values.dueDate?.toISOString(),
+        patientId: values.patientId || undefined,
       };
 
       if (isEditMode) {
@@ -242,7 +235,7 @@ export function TaskForm({
             {/* Due Date */}
             <FormField
               control={form.control}
-              name="due_date"
+              name="dueDate"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Data de vencimento</FormLabel>
@@ -288,55 +281,26 @@ export function TaskForm({
             {/* Patient */}
             <FormField
               control={form.control}
-              name="patient_id"
+              name="patientId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Paciente (opcional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select
+                    onValueChange={(val) =>
+                      field.onChange(val === '__none__' ? '' : val)
+                    }
+                    value={field.value || '__none__'}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione um paciente" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
+                      <SelectItem value="__none__">Nenhum</SelectItem>
                       {patients?.map((patient) => (
                         <SelectItem key={patient.id} value={patient.id}>
                           {patient.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Appointment */}
-            <FormField
-              control={form.control}
-              name="appointment_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Agendamento (opcional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um agendamento" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
-                      {appointments?.slice(0, 20).map((appointment) => (
-                        <SelectItem
-                          key={appointment.id}
-                          value={appointment.id}
-                        >
-                          {format(
-                            new Date(appointment.dateTime),
-                            "dd/MM/yyyy 'às' HH:mm"
-                          )}{' '}
-                          - {appointment.patientName}
                         </SelectItem>
                       ))}
                     </SelectContent>

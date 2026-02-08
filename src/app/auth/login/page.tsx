@@ -1,11 +1,12 @@
 "use client"
 
 import * as React from "react"
+import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import Link from "next/link"
 import * as authApi from "@/lib/api/auth"
 
-export default function LoginPage() {
+function LoginContent() {
   const searchParams = useSearchParams()
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
@@ -201,5 +202,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center">Carregando...</div>}>
+      <LoginContent />
+    </Suspense>
   )
 }

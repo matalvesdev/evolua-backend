@@ -17,7 +17,7 @@ export default function PacientesPage() {
     const search = searchTerm.toLowerCase()
     return patients.filter((patient) => {
       return (
-        patient.fullName.toLowerCase().includes(search) ||
+        patient.name.toLowerCase().includes(search) ||
         patient.email?.toLowerCase().includes(search) ||
         patient.phone?.toLowerCase().includes(search)
       )
@@ -108,9 +108,9 @@ export default function PacientesPage() {
                   <PatientCard
                     key={patient.id}
                     id={patient.id}
-                    name={patient.fullName}
-                    age={calculateAge(patient.dateOfBirth)}
-                    guardian={patient.emergencyContact}
+                    name={patient.name}
+                    age={calculateAge(patient.birthDate)}
+                    guardian={patient.guardianName}
                     specialties={["Geral"]}
                     status={patient.status as "active" | "inactive"}
                   />

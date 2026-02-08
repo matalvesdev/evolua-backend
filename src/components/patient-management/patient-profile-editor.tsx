@@ -34,8 +34,8 @@ export function PatientProfileEditor({
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {}
 
-    if (!formData.personalInfo.fullName.trim()) {
-      errors["personalInfo.fullName"] = "Nome completo é obrigatório"
+    if (!formData.personalInfo.name.trim()) {
+      errors["personalInfo.name"] = "Nome completo é obrigatório"
     }
     if (!formData.personalInfo.dateOfBirth) {
       errors["personalInfo.dateOfBirth"] = "Data de nascimento é obrigatória"
@@ -108,7 +108,7 @@ export function PatientProfileEditor({
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Editar Perfil do Paciente</h1>
           <p className="text-gray-600 mt-1">
-            Atualize as informações de <span className="font-medium text-gray-900">{initialData.personalInfo.fullName}</span>
+            Atualize as informações de <span className="font-medium text-gray-900">{initialData.personalInfo.name}</span>
           </p>
         </div>
         <PatientStatusBadge status={initialData.status} />
@@ -149,15 +149,15 @@ export function PatientProfileEditor({
 
             <div className="space-y-4">
               <div>
-                <Label htmlFor="fullName">Nome Completo *</Label>
+                <Label htmlFor="name">Nome Completo *</Label>
                 <Input
-                  id="fullName"
-                  value={formData.personalInfo.fullName}
-                  onChange={(e) => updatePersonalInfo("fullName", e.target.value)}
-                  className={validationErrors["personalInfo.fullName"] ? "border-red-500" : ""}
+                  id="name"
+                  value={formData.personalInfo.name}
+                  onChange={(e) => updatePersonalInfo("name", e.target.value)}
+                  className={validationErrors["personalInfo.name"] ? "border-red-500" : ""}
                 />
-                {validationErrors["personalInfo.fullName"] && (
-                  <p className="text-sm text-red-500 mt-1">{validationErrors["personalInfo.fullName"]}</p>
+                {validationErrors["personalInfo.name"] && (
+                  <p className="text-sm text-red-500 mt-1">{validationErrors["personalInfo.name"]}</p>
                 )}
               </div>
 
@@ -482,3 +482,4 @@ export function PatientProfileEditor({
     </div>
   )
 }
+

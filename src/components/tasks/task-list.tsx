@@ -151,8 +151,8 @@ export function TaskList({
   const isOverdue = (task: Task) => {
     return (
       task.status === 'pending' &&
-      task.due_date &&
-      new Date(task.due_date) < new Date()
+      task.dueDate &&
+      new Date(task.dueDate) < new Date()
     );
   };
 
@@ -285,7 +285,7 @@ export function TaskList({
                   {getPriorityBadge(task.priority)}
                   {getTypeBadge(task.type)}
 
-                  {task.due_date && (
+                  {task.dueDate && (
                     <div
                       className={cn(
                         'flex items-center gap-1',
@@ -299,7 +299,7 @@ export function TaskList({
                       ) : (
                         <Clock className="h-3 w-3" />
                       )}
-                      {format(new Date(task.due_date), 'dd/MM/yyyy', {
+                      {format(new Date(task.dueDate), 'dd/MM/yyyy', {
                         locale: ptBR,
                       })}
                     </div>

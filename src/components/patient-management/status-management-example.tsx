@@ -22,18 +22,17 @@ import type { StatusStatistics, StatusTransitionItem } from "./patient-status-da
 const mockStatistics: StatusStatistics = {
   totalPatients: 45,
   statusCounts: {
-    new: 5,
     active: 28,
-    on_hold: 4,
-    discharged: 6,
     inactive: 2,
-  },
+    discharged: 6,
+    "on-hold": 9,
+  } as Record<string, number>,
   recentTransitions: [
     {
       id: "1",
       patientName: "Maria Silva",
       patientId: "patient-1",
-      fromStatus: "new",
+      fromStatus: null,
       toStatus: "active",
       timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
       changedByName: "Dr. João Santos",
@@ -43,7 +42,7 @@ const mockStatistics: StatusStatistics = {
       patientName: "Pedro Oliveira",
       patientId: "patient-2",
       fromStatus: "active",
-      toStatus: "on_hold",
+      toStatus: "on-hold",
       reason: "Paciente solicitou pausa no tratamento por motivos pessoais",
       timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
       changedByName: "Dr. Ana Costa",
@@ -62,7 +61,7 @@ const mockStatistics: StatusStatistics = {
       id: "4",
       patientName: "Ana Paula",
       patientId: "patient-4",
-      fromStatus: "on_hold",
+      fromStatus: "on-hold",
       toStatus: "active",
       timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
       changedByName: "Dr. Ana Costa",
@@ -72,18 +71,17 @@ const mockStatistics: StatusStatistics = {
       patientName: "Carlos Eduardo",
       patientId: "patient-5",
       fromStatus: null,
-      toStatus: "new",
+      toStatus: "active",
       timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3), // 3 days ago
       changedByName: "Sistema",
     },
   ],
   averageTimeInStatus: {
-    new: 7,
     active: 45,
-    on_hold: 14,
+    "on-hold": 14,
     discharged: 90,
     inactive: 180,
-  },
+  } as Record<string, number>,
 }
 
 export function StatusManagementExample() {

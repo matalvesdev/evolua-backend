@@ -68,7 +68,7 @@ export function TransactionsFilters({
               className="w-full pl-9 pr-3 py-2.5 text-sm bg-white dark:bg-white/5 border border-[#f3f0f4] dark:border-white/10 rounded-lg text-[#161118] dark:text-white focus:ring-2 focus:ring-[#820AD1]/50 focus:border-[#820AD1] outline-none appearance-none font-medium"
             >
               <option value="all">Todos os status</option>
-              <option value="paid">Pago</option>
+              <option value="completed">Pago</option>
               <option value="pending">Pendente</option>
               <option value="overdue">Atrasado</option>
             </select>

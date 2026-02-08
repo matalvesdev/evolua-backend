@@ -15,17 +15,16 @@ interface PaginatedResponse<T> {
 export interface Transaction {
   id: string
   clinicId: string
-  therapistId: string
+  userId: string
   type: "income" | "expense"
   category: string
-  description: string
+  description?: string
   amount: number
   paymentMethod?: string
-  status: "pending" | "paid" | "cancelled" | "overdue"
-  dueDate?: string
-  paidDate?: string
+  status: "pending" | "completed" | "cancelled" | "overdue"
+  dueDate: string
+  paidAt?: string
   patientId?: string
-  patientName?: string
   appointmentId?: string
   notes?: string
   createdAt: string
@@ -35,12 +34,11 @@ export interface Transaction {
 export interface CreateTransactionInput {
   type: "income" | "expense"
   category: string
-  description: string
+  description?: string
   amount: number
   paymentMethod?: string
   dueDate?: string
   patientId?: string
-  patientName?: string
   appointmentId?: string
   notes?: string
 }
@@ -50,18 +48,16 @@ export interface UpdateTransactionInput {
   description?: string
   amount?: number
   paymentMethod?: string
-  status?: "pending" | "paid" | "cancelled" | "overdue"
+  status?: "pending" | "completed" | "cancelled" | "overdue"
   dueDate?: string
-  paidDate?: string
+  paidAt?: string
   notes?: string
 }
 
 export interface FinancialSummary {
   totalIncome: number
-  totalExpenses: number
+  totalExpense: number
   balance: number
-  pendingReceivables: number
-  pendingPayables: number
 }
 
 export async function createTransaction(input: CreateTransactionInput): Promise<Transaction> {
