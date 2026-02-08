@@ -26,7 +26,7 @@ export function WeeklyActivitiesPlan({
     <section className="glass-card rounded-[2rem] p-6 md:p-8 border border-white">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div className="flex items-start gap-4">
-          <div className="bg-[#820AD1]/10 p-2 rounded-xl text-[#820AD1] mt-1">
+          <div className="bg-[#8A05BE]/10 p-2 rounded-xl text-[#8A05BE] mt-1">
             <span className="material-symbols-outlined text-[24px]">assignment</span>
           </div>
           <div>
@@ -38,7 +38,7 @@ export function WeeklyActivitiesPlan({
         </div>
 
         <div className="flex gap-2">
-          <button className="text-xs font-bold text-[#820AD1] bg-[#820AD1]/5 border border-[#820AD1]/10 px-5 py-2.5 rounded-xl hover:bg-[#820AD1]/10 transition-colors">
+          <button className="text-xs font-bold text-[#8A05BE] bg-[#8A05BE]/5 border border-[#8A05BE]/10 px-5 py-2.5 rounded-xl hover:bg-[#8A05BE]/10 transition-colors">
             Ver Histórico
           </button>
           <button className="text-xs font-bold text-gray-600 border border-gray-200 px-5 py-2.5 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2">
@@ -64,9 +64,9 @@ export function WeeklyActivitiesPlan({
 
       <button
         onClick={onAddActivity}
-        className="w-full mt-6 py-4 border-2 border-dashed border-[#820AD1]/20 rounded-2xl text-[#820AD1] text-sm font-bold hover:bg-[#820AD1]/5 hover:border-[#820AD1]/40 transition-all flex items-center justify-center gap-2 group"
+        className="w-full mt-6 py-4 border-2 border-dashed border-[#8A05BE]/20 rounded-2xl text-[#8A05BE] text-sm font-bold hover:bg-[#8A05BE]/5 hover:border-[#8A05BE]/40 transition-all flex items-center justify-center gap-2 group"
       >
-        <span className="bg-[#820AD1]/10 p-1 rounded-lg group-hover:bg-[#820AD1]/20 transition-colors">
+        <span className="bg-[#8A05BE]/10 p-1 rounded-lg group-hover:bg-[#8A05BE]/20 transition-colors">
           <span className="material-symbols-outlined text-[18px]">add</span>
         </span>
         Adicionar Nova Atividade

@@ -96,7 +96,7 @@ export function DocumentsSection() {
             className="group flex items-center justify-between p-3.5 rounded-2xl hover:bg-white border border-transparent hover:border-gray-100 hover:shadow-md transition-all cursor-pointer bg-white/40"
           >
             <div className="flex items-center gap-4">
-              <div className={`size-11 rounded-xl ${doc.iconColor} flex items-center justify-center flex-shrink-0`}>
+              <div className={`size-11 rounded-xl ${doc.iconColor} flex items-center justify-center shrink-0`}>
                 <span className="material-symbols-outlined">{doc.icon}</span>
               </div>
               <div className="flex flex-col gap-0.5">

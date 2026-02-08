@@ -35,15 +35,15 @@ export function CommunicationTimeline({
 }: CommunicationTimelineProps) {
   return (
     <div className="relative z-10 flex-1">
-      <div className="absolute left-[23px] top-4 bottom-0 w-[2px] bg-gradient-to-b from-gray-300 via-gray-200 to-transparent" />
+      <div className="absolute left-[23px] top-4 bottom-0 w-[2px] bg-linear-to-b from-gray-300 via-gray-200 to-transparent" />
 
       {groups.map((group, groupIndex) => (
         <div key={group.date} className={groupIndex !== groups.length - 1 ? "mb-8" : "mb-4"}>
           <div className="flex items-center gap-4 mb-6 relative">
-            <div className={`size-3 rounded-full ${group.isToday ? 'bg-[#820AD1]' : 'bg-gray-300'} ring-4 ring-white shadow-sm ml-[18px] z-10`} />
+            <div className={`size-3 rounded-full ${group.isToday ? 'bg-[#8A05BE]' : 'bg-gray-300'} ring-4 ring-white shadow-sm ml-[18px] z-10`} />
             <span className={`text-[11px] font-bold uppercase tracking-wider px-3 py-1 rounded-md border ${
               group.isToday
-                ? "text-[#820AD1] bg-[#820AD1]/5 border-[#820AD1]/10"
+                ? "text-[#8A05BE] bg-[#8A05BE]/5 border-[#8A05BE]/10"
                 : "text-gray-600 bg-gray-50 border-gray-200"
             }`}>
               {group.label}
@@ -74,7 +74,7 @@ export function CommunicationTimeline({
         <div className="flex justify-center mt-6 pb-2">
           <button
             onClick={onLoadMore}
-            className="text-xs font-bold text-gray-600 hover:text-[#820AD1] transition-colors flex items-center gap-2 uppercase tracking-wider py-2 px-4 rounded-full hover:bg-gray-100"
+            className="text-xs font-bold text-gray-600 hover:text-[#8A05BE] transition-colors flex items-center gap-2 uppercase tracking-wider py-2 px-4 rounded-full hover:bg-gray-100"
           >
             <span className="material-symbols-outlined text-[18px]">history</span>
             Carregar comunicações antigas

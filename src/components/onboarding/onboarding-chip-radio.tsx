@@ -37,8 +37,8 @@ export function OnboardingChipRadio({
         className={cn(
           "px-6 py-3 rounded-full input-glass text-sm font-bold transition-all",
           selected
-            ? "bg-primary text-white border-primary shadow-[0_4px_15px_rgba(164,19,236,0.3)]"
-            : "text-slate-600 hover:text-primary hover:border-purple-300"
+            ? "bg-[#8A05BE] text-white border-[#8A05BE] shadow-[0_4px_15px_rgba(138,5,190,0.3)]"
+            : "text-slate-600 hover:text-[#8A05BE] hover:border-[#8A05BE]/30"
         )}
       >
         {label}

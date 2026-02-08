@@ -28,15 +28,16 @@ export function RecordingTimer({
     if (!isRecording || isPaused) return
 
     const interval = setInterval(() => {
-      setSeconds((prev) => {
-        const newTime = prev + 1
-        onTimeUpdate?.(newTime)
-        return newTime
-      })
+      setSeconds((prev) => prev + 1)
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [isRecording, isPaused, onTimeUpdate])
+  }, [isRecording, isPaused])
+
+  // Notify parent of time changes separately to avoid setState-during-render
+  useEffect(() => {
+    onTimeUpdate?.(seconds)
+  }, [seconds, onTimeUpdate])
 
   const formatTime = (totalSeconds: number) => {
     const mins = Math.floor(totalSeconds / 60)

@@ -120,14 +120,14 @@ export default function CommunicationPage({ params }: CommunicationPageProps) {
   return (
     <div className="relative min-h-screen bg-[#f7f6f8]">
       {/* Gradient Orb */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-[#820AD1]/5 rounded-full blur-[100px] pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-[#8A05BE]/5 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 md:px-8 py-8 pb-20">
         {/* Breadcrumbs */}
         <div className="mb-6 flex items-center gap-2 text-sm text-gray-600">
           <Link
             href={`/dashboard/pacientes/${id}`}
-            className="hover:text-[#820AD1] transition-colors flex items-center gap-1"
+            className="hover:text-[#8A05BE] transition-colors flex items-center gap-1"
           >
             <span className="material-symbols-outlined text-[16px]">arrow_back</span>
             Voltar para Perfil

@@ -21,11 +21,11 @@ export function OnboardingMobileHeader({
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-2 text-primary">
+      <div className="flex items-center gap-2 text-[#8A05BE]">
         <svg
           viewBox="0 0 24 24"
           fill="none"
-          className="size-5 text-primary"
+          className="size-5 text-[#8A05BE]"
           stroke="currentColor"
           strokeWidth="2"
           strokeLinecap="round"
@@ -39,7 +39,7 @@ export function OnboardingMobileHeader({
       </div>
 
       {/* Step Badge */}
-      <div className="text-xs text-primary font-bold bg-purple-100 px-3 py-1 rounded-full border border-purple-200">
+      <div className="text-xs text-[#8A05BE] font-bold bg-[#8A05BE]/10 px-3 py-1 rounded-full border border-[#8A05BE]/20">
         Etapa {currentStep}/{totalSteps}
       </div>
     </div>

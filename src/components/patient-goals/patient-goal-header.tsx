@@ -32,22 +32,22 @@ export function PatientGoalHeader({
 
   return (
     <section className="glass-card rounded-3xl p-6 md:p-8 flex flex-col lg:flex-row gap-8 items-start relative overflow-hidden transition-all hover:shadow-lg border border-white">
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-[#820AD1]/10 via-purple-100/20 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-linear-to-bl from-[#8A05BE]/10 via-[#8A05BE]/10 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
       
       <div className="flex-1 flex flex-col md:flex-row gap-6 items-center md:items-start z-10 w-full">
         {/* Patient Avatar */}
-        <div className="relative group flex-shrink-0">
+        <div className="relative group shrink-0">
           {patientImage ? (
             <div
               className="bg-center bg-no-repeat bg-cover rounded-[2rem] size-32 shadow-lg ring-4 ring-white/50"
               style={{ backgroundImage: `url(${patientImage})` }}
             />
           ) : (
-            <div className="size-32 rounded-[2rem] bg-gradient-to-br from-[#820AD1] to-purple-400 shadow-lg ring-4 ring-white/50 flex items-center justify-center text-white text-5xl font-bold">
+            <div className="size-32 rounded-[2rem] bg-linear-to-br from-[#8A05BE] to-[#C084FC] shadow-lg ring-4 ring-white/50 flex items-center justify-center text-white text-5xl font-bold">
               {initial}
             </div>
           )}
-          <button className="absolute -bottom-2 -right-2 bg-white text-[#820AD1] p-2 rounded-xl shadow-lg hover:scale-110 hover:shadow-[#820AD1]/20 transition-all border border-gray-100">
+          <button className="absolute -bottom-2 -right-2 bg-white text-[#8A05BE] p-2 rounded-xl shadow-lg hover:scale-110 hover:shadow-[#8A05BE]/20 transition-all border border-gray-100">
             <span className="material-symbols-outlined text-[18px]">edit</span>
           </button>
         </div>
@@ -63,21 +63,21 @@ export function PatientGoalHeader({
 
           <div className="flex flex-wrap gap-x-6 gap-y-3 text-gray-600 text-sm mb-6 justify-center md:justify-start">
             <span className="flex items-center gap-1.5 px-3 py-1 bg-white/50 rounded-lg border border-white/50">
-              <span className="material-symbols-outlined text-[#820AD1] text-[18px]">cake</span>
+              <span className="material-symbols-outlined text-[#8A05BE] text-[18px]">cake</span>
               {age} anos ({birthDate})
             </span>
             <span className="flex items-center gap-1.5 px-3 py-1 bg-white/50 rounded-lg border border-white/50">
-              <span className="material-symbols-outlined text-[#820AD1] text-[18px]">medical_services</span>
+              <span className="material-symbols-outlined text-[#8A05BE] text-[18px]">medical_services</span>
               {specialty}
             </span>
             <span className="flex items-center gap-1.5 px-3 py-1 bg-white/50 rounded-lg border border-white/50">
-              <span className="material-symbols-outlined text-[#820AD1] text-[18px]">school</span>
+              <span className="material-symbols-outlined text-[#8A05BE] text-[18px]">school</span>
               {schooling}
             </span>
           </div>
 
           <div className="flex gap-3 w-full md:w-auto">
-            <button className="flex-1 md:flex-none bg-[#820AD1] hover:bg-[#6D08AF] text-white text-sm font-bold py-2.5 px-6 rounded-full transition-all shadow-lg shadow-[#820AD1]/25 hover:shadow-[#820AD1]/40 flex items-center justify-center gap-2">
+            <button className="flex-1 md:flex-none bg-[#8A05BE] hover:bg-[#7A04AA] text-white text-sm font-bold py-2.5 px-6 rounded-full transition-all shadow-lg shadow-[#8A05BE]/25 hover:shadow-[#8A05BE]/40 flex items-center justify-center gap-2">
               <span className="material-symbols-outlined text-[18px]">print</span>
               Imprimir Plano
             </button>
@@ -89,11 +89,11 @@ export function PatientGoalHeader({
       </div>
 
       {/* Progress Stats */}
-      <div className="hidden lg:flex gap-10 border-l border-[#820AD1]/10 pl-10 z-10 min-w-[280px]">
+      <div className="hidden lg:flex gap-10 border-l border-[#8A05BE]/10 pl-10 z-10 min-w-[280px]">
         <div className="flex flex-col gap-1">
           <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">Início</span>
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-[#820AD1] text-[20px]">calendar_today</span>
+            <span className="material-symbols-outlined text-[#8A05BE] text-[20px]">calendar_today</span>
             <span className="text-lg font-bold text-gray-900">{startDate}</span>
           </div>
         </div>
@@ -103,7 +103,7 @@ export function PatientGoalHeader({
             <span className="text-2xl font-bold text-gray-900">{overallProgress}%</span>
             <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden shadow-inner">
               <div
-                className="h-full bg-gradient-to-r from-[#820AD1] to-purple-400 rounded-full relative"
+                className="h-full bg-linear-to-r from-[#8A05BE] to-[#C084FC] rounded-full relative"
                 style={{ width: `${overallProgress}%` }}
               >
                 <div className="absolute right-0 top-0 bottom-0 w-2 bg-white/30" />

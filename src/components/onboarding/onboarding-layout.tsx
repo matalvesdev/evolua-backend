@@ -39,7 +39,7 @@ export function OnboardingLayout({
   return (
     <div
       className={cn(
-        "bg-background font-sans text-foreground overflow-hidden h-screen w-screen flex flex-col md:flex-row",
+        "bg-[#fcfbfd] font-sans text-slate-800 overflow-hidden h-screen w-screen flex flex-col md:flex-row",
         className
       )}
     >
@@ -53,7 +53,7 @@ export function OnboardingLayout({
       />
 
       {/* Right Content Area */}
-      <div className="w-full md:w-1/2 h-full relative flex flex-col overflow-y-auto bg-background">
+      <div className="w-full md:w-1/2 h-full relative flex flex-col overflow-y-auto bg-[#fcfbfd]">
         {/* Mobile Header */}
         <OnboardingMobileHeader
           currentStep={currentStep}

@@ -1,6 +1,8 @@
 export { PatientCard } from "./patient-card"
 export { PatientFilters } from "./patient-filters"
 export { PatientListHeader } from "./patient-list-header"
+export { getInitials, getAvatarColor, getSpecialtyColor, filterPatients } from "./patient-utils"
+export type { PatientSearchData } from "./patient-utils"
 
 // Patient form components
 export { PatientActionButtons } from './patient-action-buttons'

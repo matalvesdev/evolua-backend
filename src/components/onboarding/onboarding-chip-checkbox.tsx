@@ -28,8 +28,8 @@ export function OnboardingChipCheckbox({
         className={cn(
           "px-4 py-2 rounded-lg input-glass text-sm font-medium transition-all",
           checked
-            ? "bg-primary/10 text-primary border-primary font-bold"
-            : "text-slate-600 hover:bg-purple-50 hover:text-primary"
+            ? "bg-[#8A05BE]/10 text-[#8A05BE] border-[#8A05BE] font-bold"
+            : "text-slate-600 hover:bg-[#8A05BE]/5 hover:text-[#8A05BE]"
         )}
       >
         {label}

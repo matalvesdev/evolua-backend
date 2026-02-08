@@ -26,13 +26,13 @@ export function ReportReviewHeader({ progress }: ReportReviewHeaderProps) {
           <p className="text-gray-900 text-sm font-semibold leading-normal">
             Revisão e Finalização
           </p>
-          <p className="text-[#820AD1] text-sm font-bold leading-normal">
+          <p className="text-[#8A05BE] text-sm font-bold leading-normal">
             {progress}%
           </p>
         </div>
-        <div className="rounded-full bg-purple-50 overflow-hidden border border-purple-100">
+        <div className="rounded-full bg-[#8A05BE]/5 overflow-hidden border border-[#8A05BE]/10">
           <div 
-            className="h-2 rounded-full bg-[#820AD1] transition-all duration-500" 
+            className="h-2 rounded-full bg-[#8A05BE] transition-all duration-500" 
             style={{ width: `${progress}%` }}
           />
         </div>

@@ -94,16 +94,16 @@ export default function ObjetivosPage() {
       }
       floatingBadges={[
         {
-          icon: <FileText className="size-3.5 text-indigo-600" />,
+          icon: <FileText className="size-3.5 text-[#8A05BE]" />,
           label: "Relatórios Digitais",
-          iconBgClassName: "bg-indigo-100",
+          iconBgClassName: "bg-[#8A05BE]/10",
           className: "absolute top-[25%] right-[20%]",
           animationDuration: "4.5s",
         },
         {
-          icon: <CalendarCheck className="size-3.5 text-primary" />,
+          icon: <CalendarCheck className="size-3.5 text-[#8A05BE]" />,
           label: "Agenda Otimizada",
-          iconBgClassName: "bg-purple-100",
+          iconBgClassName: "bg-[#8A05BE]/10",
           className: "absolute bottom-[30%] left-[18%]",
           animationDuration: "5.5s",
           animationDelay: "1.5s",
@@ -177,7 +177,7 @@ export default function ObjetivosPage() {
           onClick={handleBack}
           variant="outline"
           size="lg"
-          className="font-semibold py-4 px-8 rounded-full border-2 border-slate-200 hover:border-primary/30 hover:bg-primary/5 flex items-center gap-2 text-base h-auto transition-all duration-300"
+          className="font-semibold py-4 px-8 rounded-full border-2 border-slate-200 hover:border-[#8A05BE]/30 hover:bg-[#8A05BE]/5 flex items-center gap-2 text-base h-auto transition-all duration-300"
         >
           <ArrowLeft className="size-5" />
           Voltar
@@ -185,10 +185,10 @@ export default function ObjetivosPage() {
         <Button
           onClick={handleContinue}
           size="lg"
-          className="group bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-4 px-10 rounded-full shadow-[0_8px_25px_rgba(164,19,236,0.3)] hover:shadow-[0_10px_30px_rgba(164,19,236,0.5)] transform hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-2 text-lg h-auto"
+          className="bg-[#8A05BE] hover:bg-[#8A05BE]/90 text-white font-bold py-4 px-10 rounded-full shadow-[0_8px_25px_rgba(138,5,190,0.3)] hover:shadow-[0_10px_30px_rgba(138,5,190,0.5)] transform hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-2 text-lg h-auto"
         >
           Continuar
-          <ArrowRight className="size-5 group-hover:translate-x-1 transition-transform" />
+          <ArrowRight className="size-5" />
         </Button>
       </div>
 

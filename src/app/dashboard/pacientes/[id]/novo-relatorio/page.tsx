@@ -102,9 +102,9 @@ export default function NewReportPage({ params }: NewReportPageProps) {
   return (
     <div className="h-screen w-full overflow-hidden flex flex-col md:flex-row bg-[#F9F8FA]">
       {/* Left Panel - Illustration */}
-      <section className="relative w-full md:w-1/2 h-1/3 md:h-full bg-linear-to-br from-purple-50 via-purple-100 to-purple-200 overflow-hidden flex items-center justify-center p-8">
+      <section className="relative w-full md:w-1/2 h-1/3 md:h-full bg-linear-to-br from-[#8A05BE]/5 via-[#8A05BE]/10 to-[#8A05BE]/20 overflow-hidden flex items-center justify-center p-8">
         <div className="absolute top-[-20%] left-[-20%] w-[80%] h-[80%] bg-white/40 rounded-full blur-[100px]" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-purple-300/30 rounded-full blur-[80px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-[#8A05BE]/15 rounded-full blur-[80px]" />
 
         <div className="relative z-10 w-full max-w-lg flex flex-col items-center text-center gap-6">
           <div className="w-24 h-24 rounded-full bg-white/80 flex items-center justify-center shadow-xl">

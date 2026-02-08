@@ -2,17 +2,12 @@
 
 import * as React from "react"
 import { useUser } from "@/hooks"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Switch } from "@/components/ui/switch"
+import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 
 export default function PerfilPage() {
   const { user, loading } = useUser()
   const [isSaving, setIsSaving] = React.useState(false)
+  const [saved, setSaved] = React.useState(false)
 
   const [formData, setFormData] = React.useState({
     name: "",
@@ -20,329 +15,195 @@ export default function PerfilPage() {
     phone: "",
     crfa: "",
     specialization: "",
-  })
-
-  const [preferences, setPreferences] = React.useState({
-    emailNotifications: true,
-    pushNotifications: true,
-    appointmentReminders: true,
-    reportNotifications: true,
-    darkMode: false,
+    bio: "",
   })
 
   React.useEffect(() => {
     if (user) {
-      // Supabase User type has user_metadata for custom fields
-      const metadata = user.user_metadata || {}
+      const m = user.user_metadata || {}
       setFormData({
-        name: (metadata.name || metadata.full_name || "") as string,
+        name: (m.name || m.full_name || "") as string,
         email: user.email || "",
-        phone: (metadata.phone || "") as string,
-        crfa: (metadata.crfa || "") as string,
-        specialization: (metadata.specialization || "") as string,
+        phone: (m.phone || "") as string,
+        crfa: (m.crfa || "") as string,
+        specialization: (m.specialization || "") as string,
+        bio: (m.bio || "") as string,
       })
     }
   }, [user])
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const userName = (user?.user_metadata?.name || user?.user_metadata?.full_name || "Usuário") as string
+  const userRole = user?.user_metadata?.role === "therapist" ? "Fonoaudiólogo(a)" : "Profissional"
+
+  const getInitials = (name: string) =>
+    name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSaving(true)
-    
-    // TODO: Implement update user profile action
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    
+    setSaved(false)
+    await new Promise((r) => setTimeout(r, 1000))
     setIsSaving(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 3000)
   }
 
-  const handleSavePreferences = async () => {
-    setIsSaving(true)
-    
-    // TODO: Implement save preferences action
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    
-    setIsSaving(false)
-  }
-
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
-  }
+  const update = (field: string, value: string) =>
+    setFormData((prev) => ({ ...prev, [field]: value }))
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin size-8 border-4 border-primary border-t-transparent rounded-full" />
-      </div>
+      <>
+        <DashboardHeader />
+        <div className="flex-1 flex items-center justify-center">
+          <span className="material-symbols-outlined text-4xl text-[#8A05BE] animate-spin">progress_activity</span>
+        </div>
+      </>
     )
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Perfil</h1>
-        <p className="text-gray-500 mt-1">Gerencie suas informações pessoais e preferências</p>
-      </div>
+    <>
+      <DashboardHeader />
+      <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div className="max-w-3xl mx-auto space-y-6">
+          {/* Page header */}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Meu Perfil</h1>
+            <p className="text-sm text-gray-500 mt-1">Gerencie suas informações pessoais</p>
+          </div>
 
-      <Tabs defaultValue="profile" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="profile">Perfil</TabsTrigger>
-          <TabsTrigger value="preferences">Preferências</TabsTrigger>
-          <TabsTrigger value="security">Segurança</TabsTrigger>
-        </TabsList>
-
-        {/* Profile Tab */}
-        <TabsContent value="profile" className="space-y-6">
-          <Card className="p-6">
-            {/* Avatar Section */}
-            <div className="flex items-center gap-6 pb-6 border-b">
-              <Avatar className="size-24">
-                <AvatarImage src={user?.user_metadata?.avatar_url as string | undefined} />
-                <AvatarFallback className="text-2xl bg-primary text-white">
-                  {user?.user_metadata?.name ? getInitials(user.user_metadata.name as string) : user?.user_metadata?.full_name ? getInitials(user.user_metadata.full_name as string) : "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900">{(user?.user_metadata?.name || user?.user_metadata?.full_name || "Usuário") as string}</h3>
-                <p className="text-sm text-gray-500">{user?.email}</p>
-                <Button variant="outline" className="mt-2" size="sm">
-                  <span className="material-symbols-outlined text-lg mr-2">photo_camera</span>
-                  Alterar foto
-                </Button>
+          {/* Profile card */}
+          <div className="glass-card p-6 md:p-8">
+            <div className="flex flex-col sm:flex-row items-center gap-6 pb-6 border-b border-gray-100/50">
+              <div className="w-20 h-20 rounded-2xl bg-linear-to-br from-[#8A05BE] to-[#6B04A0] flex items-center justify-center text-white text-2xl font-bold shadow-lg shadow-purple-200/50">
+                {getInitials(userName)}
               </div>
+              <div className="text-center sm:text-left flex-1">
+                <h2 className="text-xl font-bold text-gray-900">{userName}</h2>
+                <p className="text-sm text-gray-500">{user?.email}</p>
+                <span className="inline-flex items-center gap-1.5 mt-2 px-3 py-1 rounded-full bg-purple-50 text-[#8A05BE] text-xs font-semibold">
+                  <span className="material-symbols-outlined text-sm">verified</span>
+                  {userRole}
+                </span>
+              </div>
+              <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-white/60 hover:border-[#8A05BE]/30 transition-all">
+                <span className="material-symbols-outlined text-lg">photo_camera</span>
+                Alterar foto
+              </button>
             </div>
 
-            {/* Profile Form */}
-            <form onSubmit={handleSaveProfile} className="space-y-4 mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome completo</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                    placeholder="Seu nome"
-                  />
+            {/* Form */}
+            <form onSubmit={handleSave} className="mt-6 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-gray-700">Nome completo</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg">person</span>
+                    <input
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white/50 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[rgba(138,5,190,0.25)] focus:border-[#8A05BE]/30 transition-all"
+                      value={formData.name}
+                      onChange={(e) => update("name", e.target.value)}
+                      placeholder="Seu nome completo"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">E-mail</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                    placeholder="seu@email.com"
-                  />
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-gray-700">E-mail</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg">mail</span>
+                    <input
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white/50 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[rgba(138,5,190,0.25)] focus:border-[#8A05BE]/30 transition-all"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => update("email", e.target.value)}
+                      placeholder="seu@email.com"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Telefone</Label>
-                  <Input
-                    id="phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
-                    placeholder="(00) 00000-0000"
-                  />
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-gray-700">Telefone</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg">phone</span>
+                    <input
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white/50 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[rgba(138,5,190,0.25)] focus:border-[#8A05BE]/30 transition-all"
+                      value={formData.phone}
+                      onChange={(e) => update("phone", e.target.value)}
+                      placeholder="(00) 00000-0000"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="crfa">CRFa</Label>
-                  <Input
-                    id="crfa"
-                    value={formData.crfa}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, crfa: e.target.value }))}
-                    placeholder="0-00000"
-                  />
+                <div className="space-y-1.5">
+                  <label className="text-sm font-semibold text-gray-700">CRFa</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg">badge</span>
+                    <input
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white/50 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[rgba(138,5,190,0.25)] focus:border-[#8A05BE]/30 transition-all"
+                      value={formData.crfa}
+                      onChange={(e) => update("crfa", e.target.value)}
+                      placeholder="0-00000"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="specialization">Especialização</Label>
-                  <Input
-                    id="specialization"
-                    value={formData.specialization}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, specialization: e.target.value }))
-                    }
-                    placeholder="Ex: Fonoaudiologia Clínica"
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-sm font-semibold text-gray-700">Especialização</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-lg">school</span>
+                    <input
+                      className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white/50 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[rgba(138,5,190,0.25)] focus:border-[#8A05BE]/30 transition-all"
+                      value={formData.specialization}
+                      onChange={(e) => update("specialization", e.target.value)}
+                      placeholder="Ex: Fonoaudiologia Clínica"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-sm font-semibold text-gray-700">Bio</label>
+                  <textarea
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white/50 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[rgba(138,5,190,0.25)] focus:border-[#8A05BE]/30 transition-all resize-none"
+                    rows={3}
+                    value={formData.bio}
+                    onChange={(e) => update("bio", e.target.value)}
+                    placeholder="Uma breve descrição sobre você..."
                   />
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline">
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={isSaving}>
+              {/* Save button */}
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100/50">
+                {saved && (
+                  <span className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
+                    <span className="material-symbols-outlined text-lg">check_circle</span>
+                    Salvo com sucesso
+                  </span>
+                )}
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#8A05BE] text-white text-sm font-semibold hover:bg-[#7A04AA] disabled:opacity-60 transition-all shadow-lg shadow-purple-200/50"
+                >
                   {isSaving ? (
                     <>
-                      <span className="material-symbols-outlined animate-spin text-lg mr-2">
-                        progress_activity
-                      </span>
+                      <span className="material-symbols-outlined text-lg animate-spin">progress_activity</span>
                       Salvando...
                     </>
                   ) : (
                     <>
-                      <span className="material-symbols-outlined text-lg mr-2">save</span>
+                      <span className="material-symbols-outlined text-lg">save</span>
                       Salvar alterações
                     </>
                   )}
-                </Button>
+                </button>
               </div>
             </form>
-          </Card>
-        </TabsContent>
-
-        {/* Preferences Tab */}
-        <TabsContent value="preferences" className="space-y-6">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Notificações</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">Notificações por e-mail</p>
-                  <p className="text-sm text-gray-500">
-                    Receba atualizações e lembretes por e-mail
-                  </p>
-                </div>
-                <Switch
-                  checked={preferences.emailNotifications}
-                  onCheckedChange={(checked: boolean) =>
-                    setPreferences((prev) => ({ ...prev, emailNotifications: checked }))
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">Notificações push</p>
-                  <p className="text-sm text-gray-500">
-                    Receba notificações no navegador
-                  </p>
-                </div>
-                <Switch
-                  checked={preferences.pushNotifications}
-                  onCheckedChange={(checked: boolean) =>
-                    setPreferences((prev) => ({ ...prev, pushNotifications: checked }))
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">Lembretes de agendamentos</p>
-                  <p className="text-sm text-gray-500">
-                    Receba lembretes antes dos agendamentos
-                  </p>
-                </div>
-                <Switch
-                  checked={preferences.appointmentReminders}
-                  onCheckedChange={(checked: boolean) =>
-                    setPreferences((prev) => ({ ...prev, appointmentReminders: checked }))
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">Notificações de relatórios</p>
-                  <p className="text-sm text-gray-500">
-                    Seja notificado quando relatórios forem gerados
-                  </p>
-                </div>
-                <Switch
-                  checked={preferences.reportNotifications}
-                  onCheckedChange={(checked: boolean) =>
-                    setPreferences((prev) => ({ ...prev, reportNotifications: checked }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="border-t pt-6 mt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Aparência</h3>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">Modo escuro</p>
-                  <p className="text-sm text-gray-500">
-                    Ativar tema escuro na interface
-                  </p>
-                </div>
-                <Switch
-                  checked={preferences.darkMode}
-                  onCheckedChange={(checked: boolean) =>
-                    setPreferences((prev) => ({ ...prev, darkMode: checked }))
-                  }
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-6 border-t mt-6">
-              <Button type="button" variant="outline">
-                Cancelar
-              </Button>
-              <Button onClick={handleSavePreferences} disabled={isSaving}>
-                {isSaving ? (
-                  <>
-                    <span className="material-symbols-outlined animate-spin text-lg mr-2">
-                      progress_activity
-                    </span>
-                    Salvando...
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-lg mr-2">save</span>
-                    Salvar preferências
-                  </>
-                )}
-              </Button>
-            </div>
-          </Card>
-        </TabsContent>
-
-        {/* Security Tab */}
-        <TabsContent value="security" className="space-y-6">
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Senha</h3>
-            <div className="space-y-4 max-w-md">
-              <div className="space-y-2">
-                <Label htmlFor="current-password">Senha atual</Label>
-                <Input id="current-password" type="password" placeholder="••••••••" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="new-password">Nova senha</Label>
-                <Input id="new-password" type="password" placeholder="••••••••" />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirmar nova senha</Label>
-                <Input id="confirm-password" type="password" placeholder="••••••••" />
-              </div>
-
-              <Button className="w-full">
-                <span className="material-symbols-outlined text-lg mr-2">lock</span>
-                Alterar senha
-              </Button>
-            </div>
-          </Card>
-
-          <Card className="p-6 border-red-200 bg-red-50">
-            <h3 className="text-lg font-semibold text-red-900 mb-2">Zona de perigo</h3>
-            <p className="text-sm text-red-700 mb-4">
-              Ações irreversíveis que afetarão permanentemente sua conta.
-            </p>
-            <Button variant="destructive">
-              <span className="material-symbols-outlined text-lg mr-2">delete_forever</span>
-              Excluir conta
-            </Button>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+          </div>
+        </div>
+      </main>
+    </>
   )
 }

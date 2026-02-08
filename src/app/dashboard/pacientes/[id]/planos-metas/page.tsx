@@ -112,21 +112,21 @@ export default function GoalsPage({ params }: GoalsPageProps) {
   return (
     <div className="relative min-h-screen">
       {/* Gradient Orbs */}
-      <div className="fixed top-20 right-20 w-96 h-96 bg-purple-300/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed top-20 right-20 w-96 h-96 bg-[#8A05BE]/15 rounded-full blur-3xl pointer-events-none" />
       <div className="fixed bottom-20 left-20 w-80 h-80 bg-blue-300/20 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto px-4 md:px-8 py-8 pb-32">
         {/* Breadcrumbs */}
         <div className="mb-6 flex items-center gap-2 text-sm text-gray-600">
-          <Link href="/dashboard/pacientes" className="hover:text-[#820AD1] transition-colors">
+          <Link href="/dashboard/pacientes" className="hover:text-[#8A05BE] transition-colors">
             Pacientes
           </Link>
           <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-          <Link href={`/dashboard/pacientes/${id}`} className="hover:text-[#820AD1] transition-colors">
+          <Link href={`/dashboard/pacientes/${id}`} className="hover:text-[#8A05BE] transition-colors">
             {patient.name}
           </Link>
           <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-          <span className="text-[#820AD1] font-medium">Plano e Metas</span>
+          <span className="text-[#8A05BE] font-medium">Plano e Metas</span>
         </div>
 
         <div className="flex flex-col gap-6">
@@ -154,7 +154,7 @@ export default function GoalsPage({ params }: GoalsPageProps) {
           <section>
             <div className="flex items-center justify-between mb-6 px-2">
               <div className="flex items-center gap-3">
-                <div className="bg-[#820AD1]/10 p-1.5 rounded-lg text-[#820AD1]">
+                <div className="bg-[#8A05BE]/10 p-1.5 rounded-lg text-[#8A05BE]">
                   <span className="material-symbols-outlined text-[20px]">target</span>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900">Metas de Curto Prazo</h3>
@@ -183,7 +183,7 @@ export default function GoalsPage({ params }: GoalsPageProps) {
       {/* Floating Action Button */}
       <button
         onClick={handleAddGoal}
-        className="fixed bottom-8 right-8 size-16 bg-[#820AD1] hover:bg-[#6D08AF] text-white rounded-2xl shadow-xl hover:scale-105 hover:shadow-[#820AD1]/40 transition-all flex items-center justify-center group z-50"
+        className="fixed bottom-8 right-8 size-16 bg-[#8A05BE] hover:bg-[#7A04AA] text-white rounded-2xl shadow-xl hover:scale-105 hover:shadow-[#8A05BE]/40 transition-all flex items-center justify-center group z-50"
       >
         <span className="material-symbols-outlined text-[32px] group-hover:rotate-90 transition-transform duration-300">
           add

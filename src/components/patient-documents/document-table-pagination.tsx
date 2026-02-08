@@ -24,14 +24,14 @@ export function DocumentTablePagination({
         <button
           onClick={onPrevious}
           disabled={!hasPrevious}
-          className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 hover:text-[#820AD1] transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 hover:text-[#8A05BE] transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Anterior
         </button>
         <button
           onClick={onNext}
           disabled={!hasNext}
-          className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 hover:text-[#820AD1] transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50 hover:text-[#8A05BE] transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Próximo
         </button>

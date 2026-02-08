@@ -16,7 +16,7 @@ const locationConfig = {
     label: "Casa",
     color: "purple",
     bgColor: "bg-purple-50",
-    textColor: "text-[#820AD1]",
+    textColor: "text-[#8A05BE]",
   },
   office: {
     label: "Consultório",
@@ -50,21 +50,21 @@ export function ActivityChecklistItem({
   }
 
   return (
-    <label className="group flex items-start gap-5 p-5 bg-white/80 rounded-2xl border border-transparent hover:border-[#820AD1]/20 shadow-sm hover:shadow-md transition-all cursor-pointer">
+    <label className="group flex items-start gap-5 p-5 bg-white/80 rounded-2xl border border-transparent hover:border-[#8A05BE]/20 shadow-sm hover:shadow-md transition-all cursor-pointer">
       <input
         type="checkbox"
         className="hidden peer"
         checked={checked}
         onChange={handleToggle}
       />
-      <div className="w-6 h-6 rounded-lg border-2 border-gray-300 flex items-center justify-center flex-shrink-0 transition-all bg-white peer-checked:bg-[#820AD1] peer-checked:border-[#820AD1] mt-1">
+      <div className="w-6 h-6 rounded-lg border-2 border-gray-300 flex items-center justify-center shrink-0 transition-all bg-white peer-checked:bg-[#8A05BE] peer-checked:border-[#8A05BE] mt-1">
         <span className={`material-symbols-outlined text-white text-[16px] transition-opacity font-bold ${checked ? 'opacity-100' : 'opacity-0'}`}>
           check
         </span>
       </div>
 
       <div className="flex-1">
-        <span className={`block text-base font-bold text-gray-900 group-hover:text-[#820AD1] transition-colors ${checked ? 'line-through text-gray-500' : ''}`}>
+        <span className={`block text-base font-bold text-gray-900 group-hover:text-[#8A05BE] transition-colors ${checked ? 'line-through text-gray-500' : ''}`}>
           {title}
         </span>
         <span className={`block text-sm text-gray-600 mt-1.5 leading-relaxed ${checked ? 'text-gray-400' : ''}`}>

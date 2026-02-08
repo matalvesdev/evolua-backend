@@ -32,7 +32,7 @@ export function CommunicationHeader({
 
   return (
     <section className="glass-card rounded-3xl p-6 relative overflow-hidden border border-white">
-      <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-white/40 to-transparent pointer-events-none" />
+      <div className="absolute right-0 top-0 h-full w-1/3 bg-linear-to-l from-white/40 to-transparent pointer-events-none" />
       
       <div className="flex flex-col md:flex-row gap-6 items-center justify-between relative z-10">
         <div className="flex items-center gap-5">
@@ -43,7 +43,7 @@ export function CommunicationHeader({
                 style={{ backgroundImage: `url(${patientImage})` }}
               />
             ) : (
-              <div className="size-20 rounded-2xl bg-gradient-to-br from-[#820AD1] to-purple-400 shadow-md border-2 border-white flex items-center justify-center text-white text-3xl font-bold">
+              <div className="size-20 rounded-2xl bg-linear-to-br from-[#8A05BE] to-[#C084FC] shadow-md border-2 border-white flex items-center justify-center text-white text-3xl font-bold">
                 {initial}
               </div>
             )}
@@ -71,7 +71,7 @@ export function CommunicationHeader({
         <div className="flex items-center gap-3">
           <button
             onClick={onCall}
-            className="flex flex-col items-center justify-center size-12 rounded-xl bg-white border border-gray-200 text-[#820AD1] hover:bg-[#820AD1] hover:text-white hover:border-[#820AD1] transition-all shadow-sm group"
+            className="flex flex-col items-center justify-center size-12 rounded-xl bg-white border border-gray-200 text-[#8A05BE] hover:bg-[#8A05BE] hover:text-white hover:border-[#8A05BE] transition-all shadow-sm group"
           >
             <span className="material-symbols-outlined text-[20px]">call</span>
             <span className="text-[9px] font-bold mt-0.5">Ligar</span>

@@ -29,7 +29,7 @@ const typeConfig = {
   email: {
     icon: "mail",
     bgColor: "bg-purple-50",
-    textColor: "text-[#820AD1]",
+    textColor: "text-[#8A05BE]",
   },
   received: {
     icon: "forum",
@@ -79,7 +79,7 @@ export function CommunicationTimelineItem({
 
       <div className={`flex-1 border p-5 rounded-2xl rounded-tl-none shadow-[0_2px_10px_rgba(0,0,0,0.02)] group-hover:shadow-[0_4px_20px_rgba(0,0,0,0.05)] transition-all ${
         isReceived
-          ? "bg-gradient-to-br from-green-50 to-white border-green-100"
+          ? "bg-linear-to-br from-green-50 to-white border-green-100"
           : "bg-white border-gray-100"
       }`}>
         <div className="flex flex-col sm:flex-row justify-between items-start mb-3 gap-2">
@@ -106,7 +106,7 @@ export function CommunicationTimelineItem({
 
         {attachment && (
           <div className="flex gap-2 mt-3">
-            <button className="flex items-center gap-2 text-xs font-bold text-gray-900 hover:text-[#820AD1] transition-colors bg-gray-50 hover:bg-white border border-gray-100 px-3 py-2 rounded-lg">
+            <button className="flex items-center gap-2 text-xs font-bold text-gray-900 hover:text-[#8A05BE] transition-colors bg-gray-50 hover:bg-white border border-gray-100 px-3 py-2 rounded-lg">
               <span className={`material-symbols-outlined text-[18px] ${attachment.icon === 'picture_as_pdf' ? 'text-red-500' : 'text-gray-600'}`}>
                 {attachment.icon}
               </span>

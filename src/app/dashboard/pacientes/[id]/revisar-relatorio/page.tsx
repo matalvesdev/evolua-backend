@@ -127,28 +127,46 @@ function RevisarRelatorioContent({ patientId }: { patientId: string }) {
   return (
     <div className="flex h-screen w-full">
       {/* Left Illustration Panel */}
-      <div className="hidden lg:flex w-1/2 relative flex-col items-center justify-center overflow-hidden bg-linear-to-br from-[#F3E8FF] via-[#E9D5FF] to-[#D8B4FE]">
-        <div className="absolute top-[-20%] left-[-10%] w-[500px] h-[500px] bg-white/40 rounded-full blur-[100px] mix-blend-overlay" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-[#820AD1]/10 rounded-full blur-[80px]" />
+      <div className="hidden lg:flex w-1/2 gradient-left-panel flex-col items-center justify-center overflow-hidden">
         <div className="relative z-10 p-12 flex flex-col items-center max-w-xl text-center">
-          <div className="mb-8 w-24 h-24 rounded-full bg-white/80 flex items-center justify-center shadow-xl">
-            <span className="material-symbols-outlined text-primary text-5xl">edit_document</span>
+          <div className="mb-8 w-24 h-24 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-xl border border-white/30">
+            <span className="material-symbols-outlined text-white text-5xl">edit_document</span>
           </div>
-          <h2 className="text-3xl font-bold text-[#2d1b36] mb-3 tracking-tight">
+          <h2 className="text-3xl font-bold text-white mb-3 tracking-tight">
             Revise e Finalize
           </h2>
-          <p className="text-lg text-gray-700 max-w-md leading-relaxed">
+          <p className="text-lg text-white/80 max-w-md leading-relaxed">
             Edite as seções do relatório conforme necessário e salve quando estiver satisfeito.
           </p>
+          <div className="mt-8 flex gap-3">
+            <span className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm text-white text-xs font-medium px-3 py-1.5 rounded-full border border-white/20 animate-float">
+              <span className="material-symbols-outlined text-sm">auto_awesome</span>
+              IA Assistente
+            </span>
+            <span className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm text-white text-xs font-medium px-3 py-1.5 rounded-full border border-white/20 animate-float" style={{ animationDelay: '1s' }}>
+              <span className="material-symbols-outlined text-sm">verified</span>
+              Precisão
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Right Editor Panel */}
       <div className="w-full lg:w-1/2 h-full overflow-y-auto relative flex flex-col bg-[#FDFBFD]">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-linear-to-bl from-[#F3E8FF]/40 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-linear-to-bl from-[#8A05BE]/5 via-transparent to-transparent pointer-events-none" />
         <div className="flex-1 px-6 py-8 md:px-12 md:py-10 max-w-3xl mx-auto w-full flex flex-col gap-6 relative z-10">
+          {/* Breadcrumbs */}
+          <nav className="flex items-center gap-2 text-sm text-gray-500">
+            <button onClick={() => router.push(`/dashboard/pacientes/${patientId}`)} className="hover:text-[#8A05BE] transition-colors flex items-center gap-1">
+              <span className="material-symbols-outlined text-base">person</span>
+              Paciente
+            </button>
+            <span className="material-symbols-outlined text-xs">chevron_right</span>
+            <span className="text-gray-900 font-medium truncate max-w-[200px]">{report.title}</span>
+          </nav>
+
           <div className="flex items-center gap-3 mb-2">
-            <button onClick={() => router.back()} className="text-gray-500 hover:text-primary transition-colors">
+            <button onClick={() => router.back()} className="text-gray-500 hover:text-[#8A05BE] transition-colors">
               <span className="material-symbols-outlined text-2xl">arrow_back</span>
             </button>
             <h1 className="text-xl font-bold text-gray-900 truncate">{report.title}</h1>

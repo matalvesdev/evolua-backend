@@ -36,8 +36,8 @@ export function OnboardingRadioOption({
       <div
         className={cn(
           "input-glass rounded-2xl p-5 flex items-center gap-4 transition-all",
-          "hover:border-purple-300",
-          selected && "border-primary bg-purple-50/50 shadow-[0_0_0_1px_var(--color-primary),0_4px_12px_rgba(164,19,236,0.15)]"
+          "hover:border-[#8A05BE]/30",
+          selected && "border-[#8A05BE] bg-[#8A05BE]/10 shadow-[0_0_0_1px_#8A05BE,0_4px_12px_rgba(138,5,190,0.15)]"
         )}
       >
         {/* Radio indicator */}
@@ -45,7 +45,7 @@ export function OnboardingRadioOption({
           className={cn(
             "w-5 h-5 rounded-full border relative shrink-0 flex items-center justify-center transition-all",
             selected
-              ? "border-primary bg-primary"
+              ? "border-[#8A05BE] bg-[#8A05BE]"
               : "border-slate-300 bg-slate-50"
           )}
         >
@@ -56,7 +56,7 @@ export function OnboardingRadioOption({
         <span
           className={cn(
             "text-base font-bold transition-colors",
-            selected ? "text-primary" : "text-slate-700"
+            selected ? "text-[#8A05BE]" : "text-slate-700"
           )}
         >
           {label}

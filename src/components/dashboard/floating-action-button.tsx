@@ -20,11 +20,11 @@ export function FloatingActionButton() {
 
   return (
     <div
-      className="absolute bottom-6 right-6 lg:bottom-10 lg:right-10 z-50 group flex flex-col-reverse items-end gap-4"
+      className="fixed bottom-6 right-6 lg:bottom-10 lg:right-10 z-50 group flex flex-col-reverse items-end gap-4"
       onMouseEnter={() => setIsOpen(true)}
       onMouseLeave={() => setIsOpen(false)}
     >
-      <button className="h-16 w-16 bg-gray-900 hover:bg-black text-white rounded-full shadow-2xl shadow-gray-900/30 flex items-center justify-center transition-transform hover:scale-110 active:scale-95 group-hover:rotate-45">
+      <button className="h-16 w-16 bg-[#8A05BE] hover:bg-[#6D08AF] text-white rounded-2xl shadow-2xl shadow-[rgba(138,5,190,0.3)] flex items-center justify-center transition-transform hover:scale-110 active:scale-95 group-hover:rotate-45">
         <span className="material-symbols-outlined text-3xl">add</span>
       </button>
       <div
@@ -38,10 +38,10 @@ export function FloatingActionButton() {
             className="flex items-center gap-3 group/item" 
             onClick={() => router.push(action.href)}
           >
-            <span className="bg-white px-3 py-1 rounded-lg text-xs font-bold shadow-sm text-gray-700 group-hover/item:text-primary transition-colors">
+            <span className="bg-white px-3 py-1 rounded-lg text-xs font-bold shadow-sm text-gray-700 group-hover/item:text-[#8A05BE] transition-colors">
               {action.label}
             </span>
-            <div className="h-10 w-10 bg-white rounded-full text-primary shadow-lg flex items-center justify-center hover:bg-purple-50 transition-colors">
+            <div className="h-10 w-10 bg-white rounded-2xl text-[#8A05BE] shadow-lg flex items-center justify-center hover:bg-[#8A05BE]/5 transition-colors">
               <span className="material-symbols-outlined text-xl">{action.icon}</span>
             </div>
           </button>

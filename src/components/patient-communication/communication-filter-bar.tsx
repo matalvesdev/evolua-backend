@@ -22,7 +22,7 @@ export function CommunicationFilterBar({
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 z-10">
       <div>
         <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-          <span className="p-1.5 bg-[#820AD1]/10 rounded-lg text-[#820AD1]">
+          <span className="p-1.5 bg-[#8A05BE]/10 rounded-lg text-[#8A05BE]">
             <span className="material-symbols-outlined text-[20px]">history_edu</span>
           </span>
           Timeline de Comunicação
@@ -65,7 +65,7 @@ export function CommunicationFilterBar({
 
         <button
           onClick={onNewMessage}
-          className="bg-gray-900 hover:bg-[#820AD1] text-white text-sm font-bold py-2 px-5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-black/5 transition-all transform hover:scale-105"
+          className="bg-gray-900 hover:bg-[#8A05BE] text-white text-sm font-bold py-2 px-5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-black/5 transition-all transform hover:scale-105"
         >
           <span className="material-symbols-outlined text-[18px]">add</span>
           Nova Mensagem

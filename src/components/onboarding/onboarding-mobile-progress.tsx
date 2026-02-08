@@ -25,7 +25,7 @@ export function OnboardingMobileProgress({
               key={stepNumber}
               className={cn(
                 "h-2 rounded-full transition-all duration-300",
-                isActive ? "w-8 bg-primary" : "w-2 bg-slate-200"
+                isActive ? "w-8 bg-[#8A05BE]" : "w-2 bg-slate-200"
               )}
             />
           )

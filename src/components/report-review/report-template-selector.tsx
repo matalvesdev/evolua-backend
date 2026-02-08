@@ -15,7 +15,7 @@ export function ReportTemplateSelector({ value, onChange }: ReportTemplateSelect
         <select 
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full h-14 pl-4 pr-10 rounded-xl bg-white border border-gray-200 text-gray-900 font-medium focus:ring-2 focus:ring-[#820AD1]/20 focus:border-[#820AD1] outline-none transition-all appearance-none cursor-pointer hover:border-[#820AD1]/40 shadow-sm"
+          className="w-full h-14 pl-4 pr-10 rounded-xl bg-white border border-gray-200 text-gray-900 font-medium focus:ring-2 focus:ring-[#8A05BE]/20 focus:border-[#8A05BE] outline-none transition-all appearance-none cursor-pointer hover:border-[#8A05BE]/40 shadow-sm"
         >
           <option value="resumo">Resumo de Sessão (Padrão)</option>
           <option value="encaminhamento">Encaminhamento Escolar</option>
@@ -28,7 +28,7 @@ export function ReportTemplateSelector({ value, onChange }: ReportTemplateSelect
         </div>
       </div>
       <p className="text-xs text-gray-500 flex items-center gap-1">
-        <span className="material-symbols-outlined text-[14px] text-[#820AD1]">info</span>
+        <span className="material-symbols-outlined text-[14px] text-[#8A05BE]">info</span>
         A IA reajustará o conteúdo ao mudar o modelo.
       </p>
     </div>

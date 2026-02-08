@@ -30,14 +30,14 @@ export function OnboardingCheckboxCard({
       <div
         className={cn(
           "input-glass rounded-xl p-4 h-full flex flex-col items-center justify-center gap-2 text-center transition-all min-h-27.5",
-          "hover:bg-purple-50 peer-focus:ring-2 peer-focus:ring-primary/50",
-          checked && "border-primary bg-purple-50/50 shadow-[0_0_0_1px_var(--color-primary)]"
+          "hover:bg-[#8A05BE]/10 peer-focus:ring-2 peer-focus:ring-[#8A05BE]/50",
+          checked && "border-[#8A05BE] bg-[#8A05BE]/10 shadow-[0_0_0_1px_#8A05BE]"
         )}
       >
         <span
           className={cn(
             "text-3xl transition-colors",
-            checked ? "text-primary" : "text-slate-400 group-hover:text-primary"
+            checked ? "text-[#8A05BE]" : "text-slate-400 group-hover:text-[#8A05BE]"
           )}
         >
           {icon}
@@ -45,7 +45,7 @@ export function OnboardingCheckboxCard({
         <span
           className={cn(
             "text-sm font-semibold transition-colors",
-            checked ? "text-primary" : "text-slate-600"
+            checked ? "text-[#8A05BE]" : "text-slate-600"
           )}
         >
           {label}
@@ -55,7 +55,7 @@ export function OnboardingCheckboxCard({
         className={cn(
           "absolute top-2 right-2 w-5 h-5 rounded border transition-all flex items-center justify-center",
           checked
-            ? "bg-primary border-primary"
+            ? "bg-[#8A05BE] border-[#8A05BE]"
             : "border-slate-300 bg-white"
         )}
       >

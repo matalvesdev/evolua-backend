@@ -19,13 +19,13 @@ export function OnboardingProgress({
         <span className="text-sm font-medium text-muted-foreground">
           Progresso do Onboarding
         </span>
-        <span className="text-sm font-bold text-primary">
+        <span className="text-sm font-bold text-[#8A05BE]">
           Etapa {currentStep} de {totalSteps}
         </span>
       </div>
       <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
         <div
-          className="h-full bg-primary rounded-full transition-all duration-500 ease-out progress-glow"
+          className="h-full bg-[#8A05BE] rounded-full transition-all duration-500 ease-out progress-glow"
           style={{ width: `${progressPercentage}%` }}
         />
       </div>

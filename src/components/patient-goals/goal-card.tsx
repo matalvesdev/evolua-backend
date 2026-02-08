@@ -16,11 +16,11 @@ const statusConfig = {
 const colorSchemes = {
   purple: {
     iconBg: "bg-purple-50",
-    iconText: "text-[#820AD1]",
-    iconHoverBg: "group-hover:bg-[#820AD1]",
-    progressBar: "bg-[#820AD1]",
-    progressShadow: "shadow-[#820AD1]/30",
-    progressText: "text-[#820AD1]",
+    iconText: "text-[#8A05BE]",
+    iconHoverBg: "group-hover:bg-[#8A05BE]",
+    progressBar: "bg-[#8A05BE]",
+    progressShadow: "shadow-[#8A05BE]/30",
+    progressText: "text-[#8A05BE]",
   },
   blue: {
     iconBg: "bg-blue-50",

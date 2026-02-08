@@ -38,14 +38,14 @@ export function OnboardingRadioCard({
       <div
         className={cn(
           "input-glass rounded-2xl p-4 h-full flex flex-col items-center justify-center gap-2 text-center transition-all min-h-[110px]",
-          "focus:ring-2 focus:ring-primary/30",
-          selected && "border-primary bg-purple-50/50 shadow-[0_0_0_1px_var(--color-primary),0_4px_12px_rgba(164,19,236,0.15)]"
+          "focus:ring-2 focus:ring-[#8A05BE]/30",
+          selected && "border-[#8A05BE] bg-[#8A05BE]/10 shadow-[0_0_0_1px_#8A05BE,0_4px_12px_rgba(138,5,190,0.15)]"
         )}
       >
         <span
           className={cn(
             "text-3xl transition-colors mb-1",
-            selected ? "text-primary" : "text-slate-400 group-hover:text-primary"
+            selected ? "text-[#8A05BE]" : "text-slate-400 group-hover:text-[#8A05BE]"
           )}
         >
           {icon}
@@ -53,7 +53,7 @@ export function OnboardingRadioCard({
         <span
           className={cn(
             "text-sm font-bold leading-snug transition-colors",
-            selected ? "text-primary" : "text-slate-600"
+            selected ? "text-[#8A05BE]" : "text-slate-600"
           )}
         >
           {label}
@@ -62,7 +62,7 @@ export function OnboardingRadioCard({
       <div
         className={cn(
           "absolute top-3 right-3 w-2 h-2 rounded-full transition-colors shadow-sm",
-          selected ? "bg-primary" : "bg-transparent"
+          selected ? "bg-[#8A05BE]" : "bg-transparent"
         )}
       />
     </div>

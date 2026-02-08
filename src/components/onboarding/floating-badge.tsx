@@ -14,7 +14,7 @@ interface FloatingBadgeProps {
 export function FloatingBadge({
   icon,
   label,
-  iconBgClassName = "bg-purple-100",
+  iconBgClassName = "bg-[#8A05BE]/10",
   className,
   animationDuration = "5s",
   animationDelay = "0s",

@@ -67,7 +67,7 @@ export function ReportEditorPanel({ sections, onSectionsChange }: ReportEditorPa
       {/* Editor Toolbar */}
       <div className="px-5 py-4 border-b border-gray-100/80 flex justify-between items-center bg-white/50">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-[#820AD1]">edit_note</span>
+          <span className="material-symbols-outlined text-[#8A05BE]">edit_note</span>
           <span className="font-bold text-sm text-gray-900">Editor Inteligente</span>
         </div>
         <div className="flex gap-2">

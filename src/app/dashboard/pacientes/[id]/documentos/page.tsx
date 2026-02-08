@@ -123,7 +123,7 @@ export default function DocumentsPage({ params }: DocumentsPageProps) {
     <div className="relative min-h-screen">
       {/* Gradient Orbs */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-5%] w-[600px] h-[600px] bg-purple-400/20 rounded-full blur-[120px]" />
+        <div className="absolute top-[-10%] left-[-5%] w-[600px] h-[600px] bg-[#8A05BE]/15 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] bg-blue-400/10 rounded-full blur-[100px]" />
         <div className="absolute top-[40%] left-[20%] w-[300px] h-[300px] bg-pink-300/10 rounded-full blur-[80px]" />
       </div>
@@ -131,15 +131,15 @@ export default function DocumentsPage({ params }: DocumentsPageProps) {
       <div className="relative z-10 max-w-[1200px] mx-auto px-6 md:px-10 py-8 pb-10">
         {/* Breadcrumbs */}
         <div className="mb-6 flex items-center gap-2 text-sm text-gray-600">
-          <Link href="/dashboard/pacientes" className="hover:text-[#820AD1] transition-colors">
+          <Link href="/dashboard/pacientes" className="hover:text-[#8A05BE] transition-colors">
             Pacientes
           </Link>
           <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-          <Link href={`/dashboard/pacientes/${id}`} className="hover:text-[#820AD1] transition-colors">
+          <Link href={`/dashboard/pacientes/${id}`} className="hover:text-[#8A05BE] transition-colors">
             Ana Clara Souza
           </Link>
           <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-          <span className="text-[#820AD1] font-medium">Documentos</span>
+          <span className="text-[#8A05BE] font-medium">Documentos</span>
         </div>
 
         <div className="flex flex-col gap-8">

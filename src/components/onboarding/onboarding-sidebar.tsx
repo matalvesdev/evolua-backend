@@ -24,9 +24,9 @@ interface OnboardingSidebarProps {
 
 const defaultFloatingBadges: FloatingBadgeConfig[] = [
   {
-    icon: <Sparkles className="size-3.5 text-primary" />,
+    icon: <Sparkles className="size-3.5 text-[#8A05BE]" />,
     label: "Personalizado",
-    iconBgClassName: "bg-purple-100",
+    iconBgClassName: "bg-[#8A05BE]/10",
     className: "absolute top-[30%] right-[22%]",
     animationDuration: "4s",
   },
@@ -57,17 +57,17 @@ export function OnboardingSidebar({
   return (
     <div
       className={cn(
-        "hidden md:flex md:w-1/2 h-full bg-gradient-evolua relative flex-col p-12 justify-between overflow-hidden",
+        "hidden md:flex md:w-1/2 h-full gradient-left-panel relative flex-col p-12 justify-between",
         className
       )}
     >
       {/* Logo */}
-      <div className="z-10 flex items-center gap-3 text-primary">
-        <div className="size-8 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-purple-200">
+      <div className="z-10 flex items-center gap-3 text-white">
+        <div className="size-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
           <svg
             viewBox="0 0 24 24"
             fill="none"
-            className="size-4 text-primary-foreground"
+            className="size-4 text-white"
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
@@ -84,13 +84,13 @@ export function OnboardingSidebar({
       {/* Background Effects & Illustration */}
       <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
         {/* Blurred background circles */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-200/40 rounded-full blur-[80px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-blue-100/40 rounded-full blur-[60px]" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-white/10 rounded-full blur-[80px]" />
+        <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-white/10 rounded-full blur-[60px]" />
 
         {/* Main illustration container */}
         <div className="relative w-full h-full flex items-center justify-center p-20">
           <div
-            className="w-full h-full bg-center bg-contain bg-no-repeat"
+            className="w-full h-full bg-center bg-contain bg-no-repeat rounded-3xl"
             style={{ backgroundImage: `url("${illustration}")` }}
             role="img"
             aria-label={illustrationAlt}
@@ -113,10 +113,10 @@ export function OnboardingSidebar({
 
       {/* Footer Text */}
       <div className="z-10 relative">
-        <p className="text-primary/80 text-sm font-bold tracking-widest uppercase mb-2">
+        <p className="text-white/80 text-sm font-bold tracking-widest uppercase mb-2">
           {tagline}
         </p>
-        <h3 className="text-3xl font-bold text-slate-900 leading-tight">
+        <h3 className="text-3xl font-bold text-white leading-tight">
           {headline}
         </h3>
       </div>

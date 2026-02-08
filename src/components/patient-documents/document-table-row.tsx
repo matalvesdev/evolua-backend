@@ -1,3 +1,5 @@
+import { fileTypeConfig, isAudioFile as checkIsAudio } from "./patient-documents-utils"
+
 interface DocumentTableRowProps {
   fileName: string
   fileDescription: string
@@ -15,39 +17,6 @@ interface DocumentTableRowProps {
   onPlay?: () => void
 }
 
-const fileTypeConfig = {
-  pdf: {
-    icon: "picture_as_pdf",
-    bgColor: "bg-red-50",
-    borderColor: "border-red-100",
-    textColor: "text-red-500",
-  },
-  audio: {
-    icon: "graphic_eq",
-    bgColor: "bg-purple-50",
-    borderColor: "border-purple-100",
-    textColor: "text-[#820AD1]",
-  },
-  image: {
-    icon: "image",
-    bgColor: "bg-teal-50",
-    borderColor: "border-teal-100",
-    textColor: "text-teal-600",
-  },
-  document: {
-    icon: "article",
-    bgColor: "bg-blue-50",
-    borderColor: "border-blue-100",
-    textColor: "text-blue-500",
-  },
-  other: {
-    icon: "assignment",
-    bgColor: "bg-orange-50",
-    borderColor: "border-orange-100",
-    textColor: "text-orange-500",
-  },
-}
-
 export function DocumentTableRow({
   fileName,
   fileDescription,
@@ -61,7 +30,7 @@ export function DocumentTableRow({
   onPlay,
 }: DocumentTableRowProps) {
   const config = fileTypeConfig[fileType]
-  const isAudio = fileType === "audio"
+  const isAudio = checkIsAudio(fileType)
 
   return (
     <tr className="group hover:bg-white/60 transition-colors">
@@ -74,7 +43,7 @@ export function DocumentTableRow({
             <span className="material-symbols-outlined">{config.icon}</span>
           </div>
           <div>
-            <p className="text-sm font-bold text-gray-900 group-hover:text-[#820AD1] transition-colors">
+            <p className="text-sm font-bold text-gray-900 group-hover:text-[#8A05BE] transition-colors">
               {fileName}
             </p>
             <p className="text-xs text-gray-500 mt-0.5">{fileDescription}</p>
@@ -110,7 +79,7 @@ export function DocumentTableRow({
           {isAudio ? (
             <button
               onClick={onPlay}
-              className="size-8 rounded-full hover:bg-white hover:text-[#820AD1] flex items-center justify-center text-gray-400 transition-colors shadow-sm border border-transparent hover:border-gray-100"
+              className="size-8 rounded-full hover:bg-white hover:text-[#8A05BE] flex items-center justify-center text-gray-400 transition-colors shadow-sm border border-transparent hover:border-gray-100"
               title="Reproduzir"
             >
               <span className="material-symbols-outlined text-[18px]">play_arrow</span>
@@ -118,7 +87,7 @@ export function DocumentTableRow({
           ) : (
             <button
               onClick={onView}
-              className="size-8 rounded-full hover:bg-white hover:text-[#820AD1] flex items-center justify-center text-gray-400 transition-colors shadow-sm border border-transparent hover:border-gray-100"
+              className="size-8 rounded-full hover:bg-white hover:text-[#8A05BE] flex items-center justify-center text-gray-400 transition-colors shadow-sm border border-transparent hover:border-gray-100"
               title="Visualizar"
             >
               <span className="material-symbols-outlined text-[18px]">visibility</span>

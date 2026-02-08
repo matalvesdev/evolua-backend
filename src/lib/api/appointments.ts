@@ -31,11 +31,13 @@ export interface Appointment {
 
 export interface CreateAppointmentInput {
   patientId: string
-  therapistId?: string
+  patientName: string
+  therapistId: string
+  therapistName: string
   type: string
   dateTime: string
   duration?: number
-  sessionNotes?: string
+  notes?: string
 }
 
 export async function createAppointment(input: CreateAppointmentInput): Promise<Appointment> {

@@ -62,7 +62,7 @@ export function AudioTranscriptionReviewModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div className="w-full max-w-3xl max-h-[90vh] glass-card rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -148,7 +148,7 @@ export function AudioTranscriptionReviewModal({
           <button
             onClick={handleSave}
             disabled={isSaving || !editedContent.trim()}
-            className="flex-2 h-11 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-sm shadow-lg shadow-purple-200 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-2 h-11 rounded-xl bg-[#8A05BE] hover:bg-[#6D08AF] text-white font-bold text-sm shadow-lg shadow-[#8A05BE]/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-lg">
               {isSaving ? 'hourglass_empty' : 'save_as'}

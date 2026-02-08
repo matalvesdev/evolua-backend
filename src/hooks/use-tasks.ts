@@ -41,10 +41,12 @@ export function useTasks(options?: {
     const task = tasks.find((t) => t.id === id)
     if (!task) throw new Error("Task not found")
     const newStatus = task.status === "completed" ? "pending" : "completed"
-    return tasksApi.updateTask(id, {
+    const result = await tasksApi.updateTask(id, {
       status: newStatus,
       completed: newStatus === "completed",
     })
+    queryClient.invalidateQueries({ queryKey: ["tasks"] })
+    return result
   }
 
   const statistics = {

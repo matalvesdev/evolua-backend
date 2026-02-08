@@ -136,7 +136,7 @@ export default function EditPatientPage({ params }: EditPatientPageProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#8A05BE] mx-auto" />
       </div>
     )
   }
@@ -148,18 +148,18 @@ export default function EditPatientPage({ params }: EditPatientPageProps) {
       <div className="relative max-w-4xl mx-auto px-4 md:px-8 py-8 pb-12">
         {/* Breadcrumbs */}
         <div className="mb-6 flex items-center gap-2 text-sm text-gray-600">
-          <Link href="/dashboard/pacientes" className="hover:text-[#820AD1] transition-colors">Pacientes</Link>
+          <Link href="/dashboard/pacientes" className="hover:text-[#8A05BE] transition-colors">Pacientes</Link>
           <span>›</span>
-          <Link href={`/dashboard/pacientes/${id}`} className="hover:text-[#820AD1] transition-colors">{patientName}</Link>
+          <Link href={`/dashboard/pacientes/${id}`} className="hover:text-[#8A05BE] transition-colors">{patientName}</Link>
           <span>›</span>
-          <span className="text-[#820AD1] font-medium">Editar Dados</span>
+          <span className="text-[#8A05BE] font-medium">Editar Dados</span>
         </div>
 
-        <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 md:p-10 shadow-sm border border-gray-100 dark:border-gray-800">
+        <div className="glass-card p-8 md:p-10">
           {/* Header */}
           <div className="flex items-center justify-between gap-6 mb-10 border-b border-gray-100 pb-8">
             <div className="flex items-center gap-5">
-              <div className="size-20 rounded-2xl bg-linear-to-br from-[#820AD1] to-purple-400 flex items-center justify-center text-white text-3xl font-bold">
+              <div className="size-20 rounded-2xl bg-linear-to-br from-[#8A05BE] to-[#C084FC] flex items-center justify-center text-white text-3xl font-bold">
                 {patientName?.charAt(0) || "?"}
               </div>
               <div>
@@ -288,7 +288,7 @@ export default function EditPatientPage({ params }: EditPatientPageProps) {
               {/* Buttons */}
               <div className="flex justify-end gap-3 pt-4">
                 <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
-                <Button type="submit" disabled={isUpdating} className="bg-purple-600 hover:bg-purple-700">
+                <Button type="submit" disabled={isUpdating} className="bg-[#8A05BE] hover:bg-[#7A04AA]">
                   {isUpdating ? "Salvando..." : "Salvar Alterações"}
                 </Button>
               </div>

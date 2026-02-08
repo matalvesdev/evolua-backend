@@ -139,7 +139,7 @@ export function AudioRecorderPanel({
       <div className="flex items-center justify-between mb-8 md:mb-12">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-gray-600 hover:text-[#820AD1] transition-colors group"
+          className="flex items-center gap-2 text-gray-600 hover:text-[#8A05BE] transition-colors group"
         >
           <span className="material-symbols-outlined text-2xl group-hover:-translate-x-1 transition-transform">
             arrow_back
@@ -155,7 +155,7 @@ export function AudioRecorderPanel({
           <div className="flex items-center justify-end gap-2 mt-1">
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             <p className="text-gray-600 text-xs md:text-sm font-medium">
-              Paciente: <span className="text-[#820AD1] font-bold">{patientName}</span>
+              Paciente: <span className="text-[#8A05BE] font-bold">{patientName}</span>
             </p>
           </div>
         </div>
@@ -200,10 +200,10 @@ export function AudioRecorderPanel({
               onClick={handleRestart}
               className="group flex flex-col items-center gap-2 transition-all hover:scale-105 active:scale-95"
             >
-              <div className="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 group-hover:text-[#820AD1] group-hover:border-[#820AD1]/30 group-hover:bg-[#820AD1]/5 transition-all">
+              <div className="w-12 h-12 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 group-hover:text-[#8A05BE] group-hover:border-[#8A05BE]/30 group-hover:bg-[#8A05BE]/5 transition-all">
                 <span className="material-symbols-outlined">restart_alt</span>
               </div>
-              <span className="text-xs text-gray-400 group-hover:text-[#820AD1]/80">Regravar</span>
+              <span className="text-xs text-gray-400 group-hover:text-[#8A05BE]/80">Regravar</span>
             </button>
 
             <button
@@ -237,13 +237,13 @@ export function AudioRecorderPanel({
         )}
 
         {/* AI Hint */}
-        <div className="bg-white/60 border border-[#820AD1]/10 rounded-full px-5 py-3 md:px-6 md:py-3 flex items-start md:items-center gap-3 max-w-sm shadow-sm backdrop-blur-md">
-          <span className="material-symbols-outlined text-[#820AD1] text-lg shrink-0">
+        <div className="bg-white/60 border border-[#8A05BE]/10 rounded-full px-5 py-3 md:px-6 md:py-3 flex items-start md:items-center gap-3 max-w-sm shadow-sm backdrop-blur-md">
+          <span className="material-symbols-outlined text-[#8A05BE] text-lg shrink-0">
             auto_awesome
           </span>
           <p className="text-xs md:text-sm text-gray-600 font-medium leading-relaxed">
             Apenas fale naturalmente sobre a evolução de{" "}
-            <span className="text-[#820AD1] font-bold">{patientName}</span>. Eu cuido da
+            <span className="text-[#8A05BE] font-bold">{patientName}</span>. Eu cuido da
             estrutura para você!
           </p>
         </div>

@@ -39,14 +39,14 @@ export function OnboardingRadioWithIcon({
       <div
         className={cn(
           "input-glass rounded-xl p-4 h-full flex items-center gap-3 transition-all",
-          "hover:bg-purple-50",
-          selected && "border-primary bg-purple-50/50 shadow-[0_0_0_1px_var(--color-primary)]"
+          "hover:bg-[#8A05BE]/5",
+          selected && "border-[#8A05BE] bg-[#8A05BE]/10 shadow-[0_0_0_1px_#8A05BE]"
         )}
       >
         <span
           className={cn(
             "text-2xl transition-colors",
-            selected ? "text-primary" : "text-slate-400 group-hover:text-primary"
+            selected ? "text-[#8A05BE]" : "text-slate-400 group-hover:text-[#8A05BE]"
           )}
         >
           {icon}
@@ -54,7 +54,7 @@ export function OnboardingRadioWithIcon({
         <span
           className={cn(
             "text-sm font-semibold transition-colors",
-            selected ? "text-primary" : "text-slate-600"
+            selected ? "text-[#8A05BE]" : "text-slate-600"
           )}
         >
           {label}
@@ -65,7 +65,7 @@ export function OnboardingRadioWithIcon({
         className={cn(
           "absolute top-1/2 -translate-y-1/2 right-4 w-4 h-4 rounded-full border transition-all flex items-center justify-center",
           selected
-            ? "border-primary bg-primary opacity-100"
+            ? "border-[#8A05BE] bg-[#8A05BE] opacity-100"
             : "border-slate-300 opacity-0"
         )}
       >

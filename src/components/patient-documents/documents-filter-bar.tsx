@@ -39,14 +39,14 @@ export function DocumentsFilterBar({
       <div className="flex flex-col md:flex-row items-center gap-4 w-full lg:w-auto">
         {/* Search Input */}
         <div className="relative w-full md:w-80 group">
-          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#820AD1] transition-colors">
+          <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#8A05BE] transition-colors">
             search
           </span>
           <input
             type="text"
             value={searchQuery}
             onChange={handleSearchChange}
-            className="w-full bg-white border border-gray-200 rounded-full py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-[#820AD1]/20 focus:border-[#820AD1]/30 outline-none shadow-sm transition-all placeholder:text-gray-400 text-gray-700"
+            className="w-full bg-white border border-gray-200 rounded-full py-3 pl-12 pr-4 text-sm focus:ring-2 focus:ring-[#8A05BE]/20 focus:border-[#8A05BE]/30 outline-none shadow-sm transition-all placeholder:text-gray-400 text-gray-700"
             placeholder="Buscar documento..."
           />
         </div>
@@ -60,7 +60,7 @@ export function DocumentsFilterBar({
               className={`px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
                 activeFilter === filter.id
                   ? "bg-gray-900 text-white shadow-lg shadow-gray-200 hover:shadow-xl"
-                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-[#820AD1] hover:border-[#820AD1]/20 shadow-sm"
+                  : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-[#8A05BE] hover:border-[#8A05BE]/20 shadow-sm"
               }`}
             >
               {filter.label}
@@ -72,7 +72,7 @@ export function DocumentsFilterBar({
       {/* New Document Button */}
       <button
         onClick={onNewDocument}
-        className="flex items-center gap-2 bg-[#820AD1] hover:bg-[#6D08AF] text-white px-6 py-3 rounded-full font-bold shadow-lg shadow-[#820AD1]/25 hover:shadow-[#820AD1]/40 transition-all transform hover:-translate-y-0.5 active:translate-y-0 w-full lg:w-auto justify-center"
+        className="flex items-center gap-2 bg-[#8A05BE] hover:bg-[#7A04AA] text-white px-6 py-3 rounded-full font-bold shadow-lg shadow-[#8A05BE]/25 hover:shadow-[#8A05BE]/40 transition-all transform hover:-translate-y-0.5 active:translate-y-0 w-full lg:w-auto justify-center"
       >
         <span className="material-symbols-outlined">add</span>
         <span>Novo Documento</span>

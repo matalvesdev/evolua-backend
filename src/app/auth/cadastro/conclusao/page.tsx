@@ -146,9 +146,9 @@ export default function ConclusaoPage() {
           animationDuration: "4.5s",
         },
         {
-          icon: <LayoutDashboard className="size-3.5 text-primary" />,
+          icon: <LayoutDashboard className="size-3.5 text-[#8A05BE]" />,
           label: "Seu Espaço Pronto",
-          iconBgClassName: "bg-primary/10",
+          iconBgClassName: "bg-[#8A05BE]/10",
           className: "absolute bottom-[25%] left-[20%]",
           animationDuration: "5.5s",
           animationDelay: "1.5s",
@@ -201,14 +201,14 @@ export default function ConclusaoPage() {
             Li e concordo com os{" "}
             <a
               href="#"
-              className="text-primary font-bold hover:underline decoration-2 underline-offset-2"
+              className="text-[#8A05BE] font-bold hover:underline decoration-2 underline-offset-2"
             >
               Termos de Uso
             </a>{" "}
             e{" "}
             <a
               href="#"
-              className="text-primary font-bold hover:underline decoration-2 underline-offset-2"
+              className="text-[#8A05BE] font-bold hover:underline decoration-2 underline-offset-2"
             >
               Política de Privacidade
             </a>{" "}
@@ -223,7 +223,7 @@ export default function ConclusaoPage() {
           onClick={handleBack}
           variant="outline"
           size="lg"
-          className="font-semibold py-4 px-8 rounded-full border-2 border-slate-200 hover:border-primary/30 hover:bg-primary/5 flex items-center gap-2 text-base h-auto transition-all duration-300"
+          className="font-semibold py-4 px-8 rounded-full border-2 border-slate-200 hover:border-[#8A05BE]/30 hover:bg-[#8A05BE]/5 flex items-center gap-2 text-base h-auto transition-all duration-300"
         >
           <ArrowLeft className="size-5" />
           Voltar
@@ -232,7 +232,7 @@ export default function ConclusaoPage() {
           onClick={handleFinish}
           disabled={!termsAccepted || isLoading}
           size="lg"
-          className="w-full md:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-4 px-8 md:px-10 rounded-full shadow-[0_8px_25px_rgba(164,19,236,0.3)] hover:shadow-[0_10px_30px_rgba(164,19,236,0.5)] transform hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-3 text-lg h-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
+          className="w-full md:w-auto bg-[#8A05BE] hover:bg-[#8A05BE]/90 text-white font-bold py-4 px-8 md:px-10 rounded-full shadow-[0_8px_25px_rgba(138,5,190,0.3)] hover:shadow-[0_10px_30px_rgba(138,5,190,0.5)] transform hover:-translate-y-0.5 transition-all duration-300 flex items-center gap-3 text-lg h-auto justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none"
         >
           {isLoading ? "Criando sua conta..." : "Acessar Meu Dashboard Personalizado"}
           <Rocket className="size-5" />

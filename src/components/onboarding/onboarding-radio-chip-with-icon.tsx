@@ -36,8 +36,8 @@ export function OnboardingRadioChipWithIcon({
         className={cn(
           "px-4 py-3 rounded-xl input-glass text-sm font-semibold transition-all flex items-center gap-3",
           selected
-            ? "bg-primary text-white border-primary shadow-[0_4px_15px_rgba(164,19,236,0.3)]"
-            : "text-slate-600 hover:bg-purple-50 hover:text-primary hover:border-purple-200"
+            ? "bg-[#8A05BE] text-white border-[#8A05BE] shadow-[0_4px_15px_rgba(138,5,190,0.3)]"
+            : "text-slate-600 hover:bg-[#8A05BE]/5 hover:text-[#8A05BE] hover:border-[#8A05BE]/30"
         )}
       >
         <span className="text-lg">{icon}</span>
