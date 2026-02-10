@@ -1,0 +1,280 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// MODELS — Refletem o schema real do banco Supabase
+// ============================================================================
+
+model Clinic {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  crfa      String?
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?  @map("zip_code")
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  users                 User[]
+  patients              Patient[]
+  appointments          Appointment[]
+  reports               Report[]
+  tasks                 Task[]
+  audioSessions         AudioSession[]
+  transactions          Transaction[]
+  transactionCategories TransactionCategory[]
+  messages              Message[]
+
+  @@map("clinics")
+}
+
+model User {
+  id                  String   @id @db.Uuid
+  clinicId            String?  @map("clinic_id") @db.Uuid
+  fullName            String   @map("full_name")
+  email               String   @unique
+  phone               String?
+  crfa                String?
+  role                String   @default("therapist")
+  avatarUrl           String?  @map("avatar_url")
+  areasAtuacao        String[] @map("areas_atuacao")
+  objetivos           String[] @map("objetivos")
+  onboardingCompleted Boolean? @default(false) @map("onboarding_completed")
+  onboardingStep      Int?     @default(0) @map("onboarding_step")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @map("updated_at") @db.Timestamptz
+
+  clinic          Clinic?        @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  patients        Patient[]      @relation("TherapistPatients")
+  appointments    Appointment[]
+  reports         Report[]       @relation("TherapistReports")
+  reviewedReports Report[]       @relation("ReviewerReports")
+  approvedReports Report[]       @relation("ApproverReports")
+  tasks           Task[]
+  audioSessions   AudioSession[]
+  transactions    Transaction[]
+  messages        Message[]
+
+  @@map("users")
+}
+
+model Patient {
+  id                   String    @id @default(uuid()) @db.Uuid
+  clinicId             String    @map("clinic_id") @db.Uuid
+  therapistId          String?   @map("therapist_id") @db.Uuid
+  name                 String
+  email                String?
+  phone                String?
+  birthDate            DateTime? @map("birth_date") @db.Date
+  cpf                  String?
+  status               String    @default("active")
+  guardianName         String?   @map("guardian_name")
+  guardianPhone        String?   @map("guardian_phone")
+  guardianRelationship String?   @map("guardian_relationship")
+  address              Json?
+  medicalHistory       Json?     @map("medical_history")
+  startDate            DateTime? @map("start_date") @db.Timestamptz
+  dischargeDate        DateTime? @map("discharge_date") @db.Timestamptz
+  dischargeReason      String?   @map("discharge_reason")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  clinic        Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  therapist     User?          @relation("TherapistPatients", fields: [therapistId], references: [id], onDelete: SetNull)
+  appointments  Appointment[]
+  reports       Report[]
+  tasks         Task[]
+  audioSessions AudioSession[]
+  transactions  Transaction[]
+  messages      Message[]
+
+  @@map("patients")
+}
+
+model Appointment {
+  id                 String    @id @default(uuid()) @db.Uuid
+  clinicId           String    @map("clinic_id") @db.Uuid
+  patientId          String    @map("patient_id") @db.Uuid
+  patientName        String    @map("patient_name")
+  therapistId        String    @map("therapist_id") @db.Uuid
+  therapistName      String    @map("therapist_name")
+  dateTime           DateTime  @map("date_time") @db.Timestamptz
+  duration           Int       @default(60)
+  type               String
+  status             String    @default("scheduled")
+  notes              String?
+  cancellationReason String?   @map("cancellation_reason")
+  cancellationNotes  String?   @map("cancellation_notes")
+  cancelledBy        String?   @map("cancelled_by")
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz
+  confirmedAt        DateTime? @map("confirmed_at") @db.Timestamptz
+  startedAt          DateTime? @map("started_at") @db.Timestamptz
+  completedAt        DateTime? @map("completed_at") @db.Timestamptz
+  sessionNotes       String?   @map("session_notes")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  clinic        Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient       Patient        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist     User           @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  reports       Report[]
+  audioSessions AudioSession[]
+  tasks         Task[]
+  transactions  Transaction[]
+
+  @@map("appointments")
+}
+
+model Report {
+  id              String    @id @default(uuid()) @db.Uuid
+  clinicId        String    @map("clinic_id") @db.Uuid
+  patientId       String    @map("patient_id") @db.Uuid
+  patientName     String    @map("patient_name")
+  therapistId     String    @map("therapist_id") @db.Uuid
+  therapistName   String    @map("therapist_name")
+  therapistCrfa   String    @map("therapist_crfa")
+  type            String
+  status          String    @default("draft")
+  title           String
+  content         String
+  periodStartDate DateTime? @map("period_start_date") @db.Date
+  periodEndDate   DateTime? @map("period_end_date") @db.Date
+  appointmentId   String?   @map("appointment_id") @db.Uuid
+  reviewedBy      String?   @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime? @map("reviewed_at") @db.Timestamptz
+  reviewNotes     String?   @map("review_notes")
+  approvedBy      String?   @map("approved_by") @db.Uuid
+  approvedAt      DateTime? @map("approved_at") @db.Timestamptz
+  sentAt          DateTime? @map("sent_at") @db.Timestamptz
+  sentTo          String[]  @map("sent_to")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient     Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist   User         @relation("TherapistReports", fields: [therapistId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  reviewer    User?        @relation("ReviewerReports", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  approver    User?        @relation("ApproverReports", fields: [approvedBy], references: [id], onDelete: SetNull)
+
+  @@map("reports")
+}
+
+model AudioSession {
+  id                  String    @id @default(uuid()) @db.Uuid
+  clinicId            String    @map("clinic_id") @db.Uuid
+  patientId           String    @map("patient_id") @db.Uuid
+  therapistId         String    @map("therapist_id") @db.Uuid
+  appointmentId       String?   @map("appointment_id") @db.Uuid
+  audioUrl            String    @map("audio_url")
+  audioDuration       Int?      @map("audio_duration")
+  fileSize            Int?      @map("file_size")
+  transcription       String?
+  transcriptionStatus String?   @default("pending") @map("transcription_status")
+  transcriptionError  String?   @map("transcription_error")
+  transcribedAt       DateTime? @map("transcribed_at") @db.Timestamptz
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient     Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist   User         @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@map("audio_sessions")
+}
+
+model Task {
+  id            String    @id @default(uuid()) @db.Uuid
+  clinicId      String    @map("clinic_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  title         String
+  description   String?
+  type          String    @default("task")
+  priority      String    @default("medium")
+  status        String    @default("pending")
+  dueDate       DateTime? @map("due_date") @db.Timestamptz
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz
+  patientId     String?   @map("patient_id") @db.Uuid
+  appointmentId String?   @map("appointment_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patient     Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@map("tasks")
+}
+
+model Transaction {
+  id               String    @id @default(uuid()) @db.Uuid
+  clinicId         String    @map("clinic_id") @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  patientId        String?   @map("patient_id") @db.Uuid
+  appointmentId    String?   @map("appointment_id") @db.Uuid
+  type             String
+  category         String
+  amount           Decimal   @db.Decimal
+  description      String?
+  status           String    @default("pending")
+  dueDate          DateTime  @map("due_date") @db.Date
+  paidAt           DateTime? @map("paid_at") @db.Timestamptz
+  paymentMethod    String?   @map("payment_method")
+  paymentReference String?   @map("payment_reference")
+  notes            String?
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patient     Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@map("transactions")
+}
+
+model TransactionCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  clinicId  String   @map("clinic_id") @db.Uuid
+  name      String
+  type      String
+  color     String?  @default("#6366f1")
+  icon      String?
+  isSystem  Boolean? @default(false) @map("is_system")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@map("transaction_categories")
+}
+
+model Message {
+  id             String   @id @default(uuid()) @db.Uuid
+  clinicId       String   @map("clinic_id") @db.Uuid
+  patientId      String   @map("patient_id") @db.Uuid
+  therapistId    String   @map("therapist_id") @db.Uuid
+  content        String
+  templateType   String   @map("template_type")
+  recipientPhone String   @map("recipient_phone")
+  recipientName  String   @map("recipient_name")
+  channel        String   @default("whatsapp")
+  sentAt         DateTime @default(now()) @map("sent_at") @db.Timestamptz
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  clinic    Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist User    @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
