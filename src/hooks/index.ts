@@ -45,3 +45,6 @@ export { useTransactions, useFinancialStats } from "./use-transactions"
 
 // User Hook
 export { useUser } from "./use-user"
+
+// Message Hooks
+export { useMessages, useCreateMessage } from "./use-messages"

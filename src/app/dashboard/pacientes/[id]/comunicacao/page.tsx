@@ -1,120 +1,148 @@
 "use client"
 
-import { use } from "react"
+import { use, useState, useMemo } from "react"
 import Link from "next/link"
 import {
   CommunicationHeader,
   CommunicationFilterBar,
   CommunicationTimeline,
 } from "@/components/patient-communication"
+import { WhatsAppMessageModal } from "@/components/whatsapp/whatsapp-message-modal"
+import { usePatient, useAppointments } from "@/hooks"
+import { useMessages } from "@/hooks/use-messages"
+import type { Message } from "@/lib/api/messages"
 
 interface CommunicationPageProps {
   params: Promise<{ id: string }>
 }
 
+// ---------------------------------------------------------------------------
+// Helpers — transform Message[] → TimelineGroup[]
+// ---------------------------------------------------------------------------
+
+const TEMPLATE_LABELS: Record<string, string> = {
+  reminder: "Lembrete",
+  activity: "Atividade",
+  feedback: "Feedback",
+  free: "Mensagem",
+}
+
+function formatGroupLabel(dateStr: string, isToday: boolean, isYesterday: boolean): string {
+  if (isToday) {
+    const d = new Date(dateStr)
+    return `Hoje, ${d.toLocaleDateString("pt-BR", { day: "numeric", month: "long" })}`
+  }
+  if (isYesterday) {
+    const d = new Date(dateStr)
+    return `Ontem, ${d.toLocaleDateString("pt-BR", { day: "numeric", month: "long" })}`
+  }
+  const d = new Date(dateStr)
+  return d.toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" })
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
+function messagesToTimelineGroups(messages: Message[]) {
+  const now = new Date()
+  const yesterday = new Date(now)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  const grouped = new Map<string, Message[]>()
+
+  for (const msg of messages) {
+    const d = new Date(msg.sentAt)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    if (!grouped.has(key)) grouped.set(key, [])
+    grouped.get(key)!.push(msg)
+  }
+
+  const groups = Array.from(grouped.entries())
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([dateKey, msgs]) => {
+      const dateObj = new Date(dateKey + "T00:00:00")
+      const isToday = isSameDay(dateObj, now)
+      const isYesterday = isSameDay(dateObj, yesterday)
+
+      return {
+        date: dateKey,
+        label: formatGroupLabel(dateKey, isToday, isYesterday),
+        isToday,
+        communications: msgs
+          .sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime())
+          .map((msg) => ({
+            id: msg.id,
+            type: "whatsapp" as const,
+            sender: `WhatsApp (${msg.recipientName})`,
+            status: "sent" as const,
+            time: new Date(msg.sentAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+            message: msg.content,
+            author: TEMPLATE_LABELS[msg.templateType] || "Mensagem",
+          })),
+      }
+    })
+
+  return groups
+}
+
+// ---------------------------------------------------------------------------
+// Page Component
+// ---------------------------------------------------------------------------
+
 export default function CommunicationPage({ params }: CommunicationPageProps) {
   const { id } = use(params)
+  const { patient, loading: patientLoading } = usePatient(id)
+  const { messages, loading: messagesLoading } = useMessages(id, { limit: 50 })
+  const { appointments } = useAppointments({ patientId: id })
+  const [whatsappOpen, setWhatsappOpen] = useState(false)
+  const [filterType, setFilterType] = useState<"all" | "manual" | "auto">("all")
 
-  // Mock data - substituir por dados reais do Supabase
-  const patient = {
-    name: "Ana Clara Souza",
-    image: "",
-    guardianName: "Mariana Souza",
-    guardianRelationship: "Mãe",
-    age: 6,
-    status: "active" as const,
+  const filteredMessages = useMemo(() => {
+    if (filterType === "all") return messages
+    if (filterType === "manual") return messages.filter((m) => m.templateType === "free")
+    return messages.filter((m) => m.templateType !== "free")
+  }, [messages, filterType])
+
+  const timelineGroups = useMemo(() => messagesToTimelineGroups(filteredMessages), [filteredMessages])
+
+  // Next appointment
+  const now = new Date()
+  const nextApt = appointments
+    .filter((a) => new Date(a.dateTime) > now && a.status !== "cancelled" && a.status !== "completed")
+    .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())[0] ?? null
+
+  const age = patient?.birthDate
+    ? Math.floor((now.getTime() - new Date(patient.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+    : 0
+
+  const loading = patientLoading || messagesLoading
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <span className="material-symbols-outlined animate-spin text-[#820AD1] text-3xl">progress_activity</span>
+          <p className="text-gray-500 mt-3 text-sm">Carregando comunicações...</p>
+        </div>
+      </div>
+    )
   }
 
-  const timelineGroups = [
-    {
-      date: "2023-10-12",
-      label: "Hoje, 12 Outubro",
-      isToday: true,
-      communications: [
-        {
-          id: "1",
-          type: "whatsapp" as const,
-          sender: "WhatsApp (Mariana)",
-          status: "sent" as const,
-          time: "10:42",
-          message:
-            "Olá Mariana, bom dia! Gostaria de saber se a Ana conseguiu realizar os exercícios de sopro que combinamos na última sessão. Tiveram alguma dificuldade?",
-          author: "Dra. Julia",
-          readTime: "11:15",
-        },
-      ],
-    },
-    {
-      date: "2023-10-11",
-      label: "Ontem, 11 Outubro",
-      isToday: false,
-      communications: [
-        {
-          id: "2",
-          type: "sms" as const,
-          sender: "Lembrete Automático (SMS)",
-          status: "system" as const,
-          time: "09:00",
-          message:
-            '"Olá! Lembrete da sessão de fonoaudiologia de Ana Clara amanhã (12/10) às 14h na Clínica Evolua. Responda SIM para confirmar."',
-          isSystemMessage: true,
-        },
-      ],
-    },
-    {
-      date: "2023-10-05",
-      label: "Semana Passada",
-      isToday: false,
-      communications: [
-        {
-          id: "3",
-          type: "email" as const,
-          sender: "Relatório Mensal (E-mail)",
-          status: "sent" as const,
-          time: "05 Out, 16:30",
-          message:
-            "Envio do relatório de progresso referente ao mês de Setembro. Documento PDF anexado.",
-          attachment: {
-            name: "Relatorio_Setembro_AnaClara.pdf",
-            icon: "picture_as_pdf",
-          },
-        },
-        {
-          id: "4",
-          type: "received" as const,
-          sender: "WhatsApp (Mariana)",
-          status: "received" as const,
-          time: "03 Out, 14:20",
-          message:
-            '"Dra. Julia, a Ana Clara adorou a sessão de hoje! Ela chegou em casa repetindo as palavras que aprenderam. Obrigada!"',
-          isReceived: true,
-        },
-      ],
-    },
-  ]
-
-  const handleCall = () => {
-    console.log("Iniciando chamada...")
-  }
-
-  const handleWhatsApp = () => {
-    console.log("Abrindo WhatsApp...")
-  }
-
-  const handleEmail = () => {
-    console.log("Abrindo email...")
-  }
-
-  const handleFilterChange = (filter: "all" | "manual" | "auto") => {
-    console.log("Filtro alterado:", filter)
-  }
-
-  const handleNewMessage = () => {
-    console.log("Nova mensagem...")
-  }
-
-  const handleLoadMore = () => {
-    console.log("Carregar mais comunicações...")
+  if (!patient) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="glass-card p-8 text-center max-w-md">
+          <span className="material-symbols-outlined text-5xl text-gray-300 mb-4">person_off</span>
+          <p className="text-red-600 mb-4">Paciente não encontrado</p>
+          <Link href="/dashboard/pacientes">
+            <button className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-900 text-sm font-bold py-2.5 px-5 rounded-full transition-all">
+              Voltar para lista
+            </button>
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -140,27 +168,59 @@ export default function CommunicationPage({ params }: CommunicationPageProps) {
           {/* Header */}
           <CommunicationHeader
             patientName={patient.name}
-            patientImage={patient.image}
-            guardianName={patient.guardianName}
-            guardianRelationship={patient.guardianRelationship}
-            age={patient.age}
-            status={patient.status}
-            onCall={handleCall}
-            onWhatsApp={handleWhatsApp}
-            onEmail={handleEmail}
+            patientImage=""
+            guardianName={patient.guardianName || "—"}
+            guardianRelationship={patient.guardianRelationship || "—"}
+            age={age}
+            status={patient.status === "active" ? "active" : patient.status === "discharged" ? "discharged" : "inactive"}
+            onCall={() => {
+              if (patient.guardianPhone) window.open(`tel:${patient.guardianPhone}`)
+            }}
+            onWhatsApp={() => setWhatsappOpen(true)}
+            onEmail={() => {
+              if (patient.email) window.open(`mailto:${patient.email}`)
+            }}
           />
 
           {/* Timeline */}
           <section className="glass-card rounded-[2rem] p-6 md:p-10 min-h-[600px] relative overflow-hidden flex flex-col border border-white bg-white/90 backdrop-blur-md shadow-lg">
             <CommunicationFilterBar
-              onFilterChange={handleFilterChange}
-              onNewMessage={handleNewMessage}
+              onFilterChange={setFilterType}
+              onNewMessage={() => setWhatsappOpen(true)}
             />
 
-            <CommunicationTimeline groups={timelineGroups} onLoadMore={handleLoadMore} />
+            {timelineGroups.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center py-16">
+                <span className="material-symbols-outlined text-5xl text-gray-300 mb-4">forum</span>
+                <p className="text-gray-500 text-sm font-medium">Nenhuma mensagem enviada ainda.</p>
+                <button
+                  onClick={() => setWhatsappOpen(true)}
+                  className="mt-4 bg-[#820AD1] hover:bg-[#820AD1]/90 text-white text-sm font-bold py-2.5 px-5 rounded-full transition-all shadow-lg shadow-[#820AD1]/20 flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[18px]">chat</span>
+                  Enviar primeira mensagem
+                </button>
+              </div>
+            ) : (
+              <CommunicationTimeline groups={timelineGroups} />
+            )}
           </section>
         </div>
       </div>
+
+      {/* WhatsApp Modal */}
+      <WhatsAppMessageModal
+        open={whatsappOpen}
+        onClose={() => setWhatsappOpen(false)}
+        patient={{
+          id,
+          name: patient.name,
+          guardianName: patient.guardianName,
+          guardianPhone: patient.guardianPhone,
+          guardianRelationship: patient.guardianRelationship,
+        }}
+        nextAppointment={nextApt ? { dateTime: nextApt.dateTime, type: nextApt.type, duration: nextApt.duration } : null}
+      />
     </div>
   )
 }

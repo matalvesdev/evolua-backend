@@ -17,37 +17,32 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import {
-  getPatientStatusConfig,
-  getAppointmentStatusConfig,
-  getReportStatusConfig,
   formatReportType,
-  formatAppointmentDate,
-  formatAppointmentTime,
   formatReportDate,
 } from "@/components/patient-profile/patient-profile-utils"
+import { WhatsAppMessageModal } from "@/components/whatsapp/whatsapp-message-modal"
+import type { MessageTemplateType } from "@/lib/utils/whatsapp-utils"
 
 export default function PatientDetailPage() {
   const params = useParams()
   const router = useRouter()
   const patientId = params.id as string
-
   const { patient, loading, error, refetch } = usePatient(patientId)
   const { reports, loading: reportsLoading } = usePatientReports(patientId)
-  const { appointments, loading: appointmentsLoading } = useAppointments({ patientId })
+  const { appointments } = useAppointments({ patientId })
   const { remove, discharge, reactivate, loading: mutationLoading } = usePatientMutations()
-
-  const [activeTab, setActiveTab] = React.useState<"info" | "appointments" | "reports">("info")
+  const [docSearch, setDocSearch] = React.useState("")
+  const [whatsappOpen, setWhatsappOpen] = React.useState(false)
+  const [whatsappTemplate, setWhatsappTemplate] = React.useState<MessageTemplateType>('free')
 
   const handleDelete = async () => {
     const result = await remove(patientId)
     if (result.success) router.push("/dashboard/pacientes")
   }
-
   const handleDischarge = async () => {
     const result = await discharge(patientId, "Alta médica")
     if (result.success) refetch()
   }
-
   const handleReactivate = async () => {
     const result = await reactivate(patientId)
     if (result.success) refetch()
@@ -57,7 +52,7 @@ export default function PatientDetailPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
-          <span className="material-symbols-outlined animate-spin text-[#8A05BE] text-3xl">progress_activity</span>
+          <span className="material-symbols-outlined animate-spin text-[#820AD1] text-3xl">progress_activity</span>
           <p className="text-gray-500 mt-3 text-sm">Carregando perfil...</p>
         </div>
       </div>
@@ -69,236 +64,353 @@ export default function PatientDetailPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="glass-card p-8 text-center max-w-md">
           <span className="material-symbols-outlined text-5xl text-gray-300 mb-4">person_off</span>
-          <p className="text-red-600 dark:text-red-400 mb-4">{error?.message || "Paciente não encontrado"}</p>
+          <p className="text-red-600 mb-4">{error?.message || "Paciente não encontrado"}</p>
           <Link href="/dashboard/pacientes"><Button variant="outline">Voltar para lista</Button></Link>
         </div>
       </div>
     )
   }
 
-  const status = getPatientStatusConfig(patient.status)
-  const addr = patient.address
-
-  const completedAppointments = appointments.filter((a) => a.status === "completed").length
   const age = patient.birthDate
     ? Math.floor((new Date().getTime() - new Date(patient.birthDate).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
     : null
+  const birthFmt = patient.birthDate
+    ? new Date(patient.birthDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+    : null
+  const now = new Date()
+  const upcoming = appointments
+    .filter((a) => new Date(a.dateTime) > now && a.status !== "cancelled" && a.status !== "completed")
+    .sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
+  const nextApt = upcoming[0]
+  const completed = appointments
+    .filter((a) => a.status === "completed")
+    .sort((a, b) => new Date(b.dateTime).getTime() - new Date(a.dateTime).getTime())
+  const lastSession = completed[0]
+
+  const sbMap: Record<string, { bg: string; text: string; dot: string; label: string }> = {
+    active: { bg: "bg-green-100", text: "text-green-700", dot: "bg-green-500", label: "Em Tratamento" },
+    inactive: { bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400", label: "Inativo" },
+    discharged: { bg: "bg-slate-100", text: "text-slate-600", dot: "bg-slate-400", label: "Alta" },
+    "on-hold": { bg: "bg-orange-100", text: "text-orange-700", dot: "bg-orange-500", label: "Em Espera" },
+  }
+  const sb = sbMap[patient.status] || sbMap.active
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 px-2 sm:px-0 pb-8">
-      {/* Back button */}
-      <button
-        onClick={() => router.push("/dashboard/pacientes")}
-        className="flex items-center gap-1.5 text-gray-500 hover:text-[#8A05BE] transition-colors text-sm group"
-      >
-        <span className="material-symbols-outlined text-lg group-hover:-translate-x-0.5 transition-transform">arrow_back</span>
-        Pacientes
-      </button>
-
-      {/* Hero Card with Gradient Header */}
-      <div className="glass-card overflow-hidden">
-        {/* Gradient Profile Header */}
-        <div className="relative px-6 py-8 sm:px-8" style={{ background: "linear-gradient(135deg, #8A05BE 0%, #6D08AF 100%)" }}>
-          {/* Decorative orbs */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10 blur-2xl" />
-            <div className="absolute bottom-0 left-1/4 w-32 h-32 rounded-full bg-white/5 blur-xl" />
+    <div className="flex-1 overflow-y-auto scroll-smooth">
+    <div className="flex flex-col gap-8 max-w-7xl mx-auto px-4 md:px-8 py-8 pb-24">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <nav className="flex items-center gap-2 text-sm text-gray-600 font-medium mb-1">
+            <Link href="/dashboard/pacientes" className="hover:text-[#820AD1] transition-colors">Pacientes</Link>
+            <span className="material-symbols-outlined text-[14px] text-gray-400">chevron_right</span>
+            <span className="text-gray-900">Perfil</span>
+          </nav>
+          <div className="flex flex-wrap items-center gap-4">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight">{patient.name}</h1>
+            <span className={`px-3 py-1 ${sb.bg} ${sb.text} text-xs font-bold rounded-full border shadow-sm flex items-center gap-1`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${sb.dot}`} />
+              {sb.label}
+            </span>
           </div>
-          <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              {/* Avatar initial with white border */}
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-[3px] border-white/80 bg-white/20 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                <span className="text-2xl sm:text-3xl font-bold text-white">
-                  {patient.name.charAt(0).toUpperCase()}
-                </span>
+        </div>
+        <div className="flex gap-3">
+          <Link href={`/dashboard/pacientes/${patientId}/editar`}>
+            <button className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-900 text-sm font-bold py-2.5 px-5 rounded-full transition-all flex items-center gap-2 shadow-sm">
+              <span className="material-symbols-outlined text-[18px]">edit</span>Editar
+            </button>
+          </Link>
+          <button onClick={() => { setWhatsappTemplate('free'); setWhatsappOpen(true) }} className="bg-[#820AD1] hover:bg-[#820AD1]/90 text-white text-sm font-bold py-2.5 px-5 rounded-full transition-all shadow-lg shadow-[#820AD1]/20 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px]">chat</span>Mensagem
+          </button>
+        </div>
+      </div>
+
+      {/* Patient Info Card */}
+      <section className="glass-card-strong rounded-3xl p-6 md:p-8 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[#820AD1]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+        <div className="flex flex-col xl:flex-row gap-8 items-start xl:items-center relative z-10">
+          <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start w-full xl:w-auto">
+            <div className="shrink-0">
+              <div className="rounded-[1.5rem] size-28 shadow-lg border-4 border-white flex items-center justify-center" style={{ background: "linear-gradient(135deg, #820AD1 0%, #C084FC 100%)" }}>
+                <span className="text-white text-4xl font-bold">{patient.name.charAt(0).toUpperCase()}</span>
               </div>
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-white">{patient.name}</h1>
-                <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                  {/* Status badge */}
-                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-semibold rounded-full ${status.badgeBg} ${status.color}`}>
-                    <span className="material-symbols-outlined text-sm">{status.icon}</span>
-                    {status.label}
-                  </span>
-                  {age !== null && (
-                    <span className="text-sm text-white/80">{age} anos</span>
-                  )}
-                  {patient.phone && (
-                    <span className="text-sm text-white/80 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-sm">phone</span>
-                      {patient.phone}
-                    </span>
-                  )}
+            </div>
+            <div className="flex flex-col gap-3 text-center sm:text-left">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+                {age !== null && (
+                  <InfoItem icon="cake" iconBg="bg-purple-50" iconColor="text-[#820AD1]" label="Idade" value={`${age} anos${birthFmt ? ` (${birthFmt})` : ""}`} />
+                )}
+                {patient.email && (
+                  <InfoItem icon="mail" iconBg="bg-blue-50" iconColor="text-blue-600" label="Email" value={patient.email} />
+                )}
+                {patient.phone && (
+                  <div className="flex items-center gap-2 text-gray-600 sm:col-span-2">
+                    <div className="bg-pink-50 p-1.5 rounded-lg text-pink-600">
+                      <span className="material-symbols-outlined text-[18px]">phone</span>
+                    </div>
+                    <div>
+                      <span className="block text-xs font-bold text-gray-400 uppercase tracking-wide">Telefone</span>
+                      <span className="text-sm font-semibold text-gray-900">{patient.phone}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="hidden xl:block w-px h-24 bg-gray-200" />
+          <div className="flex flex-col sm:flex-row gap-8 w-full xl:w-auto justify-between xl:justify-start">
+            {(patient.guardianName || patient.guardianPhone) && (
+              <div className="flex items-center gap-3">
+                <div className="bg-gray-100 rounded-full p-2 text-gray-500">
+                  <span className="material-symbols-outlined">family_restroom</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-0.5">Responsável</span>
+                  <p className="text-sm font-bold text-gray-900">{patient.guardianName}{patient.guardianRelationship ? ` (${patient.guardianRelationship})` : ""}</p>
+                  {patient.guardianPhone && <p className="text-xs text-gray-600 font-medium">{patient.guardianPhone}</p>}
                 </div>
               </div>
-            </div>
+            )}
+            {lastSession && (
+              <div className="flex items-center gap-3">
+                <div className="bg-green-50 rounded-full p-2 text-green-600">
+                  <span className="material-symbols-outlined">event_available</span>
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-gray-400 uppercase tracking-wide mb-0.5">Última Sessão</span>
+                  <p className="text-sm font-bold text-gray-900">
+                    {new Date(lastSession.dateTime).toLocaleDateString("pt-BR", { day: "numeric", month: "short" })},{" "}
+                    {new Date(lastSession.dateTime).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                  <p className="text-xs text-green-600 font-bold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[12px]">check_circle</span> Realizada
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
+      </section>
 
-        {/* Quick Actions */}
-        <div className="px-6 py-4 sm:px-8 bg-white/60 backdrop-blur-sm border-t border-white/50">
-          <div className="flex flex-wrap gap-2">
-            <Link href={`/dashboard/pacientes/${patientId}/editar`}>
-              <Button variant="outline" size="sm" className="gap-1.5 rounded-xl border-gray-200 hover:border-[#8A05BE]/30 hover:bg-[#8A05BE]/5 transition-all">
-                <span className="material-symbols-outlined text-base">edit</span>
-                Editar
-              </Button>
-            </Link>
-            <Link href={`/dashboard/pacientes/${patientId}/novo-relatorio`}>
-              <Button size="sm" className="gap-1.5 bg-[#8A05BE] hover:bg-[#6D08AF] rounded-xl text-white shadow-md shadow-[#8A05BE]/20">
-                <span className="material-symbols-outlined text-base">mic</span>
-                Relatório por Áudio
-              </Button>
-            </Link>
-            <Link href={`/dashboard/pacientes/${patientId}/audio`}>
-              <Button variant="outline" size="sm" className="gap-1.5 rounded-xl border-gray-200 hover:border-[#8A05BE]/30 hover:bg-[#8A05BE]/5 transition-all">
-                <span className="material-symbols-outlined text-base">headphones</span>
-                Sessões de Áudio
-              </Button>
-            </Link>
-            <Link href={`/dashboard/agendamentos/novo?patientId=${patientId}`}>
-              <Button variant="outline" size="sm" className="gap-1.5 rounded-xl border-gray-200 hover:border-[#8A05BE]/30 hover:bg-[#8A05BE]/5 transition-all">
-                <span className="material-symbols-outlined text-base">calendar_add_on</span>
-                Agendar
-              </Button>
-            </Link>
-            <Link href={`/dashboard/relatorios/novo?patientId=${patientId}`}>
-              <Button variant="outline" size="sm" className="gap-1.5 rounded-xl border-gray-200 hover:border-[#8A05BE]/30 hover:bg-[#8A05BE]/5 transition-all">
-                <span className="material-symbols-outlined text-base">description</span>
-                Relatório
-              </Button>
-            </Link>
-          </div>
+      {/* Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Left Column */}
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          {/* Documents Section */}
+          <section className="glass-card rounded-[2rem] p-6 flex flex-col gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-blue-100 p-2.5 rounded-xl text-blue-600 shadow-sm shadow-blue-100">
+                  <span className="material-symbols-outlined">folder_open</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Documentos e Relatórios</h3>
+                  <p className="text-xs text-gray-600 font-medium">{reports.length} arquivo(s)</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Link href={`/dashboard/pacientes/${patientId}/novo-relatorio`}>
+                  <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-900 text-sm font-bold rounded-full transition-colors shadow-sm">
+                    <span className="material-symbols-outlined text-[18px]">mic</span>
+                    <span className="hidden sm:inline">Gravar Áudio</span>
+                  </button>
+                </Link>
+                <Link href={`/dashboard/relatorios/novo?patientId=${patientId}`}>
+                  <button className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-full shadow-lg hover:bg-gray-800 transition-colors">
+                    <span className="material-symbols-outlined text-[18px]">upload</span>
+                    <span className="hidden sm:inline">Upload</span>
+                  </button>
+                </Link>
+              </div>
+            </div>
+            <div className="relative group">
+              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#820AD1] transition-colors text-[20px]">search</span>
+              <input type="text" value={docSearch} onChange={(e) => setDocSearch(e.target.value)} placeholder="Pesquisar documentos..." className="w-full bg-white border border-gray-100 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:ring-2 focus:ring-[#820AD1]/20 focus:border-[#820AD1]/30 shadow-sm transition-all placeholder:text-gray-400 text-gray-900" />
+            </div>
+            <div className="flex flex-col gap-2">
+              {reportsLoading ? (
+                <div className="flex justify-center py-6"><span className="material-symbols-outlined animate-spin text-[#820AD1]">progress_activity</span></div>
+              ) : reports.length === 0 ? (
+                <div className="text-center py-8">
+                  <span className="material-symbols-outlined text-4xl text-gray-300 mb-2">note_stack</span>
+                  <p className="text-sm text-gray-500">Nenhum documento ainda.</p>
+                </div>
+              ) : (
+                reports.filter((r) => !docSearch || r.title.toLowerCase().includes(docSearch.toLowerCase())).slice(0, 5).map((report) => {
+                  const icMap: Record<string, { icon: string; color: string }> = {
+                    evaluation: { icon: "picture_as_pdf", color: "bg-red-50 text-red-500" },
+                    evolution: { icon: "graphic_eq", color: "bg-purple-50 text-[#820AD1]" },
+                  }
+                  const ic = icMap[report.type] || { icon: "description", color: "bg-blue-50 text-blue-500" }
+                  return (
+                    <div key={report.id} onClick={() => router.push(`/dashboard/pacientes/${patientId}/revisar-relatorio?reportId=${report.id}`)} className="group flex items-center justify-between p-3.5 rounded-2xl hover:bg-white border border-transparent hover:border-gray-100 hover:shadow-md transition-all cursor-pointer bg-white/40">
+                      <div className="flex items-center gap-4">
+                        <div className={`size-11 rounded-xl ${ic.color} flex items-center justify-center shrink-0`}>
+                          <span className="material-symbols-outlined">{ic.icon}</span>
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm font-bold text-gray-900 group-hover:text-[#820AD1] transition-colors">{report.title}</span>
+                          <span className="text-xs text-gray-600 font-medium">{formatReportDate(report.createdAt)} • {formatReportType(report.type)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button className="p-2 hover:bg-gray-100 rounded-full text-gray-600 hover:text-gray-900 transition-colors" title="Visualizar"><span className="material-symbols-outlined text-[20px]">visibility</span></button>
+                        <button className="p-2 hover:bg-gray-100 rounded-full text-gray-600 hover:text-gray-900 transition-colors" title="Baixar"><span className="material-symbols-outlined text-[20px]">download</span></button>
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+            {reports.length > 5 && (
+              <Link href={`/dashboard/pacientes/${patientId}/documentos`} className="w-full py-3 border-t border-gray-100 text-sm text-[#820AD1] font-bold hover:bg-[#820AD1]/5 rounded-b-xl transition-colors flex items-center justify-center gap-2">
+                Ver todos os documentos<span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+              </Link>
+            )}
+          </section>
+
+          {/* Communication History */}
+          <section className="glass-card rounded-[2rem] p-6 flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-green-100 p-2.5 rounded-xl text-green-600 shadow-sm shadow-green-100">
+                  <span className="material-symbols-outlined">forum</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Histórico de Comunicação</h3>
+                  <p className="text-xs text-gray-600 font-medium">{completed.length > 0 ? `${completed.length} sessões realizadas` : "Sem interações ainda"}</p>
+                </div>
+              </div>
+              <button className="p-2 hover:bg-gray-100 rounded-full text-gray-600 transition-colors">
+                <span className="material-symbols-outlined">filter_list</span>
+              </button>
+            </div>
+            <div className="relative pl-4 space-y-8 before:content-[''] before:absolute before:left-[23px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gray-100">
+              {completed.slice(0, 3).map((apt) => (
+                <div key={apt.id} className="relative flex gap-5 pl-4 group">
+                  <div className="absolute left-0 top-1.5 size-3.5 bg-green-500 rounded-full border-[3px] border-white shadow-sm z-10 box-content" />
+                  <div className="flex-1 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-green-600">check_circle</span>
+                        <span className="text-sm font-bold text-gray-900">Sessão Realizada</span>
+                      </div>
+                      <span className="text-xs text-gray-600 font-medium">
+                        {new Date(apt.dateTime).toLocaleDateString("pt-BR", { day: "numeric", month: "short" })},{" "}
+                        {new Date(apt.dateTime).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 leading-relaxed">{apt.type ? `${apt.type} — ` : ""}{apt.duration} min</p>
+                  </div>
+                </div>
+              ))}
+              {reports.slice(0, 2).map((report) => (
+                <div key={report.id} className="relative flex gap-5 pl-4 group">
+                  <div className="absolute left-0 top-1.5 size-3.5 bg-blue-400 rounded-full border-[3px] border-white shadow-sm z-10 box-content" />
+                  <div className="flex-1 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm group-hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-blue-500">description</span>
+                        <span className="text-sm font-bold text-gray-900">{report.title}</span>
+                      </div>
+                      <span className="text-xs text-gray-600 font-medium">{formatReportDate(report.createdAt)}</span>
+                    </div>
+                    <p className="text-sm text-gray-600 leading-relaxed">{formatReportType(report.type)}</p>
+                  </div>
+                </div>
+              ))}
+              {completed.length === 0 && reports.length === 0 && (
+                <div className="text-center py-6"><p className="text-sm text-gray-500">Nenhuma interação registrada ainda.</p></div>
+              )}
+            </div>
+          </section>
         </div>
-      </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard
-          icon="event_available"
-          label="Sessões"
-          value={String(appointments.length)}
-          color="purple"
-        />
-        <StatCard
-          icon="check_circle"
-          label="Concluídas"
-          value={String(completedAppointments)}
-          color="emerald"
-        />
-        <StatCard
-          icon="description"
-          label="Relatórios"
-          value={String(reports.length)}
-          color="blue"
-        />
-        <StatCard
-          icon="calendar_today"
-          label="Início"
-          value={patient.startDate ? new Date(patient.startDate).toLocaleDateString("pt-BR", { month: "short", year: "numeric" }) : "—"}
-          color="amber"
-        />
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200/60 overflow-x-auto">
-        {[
-          { id: "info", label: "Informações", icon: "person" },
-          { id: "appointments", label: `Sessões (${appointments.length})`, icon: "event" },
-          { id: "reports", label: `Relatórios (${reports.length})`, icon: "description" },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as typeof activeTab)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === tab.id
-                ? "border-[#8A05BE] text-[#8A05BE]"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            }`}
-          >
-            <span className="material-symbols-outlined text-base">{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === "info" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Dados Pessoais */}
-          <div className="glass-card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined text-[#8A05BE] text-lg">badge</span>
-              <h3 className="font-semibold text-gray-900 dark:text-white">Dados Pessoais</h3>
+        {/* Right Column */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          {/* Next Session */}
+          <div className="glass-card rounded-[2rem] p-6 relative overflow-hidden group border-l-4 border-l-[#820AD1]/60">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-[#820AD1]/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl pointer-events-none" />
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-gray-900">Próxima Sessão</h3>
+              <span className="bg-[#820AD1]/10 text-[#820AD1] p-2 rounded-full">
+                <span className="material-symbols-outlined text-[20px]">calendar_clock</span>
+              </span>
             </div>
-            <div className="space-y-3">
-              <InfoRow icon="person" label="Nome" value={patient.name} />
-              <InfoRow icon="mail" label="Email" value={patient.email || "Não informado"} />
-              <InfoRow icon="phone" label="Telefone" value={patient.phone || "Não informado"} />
-              <InfoRow icon="cake" label="Data de Nascimento" value={patient.birthDate ? new Date(patient.birthDate).toLocaleDateString("pt-BR") : "Não informado"} />
-              <InfoRow icon="id_card" label="CPF" value={patient.cpf || "Não informado"} />
+            {nextApt ? (
+              <>
+                <div className="flex flex-col gap-1 mb-6 relative z-10">
+                  <span className="text-4xl font-bold text-gray-900 tracking-tight">
+                    {new Date(nextApt.dateTime).toLocaleDateString("pt-BR", { day: "numeric", month: "short" })}
+                  </span>
+                  <span className="text-base font-medium text-gray-600 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#820AD1]" />
+                    {new Date(nextApt.dateTime).toLocaleDateString("pt-BR", { weekday: "long" })} •{" "}
+                    {new Date(nextApt.dateTime).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+                <button className="w-full py-3.5 bg-gray-900 text-white rounded-xl font-bold text-sm shadow-xl shadow-gray-200 hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 group-hover:scale-[1.02] transform duration-200">
+                  Iniciar Sessão<span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                </button>
+              </>
+            ) : (
+              <div className="text-center py-4 relative z-10">
+                <p className="text-sm text-gray-500 mb-3">Nenhuma sessão agendada</p>
+                <Link href={`/dashboard/agendamentos/novo?patientId=${patientId}`}>
+                  <button className="w-full py-3.5 bg-[#820AD1] text-white rounded-xl font-bold text-sm shadow-lg shadow-[#820AD1]/20 hover:bg-[#820AD1]/90 transition-colors flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-[18px]">add</span>Agendar Sessão
+                  </button>
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Smart Actions */}
+          <div className="glass-card rounded-[2rem] p-6">
+            <div className="flex items-center gap-2.5 mb-5">
+              <span className="material-symbols-outlined text-[#820AD1] text-[22px]">auto_awesome</span>
+              <h3 className="text-base font-bold text-gray-900">Smart Actions</h3>
+            </div>
+            <div className="flex flex-col gap-3">
+              <button type="button" onClick={() => { setWhatsappTemplate('reminder'); setWhatsappOpen(true) }} className="block w-full">
+                <SmartActionBtn icon="chat" iconBg="bg-green-50" iconColor="text-green-600" title="Enviar Lembrete" desc={nextApt ? `Confirmar sessão do dia ${new Date(nextApt.dateTime).getDate()}` : "Sem sessão agendada"} />
+              </button>
+              <Link href={`/dashboard/pacientes/${patientId}/novo-relatorio`} className="block">
+                <SmartActionBtn icon="mic" iconBg="bg-purple-50" iconColor="text-[#820AD1]" title="Novo Relatório" desc="Criar relatório por áudio" />
+              </Link>
+              <button type="button" onClick={() => { setWhatsappTemplate('feedback'); setWhatsappOpen(true) }} className="block w-full">
+                <SmartActionBtn icon="assignment_turned_in" iconBg="bg-orange-50" iconColor="text-orange-500" title="Solicitar Feedback" desc="Questionário pós-avaliação" />
+              </button>
             </div>
           </div>
 
-          {/* Responsável */}
-          {(patient.guardianName || patient.guardianPhone) && (
-            <div className="glass-card p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-[#8A05BE] text-lg">family_restroom</span>
-                <h3 className="font-semibold text-gray-900 dark:text-white">Responsável</h3>
-              </div>
-              <div className="space-y-3">
-                <InfoRow icon="person" label="Nome" value={patient.guardianName || "Não informado"} />
-                <InfoRow icon="phone" label="Telefone" value={patient.guardianPhone || "Não informado"} />
-                <InfoRow icon="group" label="Parentesco" value={patient.guardianRelationship || "Não informado"} />
-              </div>
+          {/* Status Card */}
+          <div className="rounded-[2rem] bg-linear-to-br from-[#f8f5fa] to-white p-6 flex flex-col items-center text-center justify-center min-h-[180px] relative overflow-hidden border border-gray-200 shadow-sm">
+            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(#820AD1 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+            <div className="bg-white p-3 rounded-2xl shadow-sm mb-3 z-10 ring-1 ring-gray-100">
+              <span className="material-symbols-outlined text-[#820AD1] text-[28px]">folder_managed</span>
             </div>
-          )}
+            <h3 className="text-sm font-bold text-gray-900 z-10">{reports.length > 0 ? "Documentação em Dia!" : "Sem Documentos"}</h3>
+            <p className="text-xs text-gray-600 mt-1 max-w-[200px] z-10 font-medium">
+              {reports.length > 0 ? `${reports.length} relatório(s) arquivado(s) com sucesso.` : "Crie o primeiro relatório para este paciente."}
+            </p>
+          </div>
 
-          {/* Endereço */}
-          {addr && (
-            <div className="glass-card p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-[#8A05BE] text-lg">location_on</span>
-                <h3 className="font-semibold text-gray-900 dark:text-white">Endereço</h3>
-              </div>
-              <div className="space-y-3">
-                <InfoRow icon="home" label="Rua" value={`${addr.street || "—"}${addr.number ? `, ${addr.number}` : ""}`} />
-                {addr.complement && <InfoRow icon="apartment" label="Complemento" value={addr.complement} />}
-                <InfoRow icon="map" label="Bairro" value={addr.neighborhood || "Não informado"} />
-                <InfoRow icon="location_city" label="Cidade/UF" value={`${addr.city || "—"} / ${addr.state || "—"}`} />
-                <InfoRow icon="pin_drop" label="CEP" value={addr.zipCode || "Não informado"} />
-              </div>
+          {/* Actions Card */}
+          <div className="glass-card rounded-[2rem] p-6">
+            <div className="flex items-center gap-2.5 mb-4">
+              <span className="material-symbols-outlined text-gray-500 text-[22px]">settings</span>
+              <h3 className="text-base font-bold text-gray-900">Ações</h3>
             </div>
-          )}
-
-          {/* Histórico Médico */}
-          {patient.medicalHistory && (
-            <div className="glass-card p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <span className="material-symbols-outlined text-[#8A05BE] text-lg">medical_information</span>
-                <h3 className="font-semibold text-gray-900 dark:text-white">Histórico Médico</h3>
-              </div>
-              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
-                {patient.medicalHistory.notes || "Sem observações"}
-              </p>
-            </div>
-          )}
-
-          {/* Ações */}
-          <div className="glass-card p-5 lg:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <span className="material-symbols-outlined text-[#8A05BE] text-lg">settings</span>
-              <h3 className="font-semibold text-gray-900 dark:text-white">Ações</h3>
-            </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-col gap-2">
               {patient.status === "active" && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="outline" disabled={mutationLoading} className="gap-1.5 rounded-xl hover:border-[#8A05BE]/30">
-                      <span className="material-symbols-outlined text-base">school</span>
-                      Dar Alta
-                    </Button>
+                    <button disabled={mutationLoading} className="w-full flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-amber-300 hover:shadow-md transition-all text-left group">
+                      <div className="bg-amber-50 text-amber-600 p-2.5 rounded-lg"><span className="material-symbols-outlined text-[20px]">school</span></div>
+                      <span className="text-sm font-bold text-gray-900 group-hover:text-amber-700 transition-colors">Dar Alta</span>
+                    </button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
@@ -307,23 +419,23 @@ export default function PatientDetailPage() {
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDischarge} className="bg-[#8A05BE] hover:bg-[#6D08AF]">Confirmar</AlertDialogAction>
+                      <AlertDialogAction onClick={handleDischarge} className="bg-[#820AD1] hover:bg-[#820AD1]/90">Confirmar</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
               )}
               {patient.status === "discharged" && (
-                <Button variant="outline" onClick={handleReactivate} disabled={mutationLoading} className="gap-1.5 rounded-xl hover:border-[#8A05BE]/30">
-                  <span className="material-symbols-outlined text-base">refresh</span>
-                  Reativar
-                </Button>
+                <button onClick={handleReactivate} disabled={mutationLoading} className="w-full flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-green-300 hover:shadow-md transition-all text-left group">
+                  <div className="bg-green-50 text-green-600 p-2.5 rounded-lg"><span className="material-symbols-outlined text-[20px]">refresh</span></div>
+                  <span className="text-sm font-bold text-gray-900 group-hover:text-green-700 transition-colors">Reativar Paciente</span>
+                </button>
               )}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" disabled={mutationLoading} className="gap-1.5 rounded-xl">
-                    <span className="material-symbols-outlined text-base">delete</span>
-                    Excluir
-                  </Button>
+                  <button disabled={mutationLoading} className="w-full flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-red-300 hover:shadow-md transition-all text-left group">
+                    <div className="bg-red-50 text-red-500 p-2.5 rounded-lg"><span className="material-symbols-outlined text-[20px]">delete</span></div>
+                    <span className="text-sm font-bold text-gray-900 group-hover:text-red-600 transition-colors">Excluir Paciente</span>
+                  </button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
@@ -339,162 +451,51 @@ export default function PatientDetailPage() {
             </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {activeTab === "appointments" && (
-        <div className="space-y-3">
-          {appointmentsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <span className="material-symbols-outlined animate-spin text-[#8A05BE] text-2xl">progress_activity</span>
-            </div>
-          ) : appointments.length === 0 ? (
-            <div className="glass-card p-10 text-center">
-              <span className="material-symbols-outlined text-5xl text-gray-300 mb-3">event_busy</span>
-              <p className="text-gray-500 mb-4">Nenhuma sessão agendada ainda.</p>
-              <Link href={`/dashboard/agendamentos/novo?patientId=${patientId}`}>
-                <Button className="bg-[#8A05BE] hover:bg-[#6D08AF] gap-1.5 rounded-xl shadow-md shadow-[#8A05BE]/20">
-                  <span className="material-symbols-outlined text-base">add</span>
-                  Agendar Sessão
-                </Button>
-              </Link>
-            </div>
-          ) : (
-            appointments.map((apt) => (
-              <div key={apt.id} className="glass-card-item p-4 cursor-pointer group">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-[#8A05BE]/10 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[#8A05BE]">event</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {formatAppointmentDate(apt.dateTime)}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-sm">schedule</span>
-                      {formatAppointmentTime(apt.dateTime)} — {apt.duration} min
-                      {apt.type && (
-                        <>
-                          <span className="text-gray-300">•</span>
-                          {apt.type}
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  <AppointmentBadge status={apt.status} />
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {activeTab === "reports" && (
-        <div className="space-y-3">
-          {reportsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <span className="material-symbols-outlined animate-spin text-[#8A05BE] text-2xl">progress_activity</span>
-            </div>
-          ) : reports.length === 0 ? (
-            <div className="glass-card p-10 text-center">
-              <span className="material-symbols-outlined text-5xl text-gray-300 mb-3">note_stack</span>
-              <p className="text-gray-500 mb-4">Nenhum relatório criado ainda.</p>
-              <div className="flex gap-2 justify-center">
-                <Link href={`/dashboard/pacientes/${patientId}/novo-relatorio`}>
-                  <Button className="bg-[#8A05BE] hover:bg-[#6D08AF] gap-1.5 rounded-xl shadow-md shadow-[#8A05BE]/20">
-                    <span className="material-symbols-outlined text-base">mic</span>
-                    Relatório por Áudio
-                  </Button>
-                </Link>
-                <Link href={`/dashboard/relatorios/novo?patientId=${patientId}`}>
-                  <Button variant="outline" className="gap-1.5 rounded-xl hover:border-[#8A05BE]/30">
-                    <span className="material-symbols-outlined text-base">edit_note</span>
-                    Relatório Manual
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          ) : (
-            reports.map((report) => (
-              <div
-                key={report.id}
-                className="glass-card-item p-4 cursor-pointer group"
-                onClick={() => router.push(`/dashboard/pacientes/${patientId}/revisar-relatorio?reportId=${report.id}`)}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-blue-600">description</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 dark:text-white group-hover:text-[#8A05BE] transition-colors truncate">
-                      {report.title}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                      <span className="capitalize">{formatReportType(report.type)}</span>
-                      <span className="text-gray-300">•</span>
-                      {formatReportDate(report.createdAt)}
-                    </p>
-                  </div>
-                  <ReportBadge status={report.status} />
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
+      <WhatsAppMessageModal
+        open={whatsappOpen}
+        onClose={() => setWhatsappOpen(false)}
+        patient={{
+          id: patientId,
+          name: patient.name,
+          guardianName: patient.guardianName,
+          guardianPhone: patient.guardianPhone,
+          guardianRelationship: patient.guardianRelationship,
+        }}
+        nextAppointment={nextApt ? { dateTime: nextApt.dateTime, type: nextApt.type, duration: nextApt.duration } : null}
+        defaultTemplate={whatsappTemplate}
+      />
+    </div>
     </div>
   )
 }
 
-function StatCard({ icon, label, value, color }: { icon: string; label: string; value: string; color: string }) {
-  const colorMap: Record<string, string> = {
-    purple: "bg-[#8A05BE]/10 text-[#8A05BE]",
-    emerald: "bg-emerald-50 text-emerald-600",
-    blue: "bg-blue-50 text-blue-600",
-    amber: "bg-amber-50 text-amber-600",
-  }
+function InfoItem({ icon, iconBg, iconColor, label, value }: { icon: string; iconBg: string; iconColor: string; label: string; value: string }) {
   return (
-    <div className="glass-card-item p-4">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colorMap[color] || "bg-gray-50 text-gray-600"}`}>
-          <span className="material-symbols-outlined text-lg">{icon}</span>
-        </div>
-        <div>
-          <p className="text-lg font-bold text-gray-900 dark:text-white">{value}</p>
-          <p className="text-xs text-gray-500">{label}</p>
-        </div>
+    <div className="flex items-center gap-2 text-gray-600">
+      <div className={`${iconBg} p-1.5 rounded-lg ${iconColor}`}>
+        <span className="material-symbols-outlined text-[18px]">{icon}</span>
+      </div>
+      <div>
+        <span className="block text-xs font-bold text-gray-400 uppercase tracking-wide">{label}</span>
+        <span className="text-sm font-semibold text-gray-900">{value}</span>
       </div>
     </div>
   )
 }
 
-function InfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
+function SmartActionBtn({ icon, iconBg, iconColor, title, desc }: { icon: string; iconBg: string; iconColor: string; title: string; desc: string }) {
   return (
-    <div className="flex items-start gap-3">
-      <span className="material-symbols-outlined text-gray-400 text-base mt-0.5">{icon}</span>
-      <div className="min-w-0">
-        <p className="text-xs text-gray-500 dark:text-gray-400">{label}</p>
-        <p className="text-sm text-gray-900 dark:text-white truncate">{value}</p>
+    <button className="flex items-center gap-3 p-3 rounded-xl bg-white border border-gray-100 hover:border-[#820AD1]/30 hover:shadow-md transition-all text-left group w-full">
+      <div className={`${iconBg} ${iconColor} p-2.5 rounded-lg group-hover:bg-opacity-100 transition-colors`}>
+        <span className="material-symbols-outlined text-[20px]">{icon}</span>
       </div>
-    </div>
-  )
-}
-
-function AppointmentBadge({ status }: { status: string }) {
-  const c = getAppointmentStatusConfig(status)
-  return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${c.color}`}>
-      <span className="material-symbols-outlined text-xs">{c.icon}</span>
-      {c.label}
-    </span>
-  )
-}
-
-function ReportBadge({ status }: { status: string }) {
-  const c = getReportStatusConfig(status)
-  return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border ${c.color}`}>
-      <span className="material-symbols-outlined text-xs">{c.icon}</span>
-      {c.label}
-    </span>
+      <div className="flex-1">
+        <span className="block text-sm font-bold text-gray-900 group-hover:text-[#820AD1] transition-colors">{title}</span>
+        <span className="block text-xs text-gray-600 font-medium">{desc}</span>
+      </div>
+      <span className="material-symbols-outlined text-gray-300 group-hover:text-[#820AD1] group-hover:translate-x-1 transition-all">chevron_right</span>
+    </button>
   )
 }

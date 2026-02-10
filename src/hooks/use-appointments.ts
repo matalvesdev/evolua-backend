@@ -71,31 +71,42 @@ export function useAppointmentMutations() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
   })
 
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["appointments"] })
+    queryClient.invalidateQueries({ queryKey: ["appointment"] })
+  }
+
   const confirmMutation = useMutation({
     mutationFn: (id: string) => appointmentsApi.confirmAppointment(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+    onSuccess: invalidateAll,
+  })
+
+  const startMutation = useMutation({
+    mutationFn: (id: string) => appointmentsApi.startAppointment(id),
+    onSuccess: invalidateAll,
   })
 
   const cancelMutation = useMutation({
     mutationFn: ({ id, reason, cancelledBy, notes }: { id: string; reason: string; cancelledBy: string; notes?: string }) =>
       appointmentsApi.cancelAppointment(id, reason, cancelledBy, notes),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+    onSuccess: invalidateAll,
   })
 
   const completeMutation = useMutation({
     mutationFn: ({ id, sessionNotes }: { id: string; sessionNotes?: string }) =>
       appointmentsApi.completeAppointment(id, sessionNotes),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+    onSuccess: invalidateAll,
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => appointmentsApi.deleteAppointment(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["appointments"] }),
+    onSuccess: invalidateAll,
   })
 
   return {
     createAppointment: createMutation.mutateAsync,
     confirmAppointment: confirmMutation.mutateAsync,
+    startAppointment: startMutation.mutateAsync,
     cancelAppointment: cancelMutation.mutateAsync,
     completeAppointment: completeMutation.mutateAsync,
     deleteAppointment: deleteMutation.mutateAsync,

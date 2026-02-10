@@ -144,10 +144,12 @@ export default function NovoAgendamentoPage() {
     try {
       await createAppointment({
         patientId: selectedPatient.id,
+        patientName: selectedPatient.name,
+        therapistId: user?.id || '',
+        therapistName: user?.user_metadata?.full_name || 'Terapeuta',
         dateTime: appointmentDateTime.toISOString(),
         duration: durationMinutes,
-        type: 'regular',
-        therapistId: user?.id || '',
+        type: 'session',
       });
       router.push('/dashboard/agendamentos');
     } catch (err) {

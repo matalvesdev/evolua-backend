@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { WelcomeSection } from "@/components/dashboard/welcome-section"
 import { ScheduleCard } from "@/components/dashboard/schedule-card"
@@ -13,6 +14,7 @@ import { DashboardTodoList } from "@/components/dashboard/dashboard-todo-list"
 import { useTodayAppointments } from "@/hooks"
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { appointments, loading } = useTodayAppointments()
   const [externalModal, setExternalModal] = useState<ModalType>(null)
 
@@ -62,6 +64,8 @@ export default function DashboardPage() {
                       locationIcon="location_on"
                       locationColor="text-gray-600"
                       isPrimary={new Date(appointment.dateTime).getHours() === new Date().getHours()}
+                      onViewDetails={() => router.push(`/dashboard/agendamentos/${appointment.id}`)}
+                      onStartSession={() => router.push(`/dashboard/agendamentos/${appointment.id}`)}
                     />
                   ))
                 )}

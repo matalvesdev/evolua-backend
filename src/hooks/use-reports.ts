@@ -69,7 +69,18 @@ export function useReportMutations() {
 
   const submitMutation = useMutation({
     mutationFn: (id: string) => reportsApi.submitReportForReview(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["reports"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] })
+      queryClient.invalidateQueries({ queryKey: ["report"] })
+    },
+  })
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => reportsApi.approveReport(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["reports"] })
+      queryClient.invalidateQueries({ queryKey: ["report"] })
+    },
   })
 
   return {
@@ -77,7 +88,9 @@ export function useReportMutations() {
     updateReport: updateMutation.mutateAsync,
     deleteReport: deleteMutation.mutateAsync,
     submitForReview: submitMutation.mutateAsync,
+    approveReport: approveMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
+    isDeleting: deleteMutation.isPending,
   }
 }

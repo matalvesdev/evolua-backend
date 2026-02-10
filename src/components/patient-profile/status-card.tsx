@@ -1,6 +1,6 @@
 export function StatusCard() {
   return (
-    <div className="rounded-[2rem] bg-gradient-to-br from-[#f8f5fa] to-white p-6 flex flex-col items-center text-center justify-center min-h-[180px] relative overflow-hidden border border-gray-200 shadow-sm">
+    <div className="rounded-[2rem] bg-linear-to-br from-[#f8f5fa] to-white p-6 flex flex-col items-center text-center justify-center min-h-[180px] relative overflow-hidden border border-gray-200 shadow-sm">
       <div 
         className="absolute inset-0 opacity-10" 
         style={{

@@ -85,6 +85,10 @@ export async function submitReportForReview(id: string): Promise<Report> {
   return api.patch<Report>(`/reports/${id}/submit`, {})
 }
 
+export async function approveReport(id: string): Promise<Report> {
+  return api.patch<Report>(`/reports/${id}/approve`, {})
+}
+
 export async function deleteReport(id: string): Promise<void> {
   return api.delete(`/reports/${id}`)
 }

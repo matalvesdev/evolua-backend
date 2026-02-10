@@ -16,15 +16,22 @@ export interface Appointment {
   id: string
   clinicId: string
   patientId: string
+  patientName?: string
   therapistId: string
+  therapistName?: string
   type: string
   status: string
   dateTime: string
   duration: number
+  notes?: string
   sessionNotes?: string
   cancellationReason?: string
   cancelledBy?: string
   cancellationNotes?: string
+  confirmedAt?: string
+  startedAt?: string
+  completedAt?: string
+  cancelledAt?: string
   createdAt: string
   updatedAt: string
 }
