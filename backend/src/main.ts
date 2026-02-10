@@ -37,7 +37,7 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
 
-  const port = config.get<number>('PORT', 10000);
+  const port = config.get<number>('PORT', 8080);
   await app.listen(port, '0.0.0.0');
   console.log(`🚀 Evolua API rodando na porta ${port}`);
   console.log(`📚 Swagger docs em /api/docs`);
