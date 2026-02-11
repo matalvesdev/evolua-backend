@@ -1,7 +1,0 @@
-export { ProfileHeader } from './profile-header'
-export { PatientInfoCard } from './patient-info-card'
-export { DocumentsSection } from './documents-section'
-export { CommunicationHistory } from './communication-history'
-export { NextSessionCard } from './next-session-card'
-export { SmartActionsCard } from './smart-actions-card'
-export { StatusCard } from './status-card'

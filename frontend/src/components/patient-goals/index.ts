@@ -1,5 +1,0 @@
-export { PatientGoalHeader } from "./patient-goal-header"
-export { TherapeuticObjective } from "./therapeutic-objective"
-export { GoalCard } from "./goal-card"
-export { ActivityChecklistItem } from "./activity-checklist-item"
-export { WeeklyActivitiesPlan } from "./weekly-activities-plan"
