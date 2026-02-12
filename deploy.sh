@@ -2,25 +2,34 @@
 # ==========================================
 # Deploy Evolua Backend para AWS App Runner
 # ==========================================
-# Pré-requisitos:
-#   - AWS CLI configurado (aws configure)
-#   - Docker instalado e rodando
-#
 # Uso:
-#   chmod +x deploy.sh
-#   ./deploy.sh
+#   ./deploy.sh dev     → deploy para desenvolvimento
+#   ./deploy.sh prod    → deploy para produção
 # ==========================================
 
 set -e
 
-# Configurações - ALTERE CONFORME SEU AMBIENTE
+ENV=${1:-dev}
+
+if [ "$ENV" != "dev" ] && [ "$ENV" != "prod" ]; then
+  echo "❌ Uso: ./deploy.sh [dev|prod]"
+  exit 1
+fi
+
 AWS_REGION="sa-east-1"
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-ECR_REPO_NAME="evolua-backend"
-IMAGE_TAG="latest"
+
+if [ "$ENV" = "prod" ]; then
+  ECR_REPO_NAME="evolua-backend-prod"
+  IMAGE_TAG="latest"
+else
+  ECR_REPO_NAME="evolua-backend-dev"
+  IMAGE_TAG="latest"
+fi
 
 ECR_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO_NAME}"
 
+echo "🌍 Ambiente: ${ENV}"
 echo "🔧 Região: ${AWS_REGION}"
 echo "🔧 Account: ${AWS_ACCOUNT_ID}"
 echo "🔧 ECR URI: ${ECR_URI}"
@@ -37,7 +46,7 @@ aws ecr create-repository \
 # 2. Login no ECR
 echo "🔐 Fazendo login no ECR..."
 aws ecr get-login-password --region ${AWS_REGION} | \
-  docker login --username AWS --password-stdin ${ECR_URI}
+  docker login --username AWS --password-stdin "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
 # 3. Build da imagem
 echo "🏗️  Fazendo build da imagem Docker..."
@@ -49,13 +58,11 @@ docker tag ${ECR_REPO_NAME}:${IMAGE_TAG} ${ECR_URI}:${IMAGE_TAG}
 docker push ${ECR_URI}:${IMAGE_TAG}
 
 echo ""
-echo "✅ Imagem enviada com sucesso!"
+echo "✅ Imagem enviada com sucesso! [${ENV}]"
 echo "   ${ECR_URI}:${IMAGE_TAG}"
 echo ""
-echo "📋 Próximos passos no Console AWS:"
-echo "   1. Acesse App Runner > Create service"
-echo "   2. Source: Container registry > Amazon ECR"
-echo "   3. Image URI: ${ECR_URI}:${IMAGE_TAG}"
-echo "   4. Port: 8080"
-echo "   5. Configure as variáveis de ambiente (veja .env.example)"
-echo "   6. Health check path: /api/health"
+echo "📋 No Console AWS (App Runner):"
+echo "   1. Image URI: ${ECR_URI}:${IMAGE_TAG}"
+echo "   2. Port: 8080"
+echo "   3. Health check: /api/health"
+echo "   4. Variáveis: veja .env.${ENV == 'prod' && 'production' || 'development'}"
