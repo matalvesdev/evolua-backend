@@ -8,6 +8,7 @@ import {
   Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/decorators/current-user.decorator';
@@ -19,12 +20,14 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('signup')
+  @Throttle({ short: { ttl: 60000, limit: 3 } })
   @ApiOperation({ summary: 'Criar conta' })
   async signUp(@Body() dto: SignUpDto) {
     return this.authService.signUp(dto.email, dto.password, dto.fullName);
   }
 
   @Post('signin')
+  @Throttle({ short: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'Login' })
   async signIn(@Body() dto: SignInDto) {
     return this.authService.signIn(dto.email, dto.password);

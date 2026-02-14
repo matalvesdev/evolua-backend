@@ -44,28 +44,38 @@ export class JwtAuthGuard implements CanActivate {
     if (!user) {
       this.logger.log(`Auto-provisioning user ${supabaseUser.id} (${supabaseUser.email})`);
       try {
+        const fullName =
+          supabaseUser.user_metadata?.full_name ||
+          supabaseUser.email!.split('@')[0];
+
         // Create a default clinic for the new user
         const clinic = await this.prisma.clinic.create({
-          data: {
-            name: `Consultório de ${supabaseUser.user_metadata?.full_name || supabaseUser.email!.split('@')[0]}`,
-          },
+          data: { name: `Consultório de ${fullName}` },
         });
 
-        user = await this.prisma.user.create({
-          data: {
+        // Use upsert to avoid race condition with concurrent requests
+        user = await this.prisma.user.upsert({
+          where: { id: supabaseUser.id },
+          update: {},
+          create: {
             id: supabaseUser.id,
             email: supabaseUser.email!,
-            fullName:
-              supabaseUser.user_metadata?.full_name ||
-              supabaseUser.email!.split('@')[0],
+            fullName,
             role: 'therapist',
             clinicId: clinic.id,
           },
           select: { id: true, email: true, clinicId: true, role: true },
         });
       } catch (err) {
-        this.logger.error(`Failed to auto-provision user: ${err}`);
-        throw new UnauthorizedException('Não foi possível provisionar o usuário');
+        // If upsert also fails, try to fetch the user (created by another request)
+        user = await this.prisma.user.findUnique({
+          where: { id: supabaseUser.id },
+          select: { id: true, email: true, clinicId: true, role: true },
+        });
+        if (!user) {
+          this.logger.error(`Failed to auto-provision user: ${err}`);
+          throw new UnauthorizedException('Não foi possível provisionar o usuário');
+        }
       }
     }
 
