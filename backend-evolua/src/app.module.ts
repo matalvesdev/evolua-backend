@@ -14,6 +14,7 @@ import { AudioModule } from './audio/audio.module';
 import { AiChatModule } from './ai-chat/ai-chat.module';
 import { MessagesModule } from './messages/messages.module';
 import { HealthModule } from './health/health.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { HealthModule } from './health/health.module';
     AiChatModule,
     MessagesModule,
     HealthModule,
+    NotificationsModule,
   ],
   providers: [
     {
