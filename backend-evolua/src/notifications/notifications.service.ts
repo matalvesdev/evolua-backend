@@ -1,145 +1,221 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import axios, { AxiosInstance } from 'axios';
+import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
+import { Notification } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import { PaginatedResponseDto } from '../common/dto/paginated-response.dto';
+import { NotificationDispatcherService } from './notification-dispatcher.service';
+import { NotificationPreferencesService } from './notification-preferences.service';
 
-export interface SendEmailOptions {
-  to: string;
-  from?: string;
-  subject: string;
-  htmlBody: string;
-  textBody?: string;
-  idempotencyKey?: string;
+export interface CreateNotificationInput {
+  userId: string;
+  clinicId: string;
+  type: 'appointment_reminder' | 'report_ready' | 'general';
+  title: string;
+  body: string;
+  metadata?: Record<string, any>;
 }
 
-export interface NotificationResponse {
-  id: string;
-  channel: string;
-  status: string;
-  recipient: string;
-  created_at: string;
+export interface AppointmentReminderData {
+  appointmentId: string;
+  patientName: string;
+  dateTime: Date | string;
+}
+
+export interface ReportNotificationData {
+  reportId: string;
+  reportType: string;
+  patientName: string;
+  generatedDate: Date | string;
 }
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
-  private readonly client: AxiosInstance;
-  private readonly defaultFrom: string;
 
-  constructor(private readonly config: ConfigService) {
-    const apiKey = this.config.get<string>('NOTIFICA_API_KEY', '');
-    this.defaultFrom = this.config.get<string>(
-      'NOTIFICA_FROM_EMAIL',
-      'noreply@useevolua.com',
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly dispatcher: NotificationDispatcherService,
+    private readonly preferencesService: NotificationPreferencesService,
+  ) {}
+
+  async create(input: CreateNotificationInput): Promise<Notification> {
+    const notification = await this.prisma.notification.create({
+      data: {
+        userId: input.userId,
+        clinicId: input.clinicId,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        metadata: input.metadata ?? undefined,
+      },
+    });
+
+    try {
+      await this.dispatcher.dispatch(notification);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to dispatch notification ${notification.id}: ${error.message}`,
+      );
+    }
+
+    return notification;
+  }
+
+  async findAll(
+    userId: string,
+    clinicId: string,
+    pagination: PaginationDto,
+  ): Promise<PaginatedResponseDto<Notification>> {
+    const page = pagination.page ?? 1;
+    const limit = pagination.limit ?? 20;
+
+    const [data, total] = await Promise.all([
+      this.prisma.notification.findMany({
+        where: { userId, clinicId },
+        orderBy: { createdAt: 'desc' },
+        skip: pagination.skip,
+        take: limit,
+      }),
+      this.prisma.notification.count({
+        where: { userId, clinicId },
+      }),
+    ]);
+
+    return new PaginatedResponseDto(data, total, page, limit);
+  }
+
+  async markAsRead(
+    id: string,
+    userId: string,
+    clinicId: string,
+  ): Promise<Notification> {
+    const notification = await this.prisma.notification.findFirst({
+      where: { id, userId, clinicId },
+    });
+
+    if (!notification) {
+      throw new ForbiddenException(
+        'Notification not found or does not belong to this user/clinic',
+      );
+    }
+
+    return this.prisma.notification.update({
+      where: { id },
+      data: { readAt: new Date() },
+    });
+  }
+
+  async markAllAsRead(
+    userId: string,
+    clinicId: string,
+  ): Promise<{ count: number }> {
+    const result = await this.prisma.notification.updateMany({
+      where: { userId, clinicId, readAt: null },
+      data: { readAt: new Date() },
+    });
+
+    return { count: result.count };
+  }
+
+  async getUnreadCount(
+    userId: string,
+    clinicId: string,
+  ): Promise<{ count: number }> {
+    const count = await this.prisma.notification.count({
+      where: { userId, clinicId, readAt: null },
+    });
+
+    return { count };
+  }
+
+  async createAppointmentReminder(
+    userId: string,
+    clinicId: string,
+    appointmentData: AppointmentReminderData,
+  ): Promise<Notification | null> {
+    const preferences = await this.preferencesService.getOrCreate(
+      userId,
+      clinicId,
     );
 
-    this.client = axios.create({
-      baseURL: 'https://app.usenotifica.com.br/v1',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 10000,
-    });
-  }
-
-  async sendEmail(options: SendEmailOptions): Promise<NotificationResponse | null> {
-    try {
-      const { data } = await this.client.post('/notifications', {
-        channel: 'email',
-        recipient: options.to,
-        payload: {
-          from: options.from || this.defaultFrom,
-          subject: options.subject,
-          html_body: options.htmlBody,
-          text_body: options.textBody || this.stripHtml(options.htmlBody),
-        },
-      }, {
-        headers: options.idempotencyKey
-          ? { 'Idempotency-Key': options.idempotencyKey }
-          : {},
-      });
-
-      this.logger.log(`Email enviado para ${options.to} - ID: ${data.id}`);
-      return data;
-    } catch (error) {
-      this.logger.error(
-        `Falha ao enviar email para ${options.to}: ${error.message}`,
-      );
+    if (!preferences.appointmentRemindersEnabled) {
       return null;
     }
-  }
 
-  async sendAppointmentReminder(
-    patientEmail: string,
-    patientName: string,
-    date: string,
-    time: string,
-  ): Promise<NotificationResponse | null> {
-    return this.sendEmail({
-      to: patientEmail,
-      subject: `Lembrete: Sua consulta está agendada para ${date}`,
-      htmlBody: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #6366f1;">Olá, ${patientName}!</h2>
-          <p>Este é um lembrete da sua consulta agendada:</p>
-          <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
-            <p style="margin: 4px 0;"><strong>Data:</strong> ${date}</p>
-            <p style="margin: 4px 0;"><strong>Horário:</strong> ${time}</p>
-          </div>
-          <p>Em caso de dúvidas ou necessidade de reagendamento, entre em contato conosco.</p>
-          <p style="color: #9ca3af; font-size: 12px; margin-top: 32px;">
-            Enviado por Evolua CRM
-          </p>
-        </div>
-      `,
-      idempotencyKey: `reminder-${patientEmail}-${date}-${time}`,
+    const dateTime = new Date(appointmentData.dateTime);
+    const date = dateTime.toISOString().split('T')[0];
+    const time = dateTime.toLocaleTimeString('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    return this.create({
+      userId,
+      clinicId,
+      type: 'appointment_reminder',
+      title: 'Lembrete de agendamento',
+      body: `Você tem um agendamento com ${appointmentData.patientName} em ${date} às ${time}.`,
+      metadata: {
+        appointmentId: appointmentData.appointmentId,
+        patientName: appointmentData.patientName,
+        date,
+        time,
+      },
     });
   }
 
-  async sendWelcomeEmail(
-    email: string,
-    name: string,
-  ): Promise<NotificationResponse | null> {
-    return this.sendEmail({
-      to: email,
-      subject: 'Bem-vindo ao Evolua!',
-      htmlBody: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #6366f1;">Bem-vindo, ${name}!</h2>
-          <p>Sua conta no Evolua CRM foi criada com sucesso.</p>
-          <p>Agora você pode gerenciar seus pacientes, agendamentos e relatórios de forma simples e eficiente.</p>
-          <p style="color: #9ca3af; font-size: 12px; margin-top: 32px;">
-            Enviado por Evolua CRM
-          </p>
-        </div>
-      `,
-      idempotencyKey: `welcome-${email}`,
+  async removeAppointmentReminder(
+    appointmentId: string,
+    userId: string,
+    clinicId: string,
+  ): Promise<{ count: number }> {
+    const result = await this.prisma.notification.deleteMany({
+      where: {
+        userId,
+        clinicId,
+        type: 'appointment_reminder',
+        metadata: {
+          path: ['appointmentId'],
+          equals: appointmentId,
+        },
+      },
     });
+
+    return { count: result.count };
   }
 
-  async sendReportReady(
-    patientEmail: string,
-    patientName: string,
-    reportType: string,
-  ): Promise<NotificationResponse | null> {
-    return this.sendEmail({
-      to: patientEmail,
-      subject: `Seu relatório está pronto - ${reportType}`,
-      htmlBody: `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #6366f1;">Olá, ${patientName}!</h2>
-          <p>Seu relatório de <strong>${reportType}</strong> está pronto e disponível para consulta.</p>
-          <p>Entre em contato com seu profissional para mais detalhes.</p>
-          <p style="color: #9ca3af; font-size: 12px; margin-top: 32px;">
-            Enviado por Evolua CRM
-          </p>
-        </div>
-      `,
-      idempotencyKey: `report-${patientEmail}-${reportType}-${Date.now()}`,
-    });
-  }
+  async createReportNotification(
+    userId: string,
+    clinicId: string,
+    reportData: ReportNotificationData,
+  ): Promise<Notification | null> {
+    const preferences = await this.preferencesService.getOrCreate(
+      userId,
+      clinicId,
+    );
 
-  private stripHtml(html: string): string {
-    return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+    if (!preferences.reportNotificationsEnabled) {
+      return null;
+    }
+
+    const generatedDate =
+      typeof reportData.generatedDate === 'string'
+        ? reportData.generatedDate
+        : reportData.generatedDate.toISOString();
+
+    return this.create({
+      userId,
+      clinicId,
+      type: 'report_ready',
+      title: 'Relatório pronto',
+      body: `O relatório ${reportData.reportType} de ${reportData.patientName} está pronto.`,
+      metadata: {
+        reportId: reportData.reportId,
+        reportType: reportData.reportType,
+        patientName: reportData.patientName,
+        generatedDate,
+      },
+    });
   }
 }

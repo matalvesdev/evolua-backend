@@ -33,6 +33,9 @@ model Clinic {
   transactions          Transaction[]
   transactionCategories TransactionCategory[]
   messages              Message[]
+  notificationPreferences NotificationPreference[]
+  notifications           Notification[]
+  pushSubscriptions       PushSubscription[]
 
   @@map("clinics")
 }
@@ -63,6 +66,9 @@ model User {
   audioSessions   AudioSession[]
   transactions    Transaction[]
   messages        Message[]
+  notificationPreferences NotificationPreference[]
+  notifications           Notification[]
+  pushSubscriptions       PushSubscription[]
 
   @@map("users")
 }
@@ -277,4 +283,61 @@ model Message {
   therapist User    @relation(fields: [therapistId], references: [id], onDelete: Cascade)
 
   @@map("messages")
+}
+
+
+// ============================================================================
+// NOTIFICATION MODELS
+// ============================================================================
+
+model NotificationPreference {
+  id                          String   @id @default(uuid()) @db.Uuid
+  userId                      String   @map("user_id") @db.Uuid
+  clinicId                    String   @map("clinic_id") @db.Uuid
+  emailEnabled                Boolean  @default(true) @map("email_enabled")
+  pushEnabled                 Boolean  @default(true) @map("push_enabled")
+  appointmentRemindersEnabled Boolean  @default(true) @map("appointment_reminders_enabled")
+  reportNotificationsEnabled  Boolean  @default(true) @map("report_notifications_enabled")
+  createdAt                   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clinicId])
+  @@map("notification_preferences")
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  clinicId  String    @map("clinic_id") @db.Uuid
+  type      String
+  title     String
+  body      String
+  metadata  Json?
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([userId, clinicId, readAt])
+  @@map("notifications")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  clinicId  String   @map("clinic_id") @db.Uuid
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@map("push_subscriptions")
 }
