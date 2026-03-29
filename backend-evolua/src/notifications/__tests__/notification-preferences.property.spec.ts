@@ -49,6 +49,7 @@ describe('NotificationPreferences Property Tests', () => {
             clinicId,
             emailEnabled: true,
             pushEnabled: true,
+            inAppEnabled: true,
             appointmentRemindersEnabled: true,
             reportNotificationsEnabled: true,
           },

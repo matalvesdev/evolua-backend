@@ -15,6 +15,11 @@ export class UpdatePreferencesDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
+  inAppEnabled?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
   appointmentRemindersEnabled?: boolean;
 
   @ApiPropertyOptional()

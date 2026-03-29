@@ -41,7 +41,7 @@ describe('Report Notifications Property Tests', () => {
         fc.boolean(),
         fc.string({ minLength: 1, maxLength: 30 }),
         fc.string({ minLength: 1, maxLength: 50 }),
-        fc.date({ min: new Date('2024-01-01'), max: new Date('2030-12-31') }),
+        fc.date({ min: new Date('2024-01-01'), max: new Date('2030-12-31'), noInvalidDate: true }),
         async (userId, clinicId, reportId, reportEnabled, reportType, patientName, generatedDate) => {
           jest.clearAllMocks();
 

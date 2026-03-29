@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import axios, { AxiosInstance } from 'axios';
+import {
+  NotificaService,
+  NotificaNotificationResponse,
+} from './notifica.service';
 
 export interface SendEmailOptions {
   to: string;
@@ -8,6 +11,7 @@ export interface SendEmailOptions {
   subject: string;
   htmlBody: string;
   textBody?: string;
+  subscriberId?: string;
   idempotencyKey?: string;
 }
 
@@ -22,51 +26,38 @@ export interface NotificationResponse {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly client: AxiosInstance;
   private readonly defaultFrom: string;
 
-  constructor(private readonly config: ConfigService) {
-    const apiKey = this.config.get<string>('NOTIFICA_API_KEY', '');
+  constructor(
+    private readonly config: ConfigService,
+    private readonly notificaService: NotificaService,
+  ) {
     this.defaultFrom = this.config.get<string>(
       'NOTIFICA_FROM_EMAIL',
       'noreply@useevolua.com',
     );
-
-    this.client = axios.create({
-      baseURL: 'https://app.usenotifica.com.br/v1',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 10000,
-    });
   }
 
-  async sendEmail(options: SendEmailOptions): Promise<NotificationResponse | null> {
-    try {
-      const { data } = await this.client.post('/notifications', {
-        channel: 'email',
-        recipient: options.to,
-        payload: {
-          from: options.from || this.defaultFrom,
-          subject: options.subject,
-          html_body: options.htmlBody,
-          text_body: options.textBody || this.stripHtml(options.htmlBody),
-        },
-      }, {
-        headers: options.idempotencyKey
-          ? { 'Idempotency-Key': options.idempotencyKey }
-          : {},
-      });
+  async sendEmail(
+    options: SendEmailOptions,
+  ): Promise<NotificationResponse | null> {
+    const result = await this.notificaService.sendNotification({
+      subscriberId: options.subscriberId ?? options.to,
+      channel: 'email',
+      payload: {
+        from: options.from || this.defaultFrom,
+        subject: options.subject,
+        html_body: options.htmlBody,
+        text_body: options.textBody || this.stripHtml(options.htmlBody),
+      },
+      idempotencyKey: options.idempotencyKey,
+    });
 
-      this.logger.log(`Email enviado para ${options.to} - ID: ${data.id}`);
-      return data;
-    } catch (error) {
-      this.logger.error(
-        `Falha ao enviar email para ${options.to}: ${error.message}`,
-      );
-      return null;
+    if (result) {
+      this.logger.log(`Email enviado para ${options.to} - ID: ${result.id}`);
     }
+
+    return result as NotificationResponse | null;
   }
 
   async sendAppointmentReminder(
@@ -75,6 +66,32 @@ export class EmailService {
     date: string,
     time: string,
   ): Promise<NotificationResponse | null> {
+    const templateId = this.notificaService.getTemplateId(
+      'appointment_reminder',
+    );
+
+    if (templateId) {
+      const result = await this.notificaService.sendNotification({
+        subscriberId: patientEmail,
+        channel: 'email',
+        templateId,
+        variables: {
+          name: patientName,
+          date,
+          time,
+        },
+        idempotencyKey: `reminder-${patientEmail}-${date}-${time}`,
+      });
+
+      if (result) {
+        this.logger.log(
+          `Email de lembrete enviado para ${patientEmail} - ID: ${result.id}`,
+        );
+      }
+
+      return result as NotificationResponse | null;
+    }
+
     return this.sendEmail({
       to: patientEmail,
       subject: `Lembrete: Sua consulta está agendada para ${date}`,
@@ -100,6 +117,28 @@ export class EmailService {
     email: string,
     name: string,
   ): Promise<NotificationResponse | null> {
+    const templateId = this.notificaService.getTemplateId('welcome');
+
+    if (templateId) {
+      const result = await this.notificaService.sendNotification({
+        subscriberId: email,
+        channel: 'email',
+        templateId,
+        variables: {
+          name,
+        },
+        idempotencyKey: `welcome-${email}`,
+      });
+
+      if (result) {
+        this.logger.log(
+          `Email de boas-vindas enviado para ${email} - ID: ${result.id}`,
+        );
+      }
+
+      return result as NotificationResponse | null;
+    }
+
     return this.sendEmail({
       to: email,
       subject: 'Bem-vindo ao Evolua!',
@@ -122,6 +161,29 @@ export class EmailService {
     patientName: string,
     reportType: string,
   ): Promise<NotificationResponse | null> {
+    const templateId = this.notificaService.getTemplateId('report_ready');
+
+    if (templateId) {
+      const result = await this.notificaService.sendNotification({
+        subscriberId: patientEmail,
+        channel: 'email',
+        templateId,
+        variables: {
+          name: patientName,
+          reportType,
+        },
+        idempotencyKey: `report-${patientEmail}-${reportType}-${Date.now()}`,
+      });
+
+      if (result) {
+        this.logger.log(
+          `Email de relatório enviado para ${patientEmail} - ID: ${result.id}`,
+        );
+      }
+
+      return result as NotificationResponse | null;
+    }
+
     return this.sendEmail({
       to: patientEmail,
       subject: `Seu relatório está pronto - ${reportType}`,

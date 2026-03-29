@@ -13,6 +13,10 @@ const mockWebPushService = {
   sendToUser: jest.fn(),
 };
 
+const mockNotificaService = {
+  sendNotification: jest.fn(),
+};
+
 const mockPrisma = {
   user: {
     findUnique: jest.fn(),
@@ -28,6 +32,7 @@ describe('NotificationDispatcher Property Tests', () => {
       mockPreferencesService as any,
       mockEmailService as any,
       mockWebPushService as any,
+      mockNotificaService as any,
       mockPrisma as any,
     );
   });

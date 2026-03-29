@@ -69,6 +69,9 @@ model User {
   notificationPreferences NotificationPreference[]
   notifications           Notification[]
   pushSubscriptions       PushSubscription[]
+  goals           PatientGoal[]
+  goalSnapshots   GoalProgressSnapshot[]
+  milestones      GoalMilestone[]
 
   @@map("users")
 }
@@ -102,6 +105,8 @@ model Patient {
   audioSessions AudioSession[]
   transactions  Transaction[]
   messages      Message[]
+  goals         PatientGoal[]
+  goalSnapshots GoalProgressSnapshot[]
 
   @@map("patients")
 }
@@ -285,6 +290,66 @@ model Message {
   @@map("messages")
 }
 
+// ============================================================================
+// PATIENT GOALS & PROGRESS MODELS
+// ============================================================================
+
+model PatientGoal {
+  id          String    @id @default(uuid()) @db.Uuid
+  clinicId    String    @map("clinic_id") @db.Uuid
+  patientId   String    @map("patient_id") @db.Uuid
+  therapistId String    @map("therapist_id") @db.Uuid
+  title       String
+  description String?
+  status      String    @default("in_progress")
+  priority    String    @default("medium")
+  startDate   DateTime  @map("start_date") @db.Timestamptz
+  targetDate  DateTime? @map("target_date") @db.Timestamptz
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic      Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient     Patient                 @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist   User                    @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  snapshots   GoalProgressSnapshot[]
+  milestones  GoalMilestone[]
+
+  @@index([patientId, status])
+  @@index([clinicId])
+  @@map("patient_goals")
+}
+
+model GoalProgressSnapshot {
+  id          String   @id @default(uuid()) @db.Uuid
+  goalId      String   @map("goal_id") @db.Uuid
+  therapistId String   @map("therapist_id") @db.Uuid
+  progress    Float    // 0-100
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  goal      PatientGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  therapist User        @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, createdAt])
+  @@map("goal_progress_snapshots")
+}
+
+model GoalMilestone {
+  id          String    @id @default(uuid()) @db.Uuid
+  goalId      String    @map("goal_id") @db.Uuid
+  title       String
+  description String?
+  dueDate     DateTime  @map("due_date") @db.Date
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  goal PatientGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, dueDate])
+  @@map("goal_milestones")
+}
 
 // ============================================================================
 // NOTIFICATION MODELS
@@ -296,6 +361,7 @@ model NotificationPreference {
   clinicId                    String   @map("clinic_id") @db.Uuid
   emailEnabled                Boolean  @default(true) @map("email_enabled")
   pushEnabled                 Boolean  @default(true) @map("push_enabled")
+  inAppEnabled                Boolean  @default(true) @map("in_app_enabled")
   appointmentRemindersEnabled Boolean  @default(true) @map("appointment_reminders_enabled")
   reportNotificationsEnabled  Boolean  @default(true) @map("report_notifications_enabled")
   createdAt                   DateTime @default(now()) @map("created_at") @db.Timestamptz

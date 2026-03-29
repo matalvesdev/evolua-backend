@@ -41,7 +41,7 @@ describe('Appointment Notifications Property Tests', () => {
         fc.uuid(),
         fc.boolean(),
         fc.string({ minLength: 1, maxLength: 50 }),
-        fc.date({ min: new Date('2024-01-01'), max: new Date('2030-12-31') }),
+        fc.date({ min: new Date('2024-01-01'), max: new Date('2030-12-31'), noInvalidDate: true }),
         async (userId, clinicId, appointmentId, remindersEnabled, patientName, dateTime) => {
           jest.clearAllMocks();
 
