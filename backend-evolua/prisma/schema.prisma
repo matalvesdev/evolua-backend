@@ -36,6 +36,9 @@ model Clinic {
   notificationPreferences NotificationPreference[]
   notifications           Notification[]
   pushSubscriptions       PushSubscription[]
+  leads                   Lead[]
+  contentPosts            ContentPost[]
+  patientGoals            PatientGoal[]
 
   @@map("clinics")
 }
@@ -71,7 +74,6 @@ model User {
   pushSubscriptions       PushSubscription[]
   goals           PatientGoal[]
   goalSnapshots   GoalProgressSnapshot[]
-  milestones      GoalMilestone[]
 
   @@map("users")
 }
@@ -106,7 +108,6 @@ model Patient {
   transactions  Transaction[]
   messages      Message[]
   goals         PatientGoal[]
-  goalSnapshots GoalProgressSnapshot[]
 
   @@map("patients")
 }
@@ -349,6 +350,71 @@ model GoalMilestone {
 
   @@index([goalId, dueDate])
   @@map("goal_milestones")
+}
+
+// ============================================================================
+// MARKETING MODELS
+// ============================================================================
+
+model Lead {
+  id            String    @id @default(uuid()) @db.Uuid
+  clinicId      String    @map("clinic_id") @db.Uuid
+  name          String
+  email         String?
+  phone         String?
+  source        String    // tiktok, instagram, whatsapp, referral, website, other
+  status        String    @default("new") // new, contacted, qualified, converted, lost
+  potential     String    @default("medium") // high, medium, low
+  notes         String?
+  interests     String[]
+  lastContactAt DateTime? @map("last_contact_at") @db.Timestamptz
+  convertedAt   DateTime? @map("converted_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic    Clinic         @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  followUps LeadFollowUp[]
+
+  @@index([clinicId, status])
+  @@map("leads")
+}
+
+model LeadFollowUp {
+  id        String   @id @default(uuid()) @db.Uuid
+  leadId    String   @map("lead_id") @db.Uuid
+  channel   String   // whatsapp, instagram_dm, email, phone
+  notes     String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@map("lead_follow_ups")
+}
+
+model ContentPost {
+  id          String    @id @default(uuid()) @db.Uuid
+  clinicId    String    @map("clinic_id") @db.Uuid
+  platform    String    // tiktok, instagram
+  format      String    // reel, carousel, video, story
+  title       String
+  hook        String
+  script      String?
+  cta         String?
+  status      String    @default("draft") // draft, scheduled, published, archived
+  scheduledAt DateTime? @map("scheduled_at") @db.Timestamptz
+  publishedAt DateTime? @map("published_at") @db.Timestamptz
+  views       Int       @default(0)
+  engagement  Int       @default(0)
+  clicks      Int       @default(0)
+  leadsCount  Int       @default(0) @map("leads_count")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId, status, scheduledAt])
+  @@map("content_posts")
 }
 
 // ============================================================================

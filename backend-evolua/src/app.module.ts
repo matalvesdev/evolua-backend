@@ -15,6 +15,7 @@ import { AiChatModule } from './ai-chat/ai-chat.module';
 import { MessagesModule } from './messages/messages.module';
 import { HealthModule } from './health/health.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { MarketingModule } from './marketing/marketing.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     MessagesModule,
     HealthModule,
     NotificationsModule,
+    MarketingModule,
   ],
   providers: [
     {
