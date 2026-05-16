@@ -1,0 +1,52 @@
+# Compose dev: orquestra os 3 stacks + Postgres local opcional.
+# Em produção, o banco vive no Supabase; este compose é só para iteração local.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: ./apps/api/.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    networks: [evolua-net]
+
+  ai:
+    build:
+      context: ./apps/ai
+      dockerfile: Dockerfile
+    env_file: ./apps/ai/.env
+    ports:
+      - "8001:8001"
+    depends_on:
+      - postgres
+    networks: [evolua-net]
+
+  whatsapp:
+    build:
+      context: ./apps/services/whatsapp
+      dockerfile: Dockerfile
+    env_file: ./apps/services/whatsapp/.env
+    ports:
+      - "8010:8010"
+    networks: [evolua-net]
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: evolua
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    networks: [evolua-net]
+
+volumes:
+  pg-data:
+
+networks:
+  evolua-net:
+    driver: bridge

@@ -1,0 +1,40 @@
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Env
+.env
+.env.local
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Go
+apps/services/*/bin/
+apps/services/*/coverage.out
+
+# Prisma
+prisma/dev.db
+prisma/migrations/dev/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Codegen outputs (regenerados)
+apps/ai/app/contracts.py
+apps/services/whatsapp/internal/contracts/contracts.go

@@ -1,0 +1,875 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================================
+// MODELS — Refletem o schema real do banco Supabase
+// ============================================================================
+
+model Clinic {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  crfa      String?
+  address   String?
+  city      String?
+  state     String?
+  zipCode   String?  @map("zip_code")
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  users                   User[]
+  patients                Patient[]
+  appointments            Appointment[]
+  reports                 Report[]
+  tasks                   Task[]
+  audioSessions           AudioSession[]
+  transactions            Transaction[]
+  transactionCategories   TransactionCategory[]
+  messages                Message[]
+  goals                   PatientGoal[]
+  notificationPreferences NotificationPreference[]
+  notifications           Notification[]
+  pushSubscriptions       PushSubscription[]
+  waConversations         WaConversation[]              @relation("ClinicWaConversations")
+  protocolEntries         ClinicalProtocolEntry[]
+  treatmentPlans          TreatmentPlan[]
+  therapeuticMaterials    TherapeuticMaterial[]
+  exerciseTemplates       ExerciseTemplate[]
+  exercisePrescriptions   PatientExercisePrescription[]
+  caaBoards               CaaBoard[]
+  subscriptions           Subscription[]
+  invoices                Invoice[]
+
+  @@map("clinics")
+}
+
+model User {
+  id                   String   @id @db.Uuid
+  clinicId             String?  @map("clinic_id") @db.Uuid
+  fullName             String   @map("full_name")
+  email                String   @unique
+  phone                String?
+  crfa                 String?
+  role                 String   @default("therapist")
+  avatarUrl            String?  @map("avatar_url")
+  areasAtuacao         String[] @map("areas_atuacao")
+  objetivos            String[] @map("objetivos")
+  onboardingCompleted  Boolean? @default(false) @map("onboarding_completed")
+  onboardingStep       Int?     @default(0) @map("onboarding_step")
+  googleCalendarTokens Json?    @map("google_calendar_tokens")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic                  Clinic?                       @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  patients                Patient[]                     @relation("TherapistPatients")
+  appointments            Appointment[]
+  reports                 Report[]                      @relation("TherapistReports")
+  reviewedReports         Report[]                      @relation("ReviewerReports")
+  approvedReports         Report[]                      @relation("ApproverReports")
+  tasks                   Task[]
+  audioSessions           AudioSession[]
+  transactions            Transaction[]
+  messages                Message[]
+  notificationPreferences NotificationPreference[]
+  notifications           Notification[]
+  pushSubscriptions       PushSubscription[]
+  goals                   PatientGoal[]
+  goalSnapshots           GoalProgressSnapshot[]
+  treatmentPlans          TreatmentPlan[]
+  protocolEntries         ClinicalProtocolEntry[]
+  therapeuticMaterials    TherapeuticMaterial[]
+  exercisePrescriptions   PatientExercisePrescription[]
+  caaBoards               CaaBoard[]
+
+  @@map("users")
+}
+
+model Patient {
+  id                   String    @id @default(uuid()) @db.Uuid
+  clinicId             String    @map("clinic_id") @db.Uuid
+  therapistId          String?   @map("therapist_id") @db.Uuid
+  name                 String
+  email                String?
+  phone                String?
+  birthDate            DateTime? @map("birth_date") @db.Date
+  cpf                  String?
+  status               String    @default("active")
+  guardianName         String?   @map("guardian_name")
+  guardianPhone        String?   @map("guardian_phone")
+  guardianRelationship String?   @map("guardian_relationship")
+  address              Json?
+  medicalHistory       Json?     @map("medical_history")
+  startDate            DateTime? @map("start_date") @db.Timestamptz
+  dischargeDate        DateTime? @map("discharge_date") @db.Timestamptz
+  dischargeReason      String?   @map("discharge_reason")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz
+
+  clinic                Clinic                        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  therapist             User?                         @relation("TherapistPatients", fields: [therapistId], references: [id], onDelete: SetNull)
+  appointments          Appointment[]
+  reports               Report[]
+  tasks                 Task[]
+  audioSessions         AudioSession[]
+  transactions          Transaction[]
+  messages              Message[]
+  goals                 PatientGoal[]
+  treatmentPlans        TreatmentPlan[]
+  protocolEntries       ClinicalProtocolEntry[]
+  waConversations       WaConversation[]
+  exercisePrescriptions PatientExercisePrescription[]
+  caaBoards             CaaBoard[]
+
+  @@index([clinicId, status])
+  @@index([clinicId, therapistId])
+  @@map("patients")
+}
+
+model Appointment {
+  id                         String    @id @default(uuid()) @db.Uuid
+  clinicId                   String    @map("clinic_id") @db.Uuid
+  patientId                  String    @map("patient_id") @db.Uuid
+  patientName                String    @map("patient_name")
+  therapistId                String?   @map("therapist_id") @db.Uuid
+  therapistName              String    @map("therapist_name")
+  dateTime                   DateTime  @map("date_time") @db.Timestamptz
+  duration                   Int       @default(60)
+  type                       String
+  status                     String    @default("scheduled")
+  notes                      String?
+  cancellationReason         String?   @map("cancellation_reason")
+  cancellationNotes          String?   @map("cancellation_notes")
+  cancelledBy                String?   @map("cancelled_by")
+  cancelledAt                DateTime? @map("cancelled_at") @db.Timestamptz
+  confirmedAt                DateTime? @map("confirmed_at") @db.Timestamptz
+  startedAt                  DateTime? @map("started_at") @db.Timestamptz
+  completedAt                DateTime? @map("completed_at") @db.Timestamptz
+  sessionNotes               String?   @map("session_notes")
+  googleCalendarEventId      String?   @map("google_calendar_event_id")
+  confirmationToken          String?   @map("confirmation_token")
+  confirmationTokenExpiresAt DateTime? @map("confirmation_token_expires_at") @db.Timestamptz
+  reminder24hSentAt          DateTime? @map("reminder_24h_sent_at") @db.Timestamptz // MED-08
+  reminder1hSentAt           DateTime? @map("reminder_1h_sent_at") @db.Timestamptz // MED-08
+  createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt                  DateTime? @map("deleted_at") @db.Timestamptz
+
+  clinic            Clinic                  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient           Patient                 @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist         User?                   @relation(fields: [therapistId], references: [id], onDelete: SetNull)
+  reports           Report[]
+  audioSessions     AudioSession[]
+  tasks             Task[]
+  transactions      Transaction[]
+  treatmentSessions TreatmentSession[]
+  protocolEntries   ClinicalProtocolEntry[]
+
+  @@index([clinicId, dateTime])
+  @@index([therapistId, dateTime])
+  @@index([patientId, dateTime])
+  @@map("appointments")
+}
+
+model Report {
+  id                      String    @id @default(uuid()) @db.Uuid
+  clinicId                String    @map("clinic_id") @db.Uuid
+  patientId               String    @map("patient_id") @db.Uuid
+  patientName             String    @map("patient_name")
+  therapistId             String?   @map("therapist_id") @db.Uuid
+  therapistName           String    @map("therapist_name")
+  therapistCrfa           String    @map("therapist_crfa")
+  type                    String
+  status                  String    @default("draft")
+  title                   String
+  content                 String
+  sections                Json?     @map("sections")
+  transcription           String?   @map("transcription")
+  periodStartDate         DateTime? @map("period_start_date") @db.Date
+  periodEndDate           DateTime? @map("period_end_date") @db.Date
+  appointmentId           String?   @map("appointment_id") @db.Uuid
+  reviewedBy              String?   @map("reviewed_by") @db.Uuid
+  reviewedAt              DateTime? @map("reviewed_at") @db.Timestamptz
+  reviewNotes             String?   @map("review_notes")
+  approvedBy              String?   @map("approved_by") @db.Uuid
+  approvedAt              DateTime? @map("approved_at") @db.Timestamptz
+  sentAt                  DateTime? @map("sent_at") @db.Timestamptz
+  sentTo                  String[]  @map("sent_to")
+  signatureToken          String?   @map("signature_token")
+  signatureTokenExpiresAt DateTime? @map("signature_token_expires_at") @db.Timestamptz
+  signedAt                DateTime? @map("signed_at") @db.Timestamptz
+  signedBy                String?   @map("signed_by")
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt               DateTime? @map("deleted_at") @db.Timestamptz
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient     Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist   User?        @relation("TherapistReports", fields: [therapistId], references: [id], onDelete: SetNull)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  reviewer    User?        @relation("ReviewerReports", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  approver    User?        @relation("ApproverReports", fields: [approvedBy], references: [id], onDelete: SetNull)
+
+  @@index([clinicId, createdAt])
+  @@index([clinicId, patientId])
+  @@index([therapistId, createdAt])
+  @@map("reports")
+}
+
+model AudioSession {
+  id                  String    @id @default(uuid()) @db.Uuid
+  clinicId            String    @map("clinic_id") @db.Uuid
+  patientId           String    @map("patient_id") @db.Uuid
+  therapistId         String    @map("therapist_id") @db.Uuid
+  appointmentId       String?   @map("appointment_id") @db.Uuid
+  audioUrl            String    @map("audio_url")
+  audioDuration       Int?      @map("audio_duration")
+  fileSize            Int?      @map("file_size")
+  transcription       String?
+  transcriptionStatus String?   @default("pending") @map("transcription_status")
+  transcriptionError  String?   @map("transcription_error")
+  transcribedAt       DateTime? @map("transcribed_at") @db.Timestamptz
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient     Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist   User         @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([clinicId, createdAt])
+  @@index([clinicId, patientId])
+  @@index([transcriptionStatus])
+  @@map("audio_sessions")
+}
+
+model Task {
+  id            String    @id @default(uuid()) @db.Uuid
+  clinicId      String    @map("clinic_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  title         String
+  description   String?
+  type          String    @default("task")
+  priority      String    @default("medium")
+  status        String    @default("pending")
+  dueDate       DateTime? @map("due_date") @db.Timestamptz
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz
+  patientId     String?   @map("patient_id") @db.Uuid
+  appointmentId String?   @map("appointment_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patient     Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([clinicId, dueDate])
+  @@map("tasks")
+}
+
+model Transaction {
+  id               String    @id @default(uuid()) @db.Uuid
+  clinicId         String    @map("clinic_id") @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  patientId        String?   @map("patient_id") @db.Uuid
+  appointmentId    String?   @map("appointment_id") @db.Uuid
+  type             String
+  category         String
+  amount           Decimal   @db.Decimal
+  description      String?
+  status           String    @default("pending")
+  dueDate          DateTime  @map("due_date") @db.Date
+  paidAt           DateTime? @map("paid_at") @db.Timestamptz
+  paymentMethod    String?   @map("payment_method")
+  paymentReference String?   @map("payment_reference")
+  notes            String?
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patient     Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([clinicId, status, dueDate])
+  @@index([patientId])
+  @@map("transactions")
+}
+
+model TransactionCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  clinicId  String   @map("clinic_id") @db.Uuid
+  name      String
+  type      String
+  color     String?  @default("#6366f1")
+  icon      String?
+  isSystem  Boolean? @default(false) @map("is_system")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId])
+  @@map("transaction_categories")
+}
+
+model Message {
+  id             String   @id @default(uuid()) @db.Uuid
+  clinicId       String   @map("clinic_id") @db.Uuid
+  patientId      String   @map("patient_id") @db.Uuid
+  therapistId    String   @map("therapist_id") @db.Uuid
+  content        String
+  templateType   String   @map("template_type")
+  recipientPhone String   @map("recipient_phone")
+  recipientName  String   @map("recipient_name")
+  channel        String   @default("whatsapp")
+  sentAt         DateTime @default(now()) @map("sent_at") @db.Timestamptz
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  clinic    Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist User    @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId, sentAt])
+  @@index([patientId, sentAt])
+  @@index([therapistId, sentAt])
+  @@map("messages")
+}
+
+// ============================================================================
+// PATIENT GOALS & PROGRESS MODELS
+// ============================================================================
+
+model PatientGoal {
+  id          String    @id @default(uuid()) @db.Uuid
+  clinicId    String    @map("clinic_id") @db.Uuid
+  patientId   String    @map("patient_id") @db.Uuid
+  therapistId String    @map("therapist_id") @db.Uuid
+  title       String
+  description String?
+  status      String    @default("in_progress")
+  priority    String    @default("medium")
+  startDate   DateTime  @map("start_date") @db.Timestamptz
+  targetDate  DateTime? @map("target_date") @db.Timestamptz
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic     Clinic                 @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient    Patient                @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist  User                   @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  snapshots  GoalProgressSnapshot[]
+  milestones GoalMilestone[]
+
+  @@index([patientId, status])
+  @@index([clinicId])
+  @@map("patient_goals")
+}
+
+model GoalProgressSnapshot {
+  id          String   @id @default(uuid()) @db.Uuid
+  goalId      String   @map("goal_id") @db.Uuid
+  therapistId String   @map("therapist_id") @db.Uuid
+  progress    Float // 0-100
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  goal      PatientGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  therapist User        @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, createdAt])
+  @@map("goal_progress_snapshots")
+}
+
+model GoalMilestone {
+  id          String    @id @default(uuid()) @db.Uuid
+  goalId      String    @map("goal_id") @db.Uuid
+  title       String
+  description String?
+  dueDate     DateTime  @map("due_date") @db.Date
+  completed   Boolean   @default(false)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  goal PatientGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId, dueDate])
+  @@map("goal_milestones")
+}
+
+// ============================================================================
+// NOTIFICATION MODELS
+// ============================================================================
+
+model NotificationPreference {
+  id                          String   @id @default(uuid()) @db.Uuid
+  userId                      String   @map("user_id") @db.Uuid
+  clinicId                    String   @map("clinic_id") @db.Uuid
+  emailEnabled                Boolean  @default(true) @map("email_enabled")
+  pushEnabled                 Boolean  @default(true) @map("push_enabled")
+  inAppEnabled                Boolean  @default(true) @map("in_app_enabled")
+  appointmentRemindersEnabled Boolean  @default(true) @map("appointment_reminders_enabled")
+  reportNotificationsEnabled  Boolean  @default(true) @map("report_notifications_enabled")
+  createdAt                   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clinicId])
+  @@map("notification_preferences")
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  clinicId  String    @map("clinic_id") @db.Uuid
+  type      String
+  title     String
+  body      String
+  metadata  Json?
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([userId, clinicId, readAt])
+  @@map("notifications")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  clinicId  String   @map("clinic_id") @db.Uuid
+  endpoint  String
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@map("push_subscriptions")
+}
+
+// ============================================================================
+// LGPD COMPLIANCE MODELS
+// ============================================================================
+
+/// Immutable audit trail required by LGPD Art. 37 — records every data access
+/// and mutation involving personal data (name, CPF, phone, email, address).
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  clinicId   String   @map("clinic_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  action     String // e.g. "CREATE", "READ", "UPDATE", "DELETE", "EXPORT"
+  resource   String // e.g. "Patient", "Report", "AudioSession"
+  resourceId String?  @map("resource_id")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  metadata   Json? // diff / changed fields — never store plain-text PII
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([clinicId, createdAt])
+  @@index([userId, createdAt])
+  @@index([resource, resourceId])
+  @@map("audit_logs")
+}
+
+/// Consent records required by LGPD Art. 7 — tracks patient/guardian consent
+/// for data processing, with versioned purposes and revocation support.
+model ConsentRecord {
+  id        String    @id @default(uuid()) @db.Uuid
+  clinicId  String    @map("clinic_id") @db.Uuid
+  patientId String    @map("patient_id") @db.Uuid
+  grantedBy String    @map("granted_by") // patient name or guardian name
+  purpose   String // e.g. "treatment_data", "audio_recording", "report_sharing"
+  version   String    @default("1.0") // policy version at time of consent
+  granted   Boolean   @default(true)
+  ipAddress String?   @map("ip_address")
+  grantedAt DateTime  @default(now()) @map("granted_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+
+  @@index([patientId, purpose])
+  @@index([clinicId, grantedAt])
+  @@map("consent_records")
+}
+
+// ============================================================================
+// TREATMENT PLAN MODELS — Plano de Tratamento com controle de sessões
+// ============================================================================
+
+model TreatmentPlan {
+  id                  String    @id @default(uuid()) @db.Uuid
+  clinicId            String    @map("clinic_id") @db.Uuid
+  patientId           String    @map("patient_id") @db.Uuid
+  therapistId         String    @map("therapist_id") @db.Uuid
+  title               String
+  diagnosis           String?
+  objectives          String[]
+  totalSessions       Int       @map("total_sessions")
+  usedSessions        Int       @default(0) @map("used_sessions")
+  status              String    @default("active") // active | completed | suspended | cancelled
+  insuranceName       String?   @map("insurance_name")
+  authorizationCode   String?   @map("authorization_code")
+  authorizationExpiry DateTime? @map("authorization_expiry") @db.Date
+  startDate           DateTime  @map("start_date") @db.Date
+  expectedEndDate     DateTime? @map("expected_end_date") @db.Date
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz
+  notes               String?
+  reminder3Sent       Boolean   @default(false) @map("reminder_3_sent") // alerta ao chegar em 3 sessões restantes
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz
+
+  clinic                Clinic                        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient               Patient                       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist             User                          @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  sessions              TreatmentSession[]
+  protocols             ClinicalProtocolEntry[]
+  exercisePrescriptions PatientExercisePrescription[]
+
+  @@index([clinicId, status])
+  @@index([patientId, status])
+  @@index([therapistId])
+  @@map("treatment_plans")
+}
+
+model TreatmentSession {
+  id              String   @id @default(uuid()) @db.Uuid
+  treatmentPlanId String   @map("treatment_plan_id") @db.Uuid
+  appointmentId   String?  @map("appointment_id") @db.Uuid
+  sessionNumber   Int      @map("session_number")
+  conductedAt     DateTime @map("conducted_at") @db.Timestamptz
+  evolution       String?
+  goalProgress    Json?    @map("goal_progress") // { goalIndex: 0, progress: 75, notes: '' }
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  plan        TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
+  appointment Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([treatmentPlanId, sessionNumber])
+  @@map("treatment_sessions")
+}
+
+// ============================================================================
+// CLINICAL PROTOCOL MODELS — Protocolos clínicos validados (MBGR, FIM, etc.)
+// ============================================================================
+
+model ClinicalProtocolTemplate {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String // ex: "MBGR", "FIM", "Barthel", "VHI-10"
+  area        String // "fonoaudiologia" | "fisioterapia" | "terapia_ocupacional"
+  description String?
+  version     String   @default("1.0")
+  fields      Json // array de { key, label, type, options?, min?, max?, unit? }
+  isSystem    Boolean  @default(true) @map("is_system") // true = protocolo nativo do Evolua
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  entries ClinicalProtocolEntry[]
+
+  @@index([area])
+  @@map("clinical_protocol_templates")
+}
+
+model ClinicalProtocolEntry {
+  id              String   @id @default(uuid()) @db.Uuid
+  clinicId        String   @map("clinic_id") @db.Uuid
+  patientId       String   @map("patient_id") @db.Uuid
+  therapistId     String   @map("therapist_id") @db.Uuid
+  treatmentPlanId String?  @map("treatment_plan_id") @db.Uuid
+  appointmentId   String?  @map("appointment_id") @db.Uuid
+  templateId      String   @map("template_id") @db.Uuid
+  values          Json // { key: value } para cada campo do template
+  totalScore      Float?   @map("total_score")
+  interpretation  String? // ex: "Disfagia leve" (calculado a partir do score)
+  conductedAt     DateTime @map("conducted_at") @db.Timestamptz
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  clinic        Clinic                   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient       Patient                  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist     User                     @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  treatmentPlan TreatmentPlan?           @relation(fields: [treatmentPlanId], references: [id], onDelete: SetNull)
+  appointment   Appointment?             @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  template      ClinicalProtocolTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId, patientId])
+  @@index([patientId, templateId, conductedAt])
+  @@map("clinical_protocol_entries")
+}
+
+// ============================================================================
+// WHATSAPP CRM — Histórico de conversas por paciente
+// ============================================================================
+
+model WaConversation {
+  id        String   @id @default(uuid()) @db.Uuid
+  clinicId  String   @map("clinic_id") @db.Uuid
+  patientId String   @map("patient_id") @db.Uuid
+  phone     String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic   Clinic      @relation("ClinicWaConversations", fields: [clinicId], references: [id], onDelete: Cascade)
+  patient  Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  messages WaMessage[]
+
+  @@unique([clinicId, patientId])
+  @@index([clinicId, updatedAt])
+  @@map("wa_conversations")
+}
+
+model WaMessage {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  direction      String // "outbound" | "inbound"
+  type           String   @default("text") // "text" | "material" | "payment_link"
+  content        String
+  mediaUrl       String?  @map("media_url")
+  paymentLink    String?  @map("payment_link")
+  paymentAmount  Decimal? @map("payment_amount") @db.Decimal
+  status         String   @default("sent") // "sent" | "delivered" | "read" | "failed"
+  evolutionId    String?  @map("evolution_id") // ID retornado pela Evolution API
+  sentAt         DateTime @default(now()) @map("sent_at") @db.Timestamptz
+
+  conversation WaConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, sentAt])
+  @@map("wa_messages")
+}
+
+// ============================================================================
+// THERAPEUTIC MATERIAL — Materiais enviados a pacientes
+// ============================================================================
+
+model TherapeuticMaterial {
+  id          String    @id @default(uuid()) @db.Uuid
+  clinicId    String    @map("clinic_id") @db.Uuid
+  therapistId String    @map("therapist_id") @db.Uuid
+  title       String
+  description String?
+  area        String // "fonoaudiologia" | "fisioterapia" | "terapia_ocupacional"
+  type        String // "exercise" | "orientation" | "home_program" | "education"
+  fileUrl     String?   @map("file_url")
+  content     String? // conteúdo textual ou HTML
+  tags        String[]
+  isPublic    Boolean   @default(false) @map("is_public") // compartilhado entre clínicas
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  clinic    Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  therapist User   @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId, area, type])
+  @@map("therapeutic_materials")
+}
+
+// ============================================================================
+// EXERCISE LIBRARY — Banco de exercícios terapêuticos (diferencial Evolua)
+// Exercícios nativos de fonoaudiologia por subárea, prescritos para pacientes
+// ============================================================================
+
+model ExerciseTemplate {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String
+  area         String // "voz" | "disfagia" | "linguagem" | "motricidade_orofacial" | "fluencia" | "audicao"
+  subarea      String? // ex: "higiene_vocal", "exercicios_sopro", "estimulacao_lexical"
+  description  String
+  instructions String // Passo a passo para o paciente
+  duration     Int? // duração recomendada em minutos
+  frequency    String? // ex: "3x ao dia", "diariamente"
+  repetitions  String? // ex: "10 repetições", "5 séries de 30s"
+  videoUrl     String?  @map("video_url")
+  imageUrl     String?  @map("image_url")
+  tags         String[]
+  difficulty   String   @default("medium") // "easy" | "medium" | "hard"
+  ageGroup     String   @default("all") // "child" | "adult" | "elderly" | "all"
+  isSystem     Boolean  @default(true) @map("is_system") // true = nativo do Evolua
+  clinicId     String?  @map("clinic_id") @db.Uuid // null = nativo, preenchido = personalizado
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic        Clinic?                       @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+  prescriptions PatientExercisePrescription[]
+
+  @@index([area, subarea])
+  @@index([clinicId])
+  @@map("exercise_templates")
+}
+
+model PatientExercisePrescription {
+  id                 String    @id @default(uuid()) @db.Uuid
+  clinicId           String    @map("clinic_id") @db.Uuid
+  patientId          String    @map("patient_id") @db.Uuid
+  therapistId        String    @map("therapist_id") @db.Uuid
+  exerciseId         String    @map("exercise_id") @db.Uuid
+  treatmentPlanId    String?   @map("treatment_plan_id") @db.Uuid
+  customInstructions String?   @map("custom_instructions") // personalizações para este paciente
+  frequency          String // ex: "2x ao dia"
+  repetitions        String? // ex: "10 repetições"
+  durationDays       Int?      @map("duration_days") // quantos dias manter a prescrição
+  startDate          DateTime  @map("start_date") @db.Date
+  endDate            DateTime? @map("end_date") @db.Date
+  status             String    @default("active") // "active" | "completed" | "cancelled"
+  sentAt             DateTime? @map("sent_at") @db.Timestamptz // quando foi enviado via WhatsApp/email
+  sentVia            String?   @map("sent_via") // "whatsapp" | "email" | "both"
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic        Clinic           @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient       Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  therapist     User             @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  exercise      ExerciseTemplate @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  treatmentPlan TreatmentPlan?   @relation(fields: [treatmentPlanId], references: [id], onDelete: SetNull)
+
+  @@index([clinicId, patientId, status])
+  @@index([patientId, startDate])
+  @@map("patient_exercise_prescriptions")
+}
+
+// ============================================================================
+// CAA — Comunicação Aumentativa e Alternativa (pranchas com pictogramas)
+// ============================================================================
+
+model CaaBoard {
+  id                   String    @id @default(uuid()) @db.Uuid
+  clinicId             String    @map("clinic_id") @db.Uuid
+  therapistId          String    @map("therapist_id") @db.Uuid
+  patientId            String?   @map("patient_id") @db.Uuid
+  title                String
+  description          String?
+  rows                 Int       @default(3)
+  cols                 Int       @default(5)
+  cells                Json      @default("[]")
+  category             String    @default("Personalizado")
+  therapeuticObjective String?   @map("therapeutic_objective")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz
+
+  clinic    Clinic   @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  therapist User     @relation(fields: [therapistId], references: [id], onDelete: Cascade)
+  patient   Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([clinicId, therapistId])
+  @@index([clinicId, patientId])
+  @@index([clinicId, category])
+  @@map("caa_boards")
+}
+
+// ============================================================================
+// APPOINTMENT REMINDERS — campos de deduplicação (MED-08)
+// ============================================================================
+
+
+// ============================================================================
+// BILLING — Assinaturas SaaS (Evolua → cobranças do CLIENTE da clínica)
+// ============================================================================
+// NÃO confundir com Transaction (financeiro INTERNO da clínica).
+// Migration: 20260512000000_add_billing
+// ============================================================================
+
+model Plan {
+  id                  String   @id @default(uuid()) @db.Uuid
+  slug                String   @unique
+  name                String
+  description         String?
+  amountCents         Int      @map("amount_cents")
+  currency            String   @default("BRL") @db.Char(3)
+  interval            String   // 'monthly' | 'yearly'
+  maxUsers            Int?     @map("max_users")
+  maxPatients         Int?     @map("max_patients")
+  features            Json     @default("[]")
+  isActive            Boolean  @default(true) @map("is_active")
+  stripeProductId     String?  @map("stripe_product_id")
+  stripePriceId       String?  @map("stripe_price_id")
+  abacatepayProductId String?  @map("abacatepay_product_id")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  subscriptions Subscription[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@map("plans")
+}
+
+model Subscription {
+  id                     String    @id @default(uuid()) @db.Uuid
+  clinicId               String    @map("clinic_id") @db.Uuid
+  planId                 String    @map("plan_id") @db.Uuid
+  provider               String    // 'abacatepay' | 'stripe'
+  providerSubscriptionId String    @map("provider_subscription_id")
+  status                 String    // trialing | active | past_due | canceled | unpaid | incomplete
+  trialEndsAt            DateTime? @map("trial_ends_at") @db.Timestamptz
+  currentPeriodStart     DateTime  @map("current_period_start") @db.Timestamptz
+  currentPeriodEnd       DateTime  @map("current_period_end") @db.Timestamptz
+  cancelAtPeriodEnd      Boolean   @default(false) @map("cancel_at_period_end")
+  canceledAt             DateTime? @map("canceled_at") @db.Timestamptz
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic   Clinic    @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  plan     Plan      @relation(fields: [planId], references: [id])
+  invoices Invoice[]
+
+  @@unique([provider, providerSubscriptionId])
+  @@index([clinicId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id                String    @id @default(uuid()) @db.Uuid
+  clinicId          String    @map("clinic_id") @db.Uuid
+  subscriptionId    String?   @map("subscription_id") @db.Uuid
+  provider          String    // 'abacatepay' | 'stripe'
+  providerInvoiceId String    @map("provider_invoice_id")
+  status            String    // open | paid | void | uncollectible | refunded
+  amountCents       Int       @map("amount_cents")
+  currency          String    @db.Char(3)
+  paidAt            DateTime? @map("paid_at") @db.Timestamptz
+  invoiceUrl        String?   @map("invoice_url")
+  pdfUrl            String?   @map("pdf_url")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@unique([provider, providerInvoiceId])
+  @@index([clinicId])
+  @@index([subscriptionId])
+  @@index([status])
+  @@map("invoices")
+}
+
+// Tabela de idempotência: cada webhook que chega é registrado aqui.
+// Se o mesmo (provider, externalId) chegar de novo → ignorar.
+model BillingEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  provider    String    // 'abacatepay' | 'stripe'
+  externalId  String    @map("external_id")
+  type        String    // ex: 'invoice.paid', 'subscription.canceled'
+  payload     Json
+  processedAt DateTime? @map("processed_at") @db.Timestamptz
+  error       String?
+  receivedAt  DateTime  @default(now()) @map("received_at") @db.Timestamptz
+
+  @@unique([provider, externalId])
+  @@index([receivedAt(sort: Desc)])
+  @@map("billing_events")
+}
