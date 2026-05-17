@@ -20,6 +20,8 @@ RUN npm run build:api
 FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+# OpenSSL 1.1 compatibilidade para Prisma engine
+RUN apk add --no-cache openssl1.1-compat
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/contracts ./contracts
