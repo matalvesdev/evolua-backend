@@ -34,7 +34,7 @@ async function probeAi(): Promise<z.infer<typeof ComponentSchema>> {
   const t0 = performance.now();
   try {
     const ctrl = AbortSignal.timeout(2000);
-    const res = await fetch(`${env.AI_SERVICE_URL.replace(/\/$/, '')}/health`, { signal: ctrl });
+    const res = await fetch(`${env.AI_SERVICE_URL.replace(/\/$/, '')}/healthz`, { signal: ctrl });
     if (!res.ok) return { status: 'down', error: `HTTP ${res.status}` };
     return { status: 'up', latencyMs: Math.round(performance.now() - t0) };
   } catch (err) {
