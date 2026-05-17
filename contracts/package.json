@@ -3,13 +3,27 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./patient": "./src/patient.ts",
-    "./auth": "./src/auth.ts",
-    "./common": "./src/common.ts"
+    ".": "./dist/index.js",
+    "./patient": "./dist/patient.js",
+    "./auth": "./dist/auth.js",
+    "./common": "./dist/common.js",
+    "./appointment": "./dist/appointment.js",
+    "./audio": "./dist/audio.js",
+    "./ai": "./dist/ai.js",
+    "./billing": "./dist/billing.js",
+    "./caa": "./dist/caa.js",
+    "./clinical": "./dist/clinical.js",
+    "./finance": "./dist/finance.js",
+    "./materials": "./dist/materials.js",
+    "./message": "./dist/message.js",
+    "./notification": "./dist/notification.js",
+    "./protocol": "./dist/protocol.js",
+    "./report": "./dist/report.js",
+    "./task": "./dist/task.js",
+    "./wa-crm": "./dist/wa-crm.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json"
