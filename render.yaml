@@ -5,7 +5,7 @@ services:
     env: docker
     region: sao-paulo
     plan: free
-    dockerfilePath: ./apps/api/Dockerfile
+    dockerfilePath: ./Dockerfile
     rootDir: .
     healthCheckPath: /healthz
     envVars:
