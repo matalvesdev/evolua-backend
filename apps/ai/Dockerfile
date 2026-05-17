@@ -13,4 +13,6 @@ RUN pip install --upgrade pip && pip install .
 
 COPY . .
 EXPOSE 8001
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+# Render define a porta via variável de ambiente PORT.
+# O fallback 8001 mantém compatibilidade com docker-compose local.
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}"]
