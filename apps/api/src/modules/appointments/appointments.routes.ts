@@ -40,6 +40,33 @@ const appointmentsRoutes: FastifyPluginAsync = async (app) => {
   );
 
   route.get(
+    '/today',
+    {
+      schema: {
+        tags: ['appointments'],
+        summary: 'Lista agendamentos de hoje',
+        response: {
+          200: PaginatedResponseSchema(AppointmentSchema),
+          401: ErrorResponseSchema,
+        },
+      },
+    },
+    async (req) => {
+      const clinicId = await resolveClinicId(req.user.id);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(today.getDate() + 1);
+      return appointmentsService.list(clinicId, {
+        page: 1,
+        pageSize: 100,
+        startDate: today.toISOString(),
+        endDate: tomorrow.toISOString(),
+      });
+    },
+  );
+
+  route.get(
     '/:id',
     {
       schema: {

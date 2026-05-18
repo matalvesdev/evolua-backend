@@ -68,7 +68,13 @@ export async function buildApp(): Promise<FastifyInstance> {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
-  // Plugins core
+  // Plugins core — CORS PRIMEIRO para garantir headers em todas as respostas
+  await app.register(cors, {
+    origin: env.CORS_ORIGINS,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-internal-token', 'x-user-id'],
+  });
   await app.register(requestIdPlugin);
   await app.register(metricsPlugin);
   await app.register(sensible);
@@ -100,10 +106,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(compress);
   await app.register(multipart, {
     limits: { fileSize: 25 * 1024 * 1024, files: 1 },
-  });
-  await app.register(cors, {
-    origin: env.CORS_ORIGINS,
-    credentials: true,
   });
   await app.register(rateLimit, {
     max: env.RATE_LIMIT_MAX,
