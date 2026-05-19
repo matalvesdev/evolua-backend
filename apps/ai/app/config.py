@@ -18,7 +18,8 @@ class Settings(BaseSettings):
     huggingface_api_key: str
     huggingface_base_url: str = "https://router.huggingface.co"
     # Modelo de chat/instrução para RAG e geração clínica.
-    huggingface_chat_model: str = "meta-llama/Llama-3.1-8B-Instruct"
+    # Usa Zephyr-7B (suportado no free tier do HF Inference) para evitar erros 400.
+    huggingface_chat_model: str = "HuggingFaceH4/zephyr-7b-beta"
     huggingface_chat_provider: str = "hf-inference"
     # Embeddings para RAG (multilíngue, leve).
     huggingface_embedding_model: str = "intfloat/multilingual-e5-small"
