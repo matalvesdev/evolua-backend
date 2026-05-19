@@ -179,38 +179,73 @@ export class AudioService {
     try {
       // Coluna `audioUrl` no Prisma armazena o storage path.
       const signedUrl = await createSignedUrl(session.audioUrl, 1800); // 30min — espaço para download
-      const res = await fetch(`${env.AI_SERVICE_URL}/clinical/transcribe`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-internal-token': env.INTERNAL_SERVICE_TOKEN,
-          'x-user-id': therapistId,
-        },
-        body: JSON.stringify({
-          audio_session_id: session.id,
-          audio_url: signedUrl,
-          language: language ?? 'pt',
-        }),
-        signal: AbortSignal.timeout(120_000),
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        await prisma.audioSession.update({
-          where: { id: session.id },
-          data: {
-            transcriptionStatus: 'failed',
-            transcriptionError: `AI service ${res.status}: ${body.slice(0, 500)}`,
+
+      // Render free tier: AI service pode estar em cold start (502).
+      // Retry com backoff exponencial para aguardar o wake-up.
+      const maxRetries = 3;
+      const delays = [15_000, 30_000, 60_000]; // 15s, 30s, 60s
+      let lastError = '';
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+          const delay = delays[attempt - 1] ?? 60_000;
+          logger.info(
+            { sessionId: session.id, attempt, delayMs: delay },
+            'audio: retrying transcription after AI service cold start',
+          );
+          await new Promise(r => setTimeout(r, delay));
+        }
+
+        const res = await fetch(`${env.AI_SERVICE_URL}/clinical/transcribe`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-token': env.INTERNAL_SERVICE_TOKEN,
+            'x-user-id': therapistId,
           },
+          body: JSON.stringify({
+            audio_session_id: session.id,
+            audio_url: signedUrl,
+            language: language ?? 'pt',
+          }),
+          signal: AbortSignal.timeout(120_000),
         });
-        return;
+
+        if (res.ok) {
+          const data = (await res.json()) as { transcription: string };
+          await prisma.audioSession.update({
+            where: { id: session.id },
+            data: {
+              transcription: data.transcription ?? '',
+              transcriptionStatus: 'completed',
+              transcribedAt: new Date(),
+            },
+          });
+          return;
+        }
+
+        const body = await res.text();
+        lastError = `AI service ${res.status}: ${body.slice(0, 500)}`;
+
+        // Só faz retry em 502 (cold start do Render). Outros erros são finais.
+        if (res.status !== 502) {
+          await prisma.audioSession.update({
+            where: { id: session.id },
+            data: {
+              transcriptionStatus: 'failed',
+              transcriptionError: lastError,
+            },
+          });
+          return;
+        }
       }
-      const data = (await res.json()) as { transcription: string };
+
+      // Esgotou retries
       await prisma.audioSession.update({
         where: { id: session.id },
         data: {
-          transcription: data.transcription ?? '',
-          transcriptionStatus: 'completed',
-          transcribedAt: new Date(),
+          transcriptionStatus: 'failed',
+          transcriptionError: `AI service cold start timeout: ${lastError}`,
         },
       });
     } catch (e) {
