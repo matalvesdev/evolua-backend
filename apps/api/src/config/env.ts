@@ -19,6 +19,9 @@ const envSchema = z.object({
   INTERNAL_SERVICE_TOKEN: z.string().min(8),
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
 
+  // Hugging Face Inference API — fallback direto quando o AI service está em cold start
+  HUGGINGFACE_API_KEY: z.string().min(1).optional(),
+
   // HMAC para validar webhooks vindos do serviço Go (Evolution API gateway).
   // Em produção é OBRIGATÓRIO; em dev é opcional para facilitar testes locais.
   EVOLUTION_WEBHOOK_SECRET: z.string().min(16).optional(),

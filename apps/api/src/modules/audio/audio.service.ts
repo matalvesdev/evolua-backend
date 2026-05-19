@@ -180,72 +180,32 @@ export class AudioService {
       // Coluna `audioUrl` no Prisma armazena o storage path.
       const signedUrl = await createSignedUrl(session.audioUrl, 1800); // 30min — espaço para download
 
-      // Render free tier: AI service pode estar em cold start (502).
-      // Retry com backoff exponencial para aguardar o wake-up.
-      const maxRetries = 3;
-      const delays = [15_000, 30_000, 60_000]; // 15s, 30s, 60s
-      let lastError = '';
+      // Tenta o serviço Python AI primeiro (com retry para cold start)
+      const aiResult = await this.tryAiService(signedUrl, session.id, therapistId, language);
 
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        if (attempt > 0) {
-          const delay = delays[attempt - 1] ?? 60_000;
-          logger.info(
-            { sessionId: session.id, attempt, delayMs: delay },
-            'audio: retrying transcription after AI service cold start',
-          );
-          await new Promise(r => setTimeout(r, delay));
-        }
-
-        const res = await fetch(`${env.AI_SERVICE_URL}/clinical/transcribe`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-internal-token': env.INTERNAL_SERVICE_TOKEN,
-            'x-user-id': therapistId,
-          },
-          body: JSON.stringify({
-            audio_session_id: session.id,
-            audio_url: signedUrl,
-            language: language ?? 'pt',
-          }),
-          signal: AbortSignal.timeout(120_000),
-        });
-
-        if (res.ok) {
-          const data = (await res.json()) as { transcription: string };
-          await prisma.audioSession.update({
-            where: { id: session.id },
-            data: {
-              transcription: data.transcription ?? '',
-              transcriptionStatus: 'completed',
-              transcribedAt: new Date(),
-            },
-          });
-          return;
-        }
-
-        const body = await res.text();
-        lastError = `AI service ${res.status}: ${body.slice(0, 500)}`;
-
-        // Só faz retry em 502 (cold start do Render). Outros erros são finais.
-        if (res.status !== 502) {
-          await prisma.audioSession.update({
-            where: { id: session.id },
-            data: {
-              transcriptionStatus: 'failed',
-              transcriptionError: lastError,
-            },
-          });
-          return;
-        }
+      if (aiResult.success) {
+        await this.saveTranscription(session.id, aiResult.transcription);
+        return;
       }
 
-      // Esgotou retries
+      // Fallback: Hugging Face Inference API direto (serverless, sem cold start)
+      logger.info(
+        { sessionId: session.id, fallback: 'huggingface' },
+        'audio: AI service unavailable, falling back to Hugging Face Inference API',
+      );
+
+      const hfResult = await this.tryHuggingFaceFallback(signedUrl);
+      if (hfResult.success) {
+        await this.saveTranscription(session.id, hfResult.transcription);
+        return;
+      }
+
+      // Ambos falharam
       await prisma.audioSession.update({
         where: { id: session.id },
         data: {
           transcriptionStatus: 'failed',
-          transcriptionError: `AI service cold start timeout: ${lastError}`,
+          transcriptionError: `AI service: ${aiResult.error} | HF fallback: ${hfResult.error}`,
         },
       });
     } catch (e) {
@@ -257,6 +217,123 @@ export class AudioService {
         },
       });
     }
+  }
+
+  /** Tenta transcrever via serviço Python AI com retry para cold start. */
+  private async tryAiService(
+    signedUrl: string,
+    sessionId: string,
+    therapistId: string,
+    language?: string,
+  ): Promise<{ success: boolean; transcription?: string; error?: string }> {
+    const maxRetries = 2;
+    const delays = [10_000, 20_000]; // 10s, 20s
+    let lastError = '';
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        const delay = delays[attempt - 1] ?? 20_000;
+        logger.info(
+          { sessionId, attempt, delayMs: delay },
+          'audio: retrying AI service after cold start',
+        );
+        await new Promise(r => setTimeout(r, delay));
+      }
+
+      try {
+        const res = await fetch(`${env.AI_SERVICE_URL}/clinical/transcribe`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-token': env.INTERNAL_SERVICE_TOKEN,
+            'x-user-id': therapistId,
+          },
+          body: JSON.stringify({
+            audio_session_id: sessionId,
+            audio_url: signedUrl,
+            language: language ?? 'pt',
+          }),
+          signal: AbortSignal.timeout(60_000),
+        });
+
+        if (res.ok) {
+          const data = (await res.json()) as { transcription: string };
+          return { success: true, transcription: data.transcription };
+        }
+
+        const body = await res.text();
+        lastError = `HTTP ${res.status}`;
+
+        // Só retry em 502/503 (cold start). Outros erros são finais.
+        if (res.status !== 502 && res.status !== 503) {
+          return { success: false, error: lastError };
+        }
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : 'unknown';
+        // Timeout ou network error — pode ser cold start
+        if (attempt < maxRetries) continue;
+        return { success: false, error: lastError };
+      }
+    }
+
+    return { success: false, error: `cold start timeout (${lastError})` };
+  }
+
+  /** Fallback direto para Hugging Face Inference API (Whisper-large-v3). */
+  private async tryHuggingFaceFallback(
+    signedUrl: string,
+  ): Promise<{ success: boolean; transcription?: string; error?: string }> {
+    if (!env.HUGGINGFACE_API_KEY) {
+      return { success: false, error: 'HUGGINGFACE_API_KEY not configured' };
+    }
+
+    try {
+      // 1. Baixa o áudio do signed URL
+      const audioRes = await fetch(signedUrl, { signal: AbortSignal.timeout(30_000) });
+      if (!audioRes.ok) {
+        return { success: false, error: `Failed to download audio: ${audioRes.status}` };
+      }
+      const audioBytes = await audioRes.arrayBuffer();
+
+      // 2. Envia para Hugging Face Inference API
+      const hfRes = await fetch(
+        'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${env.HUGGINGFACE_API_KEY}`,
+            'Content-Type': 'audio/webm',
+          },
+          body: audioBytes,
+          signal: AbortSignal.timeout(120_000),
+        },
+      );
+
+      if (!hfRes.ok) {
+        const body = await hfRes.text().catch(() => '');
+        return { success: false, error: `HF API ${hfRes.status}: ${body.slice(0, 200)}` };
+      }
+
+      const data = (await hfRes.json()) as { text?: string };
+      if (!data.text) {
+        return { success: false, error: 'HF API returned empty transcription' };
+      }
+
+      return { success: true, transcription: data.text };
+    } catch (e) {
+      return { success: false, error: e instanceof Error ? e.message : 'unknown' };
+    }
+  }
+
+  private async saveTranscription(sessionId: string, transcription: string): Promise<void> {
+    await prisma.audioSession.update({
+      where: { id: sessionId },
+      data: {
+        transcription,
+        transcriptionStatus: 'completed',
+        transcribedAt: new Date(),
+      },
+    });
   }
 }
 
