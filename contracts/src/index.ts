@@ -15,3 +15,4 @@ export * from './wa-crm.js';
 export * from './caa.js';
 export * from './materials.js';
 export * from './billing.js';
+export * from './marketing.js';

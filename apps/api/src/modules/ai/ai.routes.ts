@@ -8,6 +8,8 @@ import {
   GeneratedEvolutionSchema,
   GenerateReportRequestSchema,
   GenerateReportResponseSchema,
+  MarketingGenerateRequestSchema,
+  MarketingGenerateResponseSchema,
   LibraryDocumentListResponseSchema,
   LibraryIngestResponseSchema,
   LibraryIngestUrlRequestSchema,
@@ -200,6 +202,57 @@ const aiRoutes: FastifyPluginAsync = async (app) => {
         });
       }
     },
+  );
+
+  // ── Marketing ────────────────────────────────────────────────────────────
+
+  route.post(
+    '/marketing/generate',
+    {
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+      schema: {
+        tags: ['ai-marketing'],
+        body: MarketingGenerateRequestSchema,
+        response: {
+          200: MarketingGenerateResponseSchema,
+          502: ErrorResponseSchema,
+        },
+      },
+    },
+    async (req, reply) => {
+      try {
+        return await aiService.generateMarketingContent(req.body, req.user.id);
+      } catch (e) {
+        return reply.code(502).send({
+          error: 'AiServiceError',
+          message: e instanceof Error ? e.message : 'Falha ao gerar conteúdo de marketing',
+        });
+      }
+    },
+  );
+
+  // ── Suggested Questions ─────────────────────────────────────────────────
+
+  route.get(
+    '/suggested-questions',
+    {
+      schema: {
+        tags: ['ai'],
+        response: {
+          200: z.array(z.string()),
+        },
+      },
+    },
+    async () => [
+      'Como elaborar um relatório de evolução?',
+      'Quais são os marcos do desenvolvimento infantil?',
+      'Como conduzir uma anamnese de linguagem?',
+      'O que é a escala MASA?',
+      'Como identificar disfagia em idosos?',
+      'Quais exercícios para motricidade orofacial?',
+      'Como calcular o índice de desmame da sonda?',
+      'O que é o protocolo FOIS?',
+    ],
   );
 };
 
