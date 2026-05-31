@@ -80,13 +80,6 @@ export class AuthService {
         .catch((err) => logger.error({ err }, 'Welcome email failed'));
     }
 
-    // Welcome email via Notifica (fire-and-forget)
-    if (emailService.isEnabled()) {
-      emailService
-        .sendWelcome(input.email, input.fullName)
-        .catch((err) => logger.error({ err }, 'Welcome email failed'));
-    }
-
     return {
       user: { id: data.user.id, email: data.user.email ?? input.email },
       session: data.session ? toAuthSession(data.session) : null,

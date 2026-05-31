@@ -45,6 +45,7 @@ export class SmtpClient {
       });
       return { success: true };
     } catch (e) {
+      this.transport = null
       return {
         success: false,
         error: e instanceof Error ? e.message : String(e),

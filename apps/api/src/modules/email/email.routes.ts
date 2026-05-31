@@ -25,6 +25,7 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
       }),
       response: {
         200: z.object({ success: z.literal(true) }),
+        500: z.object({ error: z.string(), message: z.string() }),
       },
     },
   }, async (req, _rep) => {
@@ -40,6 +41,7 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
     const result = await emailService.sendLeadMagnetDelivery(email, email, title, downloadLink);
     if (!result.success) {
       req.log.error({ email, magnetId, error: result.error }, 'lead magnet delivery email failed');
+      return rep.code(500).send({ error: 'SendFailed', message: 'Falha ao enviar email' });
     }
 
     return { success: true as const };
