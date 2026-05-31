@@ -214,7 +214,7 @@ type evolutionWebhookPayload struct {
 
 type canonicalInbound struct {
 	MessageID   string `json:"messageId"`
-	From        string `json:"from"`
+	From        string `json:"senderPhone"`
 	PushName    string `json:"pushName"`
 	Text        string `json:"text"`
 	Timestamp   int64  `json:"timestamp"`
