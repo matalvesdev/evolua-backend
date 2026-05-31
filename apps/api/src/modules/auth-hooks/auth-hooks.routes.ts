@@ -4,15 +4,6 @@ import { authHooksService } from './auth-hooks.service.js';
 import { env } from '../../config/env.js';
 
 const authHooksRoutes: FastifyPluginAsync = async (app) => {
-  // Raw body parser for HMAC verification
-  app.addContentTypeParser(
-    'application/json',
-    { parseAs: 'string', bodyLimit: 65536 },
-    (_req, body: string, done: (err: Error | null, result?: string) => void) => {
-      done(null, body);
-    },
-  );
-
   app.post<{ Body: string }>(
     '/auth-hook',
     async (req, rep) => {
