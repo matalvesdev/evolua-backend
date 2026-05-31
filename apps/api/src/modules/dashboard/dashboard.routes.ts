@@ -99,7 +99,7 @@ const dashboardRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['dashboard'],
         querystring: z.object({
-          period: z.enum(['week', 'month', 'quarter']).default('month'),
+          period: z.string().default('month'),
         }),
         response: { 200: DashboardAnalyticsSchema },
       },
