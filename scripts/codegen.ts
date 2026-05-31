@@ -43,7 +43,7 @@ class PatientAddress(BaseModel):
     complement: Optional[str] = None
     neighborhood: Optional[str] = None
     city: Optional[str] = None
-    state: Optional[str] = Field(default=None, min_length=2, max_length=2)
+    state: Optional[str] = Field(default=None, max_length=2)
     zip_code: Optional[str] = Field(default=None, alias="zipCode")
 
 

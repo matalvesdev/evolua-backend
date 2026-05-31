@@ -24,6 +24,7 @@ model Clinic {
   email     String?
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  settings  Json?     @default("{}")
 
   users                   User[]
   patients                Patient[]
@@ -45,6 +46,7 @@ model Clinic {
   exerciseTemplates       ExerciseTemplate[]
   exercisePrescriptions   PatientExercisePrescription[]
   caaBoards               CaaBoard[]
+  teleSessions            TeleSession[]
   subscriptions           Subscription[]
   invoices                Invoice[]
 
@@ -128,6 +130,7 @@ model Patient {
   waConversations       WaConversation[]
   exercisePrescriptions PatientExercisePrescription[]
   caaBoards             CaaBoard[]
+  teleSessions          TeleSession[]
 
   @@index([clinicId, status])
   @@index([clinicId, therapistId])
@@ -612,6 +615,28 @@ model ClinicalProtocolEntry {
 }
 
 // ============================================================================
+// LEAD — Potenciais novos pacientes (WhatsApp inbound desconhecido)
+// ============================================================================
+
+model Lead {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  phone     String?
+  email     String?
+  source    String   @default("whatsapp")
+  message   String?
+  status    String   @default("new") // new | contacted | qualified | converted | discarded
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status])
+  @@index([source])
+  @@index([createdAt(sort: Desc)])
+  @@map("leads")
+}
+
+// ============================================================================
 // WHATSAPP CRM — Histórico de conversas por paciente
 // ============================================================================
 
@@ -872,4 +897,58 @@ model BillingEvent {
   @@unique([provider, externalId])
   @@index([receivedAt(sort: Desc)])
   @@map("billing_events")
+}
+
+// ============================================================================
+// Blog & Newsletter — Suporte ao conteúdo e mailing
+// ============================================================================
+
+model BlogPost {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String
+  slug        String    @unique
+  excerpt     String?
+  content     String
+  coverImage  String?   @map("cover_image")
+  author      String?   @default("Evolua")
+  status      String    @default("draft") // draft | published | archived
+  publishedAt DateTime? @map("published_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@index([status, publishedAt(sort: Desc)])
+  @@index([slug])
+  @@map("blog_posts")
+}
+
+model NewsletterSubscriber {
+  id            String    @id @default(uuid()) @db.Uuid
+  email         String    @unique
+  name          String?
+  subscribedAt  DateTime  @default(now()) @map("subscribed_at") @db.Timestamptz
+  unsubscribedAt DateTime? @map("unsubscribed_at") @db.Timestamptz
+
+  @@index([subscribedAt(sort: Desc)])
+  @@map("newsletter_subscribers")
+}
+
+model TeleSession {
+  id              String   @id @default(uuid()) @db.Uuid
+  clinicId        String   @map("clinic_id") @db.Uuid
+  patientId       String   @map("patient_id") @db.Uuid
+  patientName     String   @map("patient_name")
+  date            String
+  time            String
+  link            String
+  status          String   @default("scheduled")
+  sentViaWhatsApp Boolean  @default(false) @map("sent_via_whatsapp")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinicRef  Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patientRef Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId])
+  @@index([status])
+  @@map("tele_sessions")
 }

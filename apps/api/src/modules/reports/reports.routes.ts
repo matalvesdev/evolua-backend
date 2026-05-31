@@ -15,6 +15,8 @@ import {
 import { reportsService } from './reports.service.js';
 import { resolveClinicId } from '../auth/auth.helpers.js';
 import { auditAsync } from '../../lib/audit.js';
+import { prisma } from '../../lib/prisma.js';
+import { reportToDTO } from './reports.mapper.js';
 
 const notFound = { error: 'NotFound', message: 'Report not found' };
 
@@ -173,6 +175,108 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
 
   route.delete(
     '/:id',
+    {
+      schema: {
+        tags: ['reports'],
+        params: z.object({ id: UuidSchema }),
+        response: { 204: z.null(), 404: ErrorResponseSchema },
+      },
+    },
+    async (req, rep) => {
+      const clinicId = await resolveClinicId(req.user.id);
+      const r = await reportsService.remove(clinicId, req.params.id);
+      if (!r) return rep.code(404).send(notFound);
+      auditAsync({
+        clinicId, userId: req.user.id, action: 'DELETE', resource: 'Report',
+        resourceId: req.params.id, ipAddress: req.ip, userAgent: req.headers['user-agent'] ?? null,
+      });
+      return rep.code(204).send(null);
+    },
+  );
+
+  // ── Laudos ──────────────────────────────────────────────────────────────
+
+  route.get(
+    '/laudos',
+    {
+      schema: {
+        tags: ['reports'],
+        querystring: z.object({
+          page: z.coerce.number().int().min(1).default(1),
+          pageSize: z.coerce.number().int().min(1).max(100).default(20),
+          patientId: UuidSchema.optional(),
+          status: z.string().optional(),
+        }),
+        response: {
+          200: PaginatedResponseSchema(ReportSchema),
+        },
+      },
+    },
+    async (req) => reportsService.listLaudos(await resolveClinicId(req.user.id), req.query),
+  );
+
+  route.post(
+    '/laudos',
+    {
+      schema: {
+        tags: ['reports'],
+        body: z.object({
+          patientId: UuidSchema,
+          patientName: z.string().min(1).max(200),
+          therapistName: z.string().min(1).max(200),
+          therapistCrfa: z.string().max(50),
+          type: z.string().min(1),
+          title: z.string().min(1).max(300),
+          content: z.string().default(''),
+        }),
+        response: { 201: ReportSchema },
+      },
+    },
+    async (req, rep) => {
+      const clinicId = await resolveClinicId(req.user.id);
+      const r = await reportsService.createLaudo(clinicId, req.user.id, req.body);
+      auditAsync({
+        clinicId, userId: req.user.id, action: 'CREATE', resource: 'Report',
+        resourceId: r.id, ipAddress: req.ip, userAgent: req.headers['user-agent'] ?? null,
+        metadata: { patientId: r.patientId, type: r.type },
+      });
+      return rep.code(201).send(r);
+    },
+  );
+
+  route.patch(
+    '/laudos/:id',
+    {
+      schema: {
+        tags: ['reports'],
+        params: z.object({ id: UuidSchema }),
+        body: z.object({
+          title: z.string().min(1).max(300).optional(),
+          content: z.string().optional(),
+        }),
+        response: { 200: ReportSchema, 404: ErrorResponseSchema },
+      },
+    },
+    async (req, rep) => {
+      const clinicId = await resolveClinicId(req.user.id);
+      const existing = await prisma.report.findFirst({
+        where: { id: req.params.id, clinicId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!existing) return rep.code(404).send(notFound);
+      const updated = await prisma.report.update({
+        where: { id: req.params.id },
+        data: {
+          ...(req.body.title !== undefined && { title: req.body.title }),
+          ...(req.body.content !== undefined && { content: req.body.content }),
+        },
+      });
+      return reportToDTO(updated);
+    },
+  );
+
+  route.delete(
+    '/laudos/:id',
     {
       schema: {
         tags: ['reports'],

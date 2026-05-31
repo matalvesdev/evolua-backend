@@ -63,6 +63,20 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     async (req) => authService.refresh(req.body.refreshToken),
   );
 
+  route.post(
+    '/forgot-password',
+    {
+      config: { rateLimit: { max: 3, timeWindow: '1 minute' } },
+      schema: {
+        tags: ['auth'],
+        summary: 'Solicitar redefinição de senha (via Notifica)',
+        body: z.object({ email: z.string().email() }),
+        response: { 200: z.object({ success: z.boolean() }) },
+      },
+    },
+    async (req) => authService.forgotPassword(req.body.email),
+  );
+
   // ── Protegidos ─────────────────────────────────────────────────────────
 
   route.get(

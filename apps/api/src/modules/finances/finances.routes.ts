@@ -225,6 +225,27 @@ const financesRoutes: FastifyPluginAsync = async (app) => {
       return rep.code(204).send(null);
     },
   );
+
+  // ── Metrics ─────────────────────────────────────────────────────────────
+
+  const FinancialMetricSchema = z.object({
+    month: z.string(),
+    revenue: z.number(),
+    expenses: z.number(),
+    profit: z.number(),
+    sessions: z.number(),
+  });
+
+  route.get(
+    '/metrics',
+    {
+      schema: {
+        tags: ['finances'],
+        response: { 200: z.array(FinancialMetricSchema) },
+      },
+    },
+    async (req) => financesService.getMetrics(await resolveClinicId(req.user.id)),
+  );
 };
 
 export default financesRoutes;

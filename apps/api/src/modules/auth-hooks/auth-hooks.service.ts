@@ -1,0 +1,97 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
+import { env } from '../../config/env.js';
+import { logger } from '../../lib/logger.js';
+import { emailService } from '../email/email.service.js';
+
+/**
+ * Payload enviado pelo Supabase Auth HTTP Hook.
+ * @see https://supabase.com/docs/guides/auth/auth-hooks
+ */
+interface AuthHookPayload {
+  event: 'user.signup' | 'user.password_reset' | 'user.login' | 'user.token_refreshed';
+  user: {
+    id: string;
+    email: string;
+    phone?: string;
+    user_metadata?: Record<string, unknown>;
+    app_metadata?: Record<string, unknown>;
+  };
+  redirect_to?: string;
+}
+
+interface AuthHookResponse {
+  action: 'show_confirmation' | 'request_password_reset' | 'allow' | 'deny';
+  redirect_to?: string;
+  message?: string;
+}
+
+function verifySignature(rawBody: string, signature: string): boolean {
+  const secret = env.SUPABASE_AUTH_HOOK_SECRET;
+  if (!secret) return true; // skip verification in dev
+  try {
+    const hmac = createHmac('sha256', secret).update(rawBody).digest('hex');
+    const received = signature.replace(/^sha256=/, '');
+    return timingSafeEqual(Buffer.from(hmac), Buffer.from(received));
+  } catch {
+    return false;
+  }
+}
+
+export class AuthHooksService {
+  verifySignature(rawBody: string, signature: string): boolean {
+    return verifySignature(rawBody, signature);
+  }
+
+  async handleEvent(payload: AuthHookPayload): Promise<AuthHookResponse> {
+    const { event, user } = payload;
+
+    switch (event) {
+      case 'user.signup': {
+        logger.info({ userId: user.id, email: user.email }, 'Auth hook: signup');
+
+        // Envia email de boas-vindas via Notifica
+        const name =
+          (user.user_metadata?.full_name as string) ??
+          (user.user_metadata?.fullName as string) ??
+          user.email;
+
+        if (emailService.isEnabled()) {
+          emailService
+            .sendWelcome(user.email, name)
+            .catch((err) => logger.error({ err }, 'Auth hook welcome email failed'));
+        }
+
+        return {
+          action: 'show_confirmation',
+          message: 'Verifique seu email para confirmar o cadastro.',
+        };
+      }
+
+      case 'user.password_reset': {
+        logger.info({ userId: user.id, email: user.email }, 'Auth hook: password reset');
+
+        const redirectTo = payload.redirect_to ?? `${env.FRONTEND_URL}/nova-senha`;
+
+        if (emailService.isEnabled()) {
+          emailService
+            .sendPasswordReset(user.email, redirectTo)
+            .catch((err) => logger.error({ err }, 'Auth hook password reset email failed'));
+        }
+
+        return {
+          action: 'request_password_reset',
+          redirect_to: redirectTo,
+        };
+      }
+
+      case 'user.login':
+      case 'user.token_refreshed':
+        return { action: 'allow' };
+
+      default:
+        return { action: 'allow' };
+    }
+  }
+}
+
+export const authHooksService = new AuthHooksService();

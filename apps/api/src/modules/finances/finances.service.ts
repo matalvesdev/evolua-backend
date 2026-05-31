@@ -218,6 +218,39 @@ export class FinancesService {
       ).toString(),
     };
   }
+  async getMetrics(clinicId: string) {
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+    const rows = await prisma.$queryRaw<
+      Array<{
+        month: Date;
+        revenue: Prisma.Decimal;
+        expenses: Prisma.Decimal;
+        sessions: bigint;
+      }>
+    >`
+      SELECT
+        date_trunc('month', COALESCE(paid_at, due_date)) AS month,
+        COALESCE(SUM(CASE WHEN type = 'income' AND status = 'paid' THEN amount ELSE 0 END), 0) AS revenue,
+        COALESCE(SUM(CASE WHEN type = 'expense' AND status = 'paid' THEN amount ELSE 0 END), 0) AS expenses,
+        COUNT(*) FILTER (WHERE type = 'income' AND status = 'paid') AS sessions
+      FROM transactions
+      WHERE clinic_id = ${clinicId}::uuid
+        AND deleted_at IS NULL
+        AND (paid_at >= ${sixMonthsAgo} OR due_date >= ${sixMonthsAgo})
+      GROUP BY date_trunc('month', COALESCE(paid_at, due_date))
+      ORDER BY month ASC
+    `;
+
+    return rows.map((r) => ({
+      month: r.month.toISOString().slice(0, 7),
+      revenue: Number(r.revenue),
+      expenses: Number(r.expenses),
+      profit: Number(r.revenue) - Number(r.expenses),
+      sessions: Number(r.sessions),
+    }));
+  }
 }
 
 export const financesService = new FinancesService();

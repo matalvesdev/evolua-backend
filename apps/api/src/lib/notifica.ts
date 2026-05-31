@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { env } from '../config/env.js';
+import { smtpClient } from './smtp.js';
 
 export interface SendEmailParams {
   to: string;
@@ -78,9 +79,29 @@ export class NotificaClient {
         return { success: true, status: 'pending' };
       }
     } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+
+      // SMTP fallback quando Notifica falha
+      if (smtpClient.isEnabled()) {
+        try {
+          await smtpClient.sendEmail({
+            to: params.to,
+            subject: params.subject,
+            html: params.html,
+            text: params.text,
+          });
+          return { success: true };
+        } catch (smtpErr) {
+          return {
+            success: false,
+            error: `Notifica: ${errorMsg}; SMTP fallback: ${smtpErr instanceof Error ? smtpErr.message : String(smtpErr)}`,
+          };
+        }
+      }
+
       return {
         success: false,
-        error: e instanceof Error ? e.message : String(e),
+        error: errorMsg,
       };
     }
   }

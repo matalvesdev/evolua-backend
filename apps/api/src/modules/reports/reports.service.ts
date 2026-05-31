@@ -143,6 +143,57 @@ export class ReportsService {
     });
   }
 
+  async listLaudos(clinicId: string, q: { page: number; pageSize: number; patientId?: string; status?: string }) {
+    const laudoTypes = ['laudo', 'atestado', 'declaracao', 'relatorio'];
+    const where: Prisma.ReportWhereInput = {
+      clinicId,
+      deletedAt: null,
+      type: { in: laudoTypes },
+      ...(q.patientId && { patientId: q.patientId }),
+      ...(q.status && { status: q.status }),
+    };
+    const [rows, total] = await prisma.$transaction([
+      prisma.report.findMany({
+        where,
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.report.count({ where }),
+    ]);
+    return {
+      data: rows.map(reportToDTO),
+      pagination: {
+        page: q.page,
+        pageSize: q.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / q.pageSize)),
+      },
+    };
+  }
+
+  async createLaudo(
+    clinicId: string,
+    therapistId: string,
+    input: { patientId: string; patientName: string; therapistName: string; therapistCrfa: string; type: string; title: string; content: string },
+  ): Promise<Report> {
+    const row = await prisma.report.create({
+      data: {
+        clinicId,
+        patientId: input.patientId,
+        patientName: input.patientName,
+        therapistId,
+        therapistName: input.therapistName,
+        therapistCrfa: input.therapistCrfa,
+        type: input.type,
+        title: input.title,
+        content: input.content,
+        sections: Prisma.JsonNull,
+      },
+    });
+    return reportToDTO(row);
+  }
+
   async remove(clinicId: string, id: string): Promise<Report | null> {
     const exists = await prisma.report.findFirst({
       where: { id, clinicId, deletedAt: null },

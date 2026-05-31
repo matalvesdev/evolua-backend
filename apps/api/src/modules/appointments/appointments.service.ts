@@ -1,6 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
+import { logger } from '../../lib/logger.js';
+import { emailService } from '../email/email.service.js';
 import type {
   CreateAppointmentInput,
   UpdateAppointmentInput,
@@ -12,19 +14,35 @@ import type {
 import { appointmentToDTO } from './appointments.mapper.js';
 
 /**
- * Cliente HTTP fino para falar com o serviço Go de Google Calendar.
- * Por enquanto é stub: o serviço ainda não foi implementado.
- * TODO: extrair para `lib/services-client.ts` quando outros serviços forem usados.
+ * Cliente HTTP para sincronização com provedor de calendário.
+ * Suporta Google Calendar via REST API e evolui para outros provedores.
  */
 async function syncCalendar(
-  action: 'create' | 'delete',
+  action: 'create' | 'delete' | 'update',
   payload: Record<string, unknown>,
 ): Promise<{ eventId?: string }> {
-  // Marcador de TODO — ver apps/services/calendar/ (a implementar).
-  void action;
-  void payload;
-  void env.WHATSAPP_SERVICE_URL; // ainda não temos URL específica de calendar
-  return {};
+  const { CALENDAR_SERVICE_URL, CALENDAR_SERVICE_TOKEN } = env;
+  if (!CALENDAR_SERVICE_URL) return {};
+
+  try {
+    const res = await fetch(`${CALENDAR_SERVICE_URL}/api/calendar/events`, {
+      method: action === 'delete' ? 'DELETE' : 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${CALENDAR_SERVICE_TOKEN}`,
+      },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    if (!res.ok) {
+      logger.warn({ status: res.status, action }, 'syncCalendar: HTTP error');
+      return {};
+    }
+    const data = await res.json().catch(() => ({})) as { eventId?: string };
+    return { eventId: data.eventId ?? undefined };
+  } catch (err) {
+    logger.warn({ err, action }, 'syncCalendar: request failed');
+    return {};
+  }
 }
 
 export class AppointmentsService {
@@ -134,10 +152,64 @@ export class AppointmentsService {
   }
 
   async confirm(clinicId: string, id: string): Promise<Appointment | null> {
-    return this.transition(clinicId, id, {
+    const appt = await this.findById(clinicId, id);
+    if (!appt) return null;
+
+    const updated = await this.transition(clinicId, id, {
       status: 'confirmed',
       confirmedAt: new Date(),
     });
+
+    // Envia lembretes conforme configuração da clínica
+    if (updated && emailService.isEnabled()) {
+      const clinic = await prisma.clinic.findUnique({
+        where: { id: clinicId },
+        select: { settings: true },
+      });
+      const settings = (clinic?.settings ?? {}) as Record<string, unknown>;
+      const autoSend = (settings.autoSendReminders as boolean) ?? false;
+      const send24h = (settings.reminder24h as boolean) ?? true;
+      const send1h = (settings.reminder1h as boolean) ?? false;
+
+      if (autoSend && (send24h || send1h)) {
+        const patient = await prisma.patient.findFirst({
+          where: { id: updated.patientId, clinicId },
+          select: { name: true, email: true },
+        });
+        const to = patient?.email;
+        if (to) {
+          const dt = new Date(updated.dateTime);
+          const date = dt.toLocaleDateString('pt-BR');
+          const time = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+          if (send24h) {
+            emailService
+              .sendAppointmentReminder24h(to, patient.name, date, time)
+              .then(() =>
+                prisma.appointment.update({
+                  where: { id: updated.id },
+                  data: { reminder24hSentAt: new Date() },
+                }).catch(() => {}),
+              )
+              .catch((err) => logger.warn({ err }, '24h reminder email failed'));
+          }
+
+          if (send1h) {
+            emailService
+              .sendAppointmentReminder1h(to, patient.name, date, time)
+              .then(() =>
+                prisma.appointment.update({
+                  where: { id: updated.id },
+                  data: { reminder1hSentAt: new Date() },
+                }).catch(() => {}),
+              )
+              .catch((err) => logger.warn({ err }, '1h reminder email failed'));
+          }
+        }
+      }
+    }
+
+    return updated;
   }
 
   async start(clinicId: string, id: string): Promise<Appointment | null> {

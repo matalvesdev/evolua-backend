@@ -120,6 +120,139 @@ export class PatientsService {
     return patientToDTO(row);
   }
 
+  async listRecords(clinicId: string, q: { page: number; pageSize: number; patientId?: string }) {
+    const where: Prisma.ReportWhereInput = {
+      clinicId,
+      deletedAt: null,
+      type: 'evolution',
+      ...(q.patientId && { patientId: q.patientId }),
+    };
+    const [rows, total] = await prisma.$transaction([
+      prisma.report.findMany({
+        where,
+        skip: (q.page - 1) * q.pageSize,
+        take: q.pageSize,
+        orderBy: { createdAt: 'desc' },
+        include: { patient: { select: { id: true, name: true, phone: true } } },
+      }),
+      prisma.report.count({ where }),
+    ]);
+    return {
+      data: rows,
+      pagination: {
+        page: q.page,
+        pageSize: q.pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / q.pageSize)),
+      },
+    };
+  }
+
+  async createRecord(clinicId: string, therapistId: string, input: {
+    patientId: string; patientName: string; therapistName: string;
+    therapistCrfa: string; title: string; content: string;
+  }) {
+    const row = await prisma.report.create({
+      data: {
+        clinicId,
+        patientId: input.patientId,
+        patientName: input.patientName,
+        therapistId,
+        therapistName: input.therapistName,
+        therapistCrfa: input.therapistCrfa,
+        type: 'evolution',
+        title: input.title,
+        content: input.content,
+        sections: Prisma.JsonNull,
+      },
+    });
+    return row;
+  }
+
+  async updateRecord(clinicId: string, id: string, input: {
+    title?: string; content?: string;
+  }) {
+    const exists = await prisma.report.findFirst({
+      where: { id, clinicId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!exists) return null;
+    return prisma.report.update({
+      where: { id },
+      data: {
+        ...(input.title !== undefined && { title: input.title }),
+        ...(input.content !== undefined && { content: input.content }),
+      },
+    });
+  }
+
+  async getTimeline(clinicId: string, patientId: string) {
+    const appointmentsPromise = prisma.appointment.findMany({
+      where: { clinicId, patientId, deletedAt: null },
+      orderBy: { dateTime: 'asc' },
+      select: { id: true, dateTime: true, status: true, type: true },
+    });
+
+    const reportsPromise = prisma.report.findMany({
+      where: { clinicId, patientId, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, createdAt: true, type: true, title: true, status: true, approvedAt: true },
+    });
+
+    const goalsPromise = prisma.patientGoal.findMany({
+      where: { clinicId, patientId },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, title: true, status: true, completedAt: true, createdAt: true },
+    });
+
+    const [appointments, reports, goals] = await Promise.all([
+      appointmentsPromise, reportsPromise, goalsPromise,
+    ]);
+
+    const events: Array<{
+      id: string; date: string; type: string; title: string; description?: string;
+      score?: number; area?: string; tag?: string;
+    }> = [];
+
+    for (const a of appointments) {
+      events.push({
+        id: a.id,
+        date: a.dateTime.toISOString(),
+        type: 'appointment',
+        title: `Consulta ${a.type}`,
+        description: `Status: ${a.status}`,
+        tag: a.status,
+      });
+    }
+
+    for (const r of reports) {
+      events.push({
+        id: r.id,
+        date: (r.approvedAt ?? r.createdAt).toISOString(),
+        type: 'report',
+        title: r.title,
+        description: `Tipo: ${r.type} — Status: ${r.status}`,
+        tag: r.status,
+      });
+    }
+
+    for (const g of goals) {
+      const isAchieved = g.status === 'achieved' || g.status === 'completed';
+      events.push({
+        id: g.id,
+        date: (g.completedAt ?? g.createdAt).toISOString(),
+        type: 'goal',
+        title: g.title,
+        description: isAchieved ? 'Meta alcançada' : `Status: ${g.status}`,
+        score: isAchieved ? 100 : 0,
+        tag: g.status,
+      });
+    }
+
+    events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    return events;
+  }
+
   /** Soft delete (preserva histórico clínico). */
   async remove(clinicId: string, id: string): Promise<Patient | null> {
     const existing = await prisma.patient.findFirst({

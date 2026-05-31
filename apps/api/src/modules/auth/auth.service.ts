@@ -1,6 +1,9 @@
 import type { User as PrismaUser, Clinic as PrismaClinic } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { supabaseAdmin, supabaseFor } from '../../lib/supabase.js';
+import { emailService } from '../email/email.service.js';
+import { logger } from '../../lib/logger.js';
+import { env } from '../../config/env.js';
 import type {
   SignUpInput,
   SignInInput,
@@ -71,10 +74,45 @@ export class AuthService {
       throw e;
     }
 
+    if (emailService.isEnabled()) {
+      emailService
+        .sendWelcome(input.email, input.fullName)
+        .catch((err) => logger.error({ err }, 'Welcome email failed'));
+    }
+
+    // Welcome email via Notifica (fire-and-forget)
+    if (emailService.isEnabled()) {
+      emailService
+        .sendWelcome(input.email, input.fullName)
+        .catch((err) => logger.error({ err }, 'Welcome email failed'));
+    }
+
     return {
       user: { id: data.user.id, email: data.user.email ?? input.email },
       session: data.session ? toAuthSession(data.session) : null,
     };
+  }
+
+  async forgotPassword(email: string): Promise<{ success: boolean }> {
+    const resetLink = await this.#generateResetLink(email);
+    if (resetLink) {
+      await emailService.sendPasswordReset(email, resetLink);
+    }
+    // Sempre retorna sucesso para não vazar se email existe
+    return { success: true };
+  }
+
+  async #generateResetLink(email: string): Promise<string | null> {
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'recovery',
+      email,
+      options: { redirectTo: `${env.FRONTEND_URL}/nova-senha` },
+    });
+    if (error || !data.properties?.action_link) {
+      logger.warn({ err: error, email }, 'Failed to generate reset link');
+      return null;
+    }
+    return data.properties.action_link;
   }
 
   async signIn(input: SignInInput): Promise<AuthResponse> {

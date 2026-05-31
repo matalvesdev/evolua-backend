@@ -35,6 +35,22 @@ const envSchema = z.object({
   NOTIFICA_API_URL: z.string().url().default('https://app.usenotifica.com.br/v1'),
   NOTIFICA_API_KEY: z.string().min(1).optional(),
   NOTIFICA_FROM_EMAIL: z.string().email().optional(),
+  NOTIFICA_FROM_NAME: z.string().default('Evolua'),
+
+  // SMTP fallback — usado quando Notifica falha
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_SECURE: z.coerce.boolean().default(false),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().email().optional(),
+  SMTP_FROM_NAME: z.string().default('Evolua'),
+
+  // Supabase Auth HTTP Hook — HMAC secreto para validar payloads dos hooks
+  SUPABASE_AUTH_HOOK_SECRET: z.string().min(16).optional(),
+
+  // Landing page contact form — para onde enviar notificações de novo contato
+  CONTACT_NOTIFICATION_EMAIL: z.string().email().optional(),
 
   // Pix (geração local de QR EMV — sem provider externo)
   PIX_KEY: z.string().min(1).optional(),
@@ -56,6 +72,10 @@ const envSchema = z.object({
   STRIPE_API_URL: z.string().url().default('https://api.stripe.com/v1'),
   STRIPE_SECRET_KEY: z.string().min(1).optional(),
   STRIPE_WEBHOOK_SECRET: z.string().min(16).optional(),
+
+  // Google Calendar Sync — serviço externo de agenda
+  CALENDAR_SERVICE_URL: z.string().url().optional(),
+  CALENDAR_SERVICE_TOKEN: z.string().min(1).optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

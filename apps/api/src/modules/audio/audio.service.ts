@@ -183,7 +183,7 @@ export class AudioService {
       // Tenta o serviço Python AI primeiro (com retry para cold start)
       const aiResult = await this.tryAiService(signedUrl, session.id, therapistId, language);
 
-      if (aiResult.success) {
+      if (aiResult.success && aiResult.transcription) {
         await this.saveTranscription(session.id, aiResult.transcription);
         return;
       }
@@ -195,7 +195,7 @@ export class AudioService {
       );
 
       const hfResult = await this.tryHuggingFaceFallback(signedUrl);
-      if (hfResult.success) {
+      if (hfResult.success && hfResult.transcription) {
         await this.saveTranscription(session.id, hfResult.transcription);
         return;
       }
@@ -261,7 +261,7 @@ export class AudioService {
           return { success: true, transcription: data.transcription };
         }
 
-        const body = await res.text();
+        await res.text();
         lastError = `HTTP ${res.status}`;
 
         // Só retry em 502/503 (cold start). Outros erros são finais.

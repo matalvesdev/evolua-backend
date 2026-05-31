@@ -222,11 +222,27 @@ export class WaCrmService {
       return;
     }
 
-    // 3. Órfã: descarta com log. TODO: criar lead / notificar clínica.
-    logger.info(
-      { pushName: payload.pushName, messageId: payload.messageId },
-      'wa-crm: inbound de número desconhecido — descartado',
-    );
+    // 3. Órfã: cria lead (potencial novo paciente)
+    try {
+      const lead = await prisma.lead.create({
+        data: {
+          name: payload.pushName ?? 'Lead WhatsApp',
+          phone: payload.senderPhone,
+          source: 'whatsapp',
+          message: payload.text,
+          status: 'new',
+        },
+      });
+      logger.info(
+        { leadId: lead.id, phone: payload.senderPhone, pushName: payload.pushName },
+        'wa-crm: lead criado a partir de inbound desconhecido',
+      );
+    } catch (e) {
+      logger.warn(
+        { err: e, phone: payload.senderPhone },
+        'wa-crm: falha ao criar lead para inbound desconhecido',
+      );
+    }
   }
 
   // ── Privados ─────────────────────────────────────────────────────────

@@ -81,6 +81,32 @@ const dashboardRoutes: FastifyPluginAsync = async (app) => {
         req.query.months,
       ),
   );
+
+  // ── Analytics ───────────────────────────────────────────────────────────
+
+  const DashboardAnalyticsSchema = z.object({
+    revenue: z.object({ labels: z.array(z.string()), values: z.array(z.number()) }),
+    appointments: z.object({ labels: z.array(z.string()), values: z.array(z.number()) }),
+    newPatients: z.object({ labels: z.array(z.string()), values: z.array(z.number()) }),
+    topProcedures: z.array(z.object({ name: z.string(), count: z.number() })),
+    cancellationRate: z.number(),
+    noShowRate: z.number(),
+  });
+
+  route.get(
+    '/analytics',
+    {
+      schema: {
+        tags: ['dashboard'],
+        querystring: z.object({
+          period: z.enum(['week', 'month', 'quarter']).default('month'),
+        }),
+        response: { 200: DashboardAnalyticsSchema },
+      },
+    },
+    async (req) =>
+      dashboardService.getAnalytics(await resolveClinicId(req.user.id), req.query.period),
+  );
 };
 
 export default dashboardRoutes;

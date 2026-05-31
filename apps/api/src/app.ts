@@ -13,6 +13,7 @@ import {
   jsonSchemaTransform,
 } from 'fastify-type-provider-zod';
 
+import teleconsultaRoutes from './modules/teleconsulta/teleconsulta.routes.js';
 import { env } from './config/env.js';
 import authPlugin from './plugins/auth.js';
 import errorHandler from './plugins/error-handler.js';
@@ -40,6 +41,17 @@ import consentRoutes from './modules/consent/consent.routes.js';
 import caaRoutes from './modules/caa/caa.routes.js';
 import materialsRoutes from './modules/materials/materials.routes.js';
 import { billingRoutes, billingWebhookRoutes } from './modules/billing/billing.routes.js';
+import authHooksRoutes from './modules/auth-hooks/auth-hooks.routes.js';
+import emailRoutes from './modules/email/email.routes.js';
+import newsletterRoutes from './modules/newsletter/newsletter.routes.js';
+import contactRoutes from './modules/contact/contact.routes.js';
+import onboardingRoutes from './modules/onboarding/onboarding.routes.js';
+import leadsRoutes from './modules/leads/leads.routes.js';
+import documentsRoutes from './modules/documents/documents.routes.js';
+import settingsRoutes from './modules/settings/settings.routes.js';
+import schedulerPlugin from './modules/scheduler/index.js';
+import articlesRoutes from './modules/articles/articles.routes.js';
+import blogRoutes from './modules/blog/blog.routes.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -130,7 +142,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
     transform: jsonSchemaTransform,
   });
-  await app.register(swaggerUi, { routePrefix: '/docs' });
+  if (env.NODE_ENV !== 'production') {
+    await app.register(swaggerUi, { routePrefix: '/docs' });
+  }
 
   // Auth + error handler
   await app.register(authPlugin);
@@ -159,8 +173,21 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(caaRoutes, { prefix: '/api/caa' });
   await app.register(materialsRoutes, { prefix: '/api/materials' });
   await app.register(billingRoutes, { prefix: '/api/billing' });
+  await app.register(emailRoutes, { prefix: '/api/email' });
+  await app.register(newsletterRoutes, { prefix: '/api/newsletter' });
+  await app.register(contactRoutes, { prefix: '/api/contact' });
+  await app.register(documentsRoutes, { prefix: '/api/documents' });
+  await app.register(settingsRoutes, { prefix: '/api/settings' });
+  await app.register(articlesRoutes, { prefix: '/api/articles' });
+  await app.register(blogRoutes, { prefix: '/api/blog' });
+  await app.register(onboardingRoutes, { prefix: '/api/onboarding' });
+  await app.register(leadsRoutes, { prefix: '/api/leads' });
+  await app.register(teleconsultaRoutes, { prefix: '/api/teleconsulta' });
 
-  // Webhooks de billing — contexto encapsulado com parser raw-string para validar HMAC.
+  // Scheduler — background job para lembretes de consulta
+  await app.register(schedulerPlugin);
+
+  // Webhooks & Auth Hooks — contexto encapsulado com parser raw-string para validar HMAC.
   // O parser só vale dentro deste escopo; demais rotas continuam recebendo JSON parseado.
   await app.register(async (instance) => {
     instance.addContentTypeParser(
@@ -169,7 +196,8 @@ export async function buildApp(): Promise<FastifyInstance> {
       (_req, body, done) => done(null, body),
     );
     await instance.register(billingWebhookRoutes);
-  }, { prefix: '/webhooks' });
+    await instance.register(authHooksRoutes);
+  }, { prefix: '/hooks' });
 
   return app;
 }

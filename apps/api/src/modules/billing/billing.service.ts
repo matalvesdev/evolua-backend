@@ -8,6 +8,7 @@ import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
 import { abacatepay } from './providers/abacatepay.js';
 import { stripe } from './providers/stripe.js';
+import { emailService } from '../email/email.service.js';
 import { env } from '../../config/env.js';
 import { planToDTO, subscriptionToDTO, invoiceToDTO } from './billing.mapper.js';
 import type { BillingProvider } from '@evolua/contracts';
@@ -213,6 +214,21 @@ class BillingService {
             where: { clinicId, provider: 'abacatepay' },
             data: { status: 'active' },
           });
+
+          // Envia comprovante de pagamento para a clínica
+          if (emailService.isEnabled() && clinicId) {
+            const clinic = await prisma.clinic.findUnique({
+              where: { id: clinicId },
+              select: { name: true, email: true },
+            });
+            if (clinic?.email) {
+              const amount = fmtBRL(Number(data.amount ?? 0));
+              const today = new Date().toLocaleDateString('pt-BR');
+              emailService
+                .sendBillingReceipt(clinic.email, clinic.name, amount, today, 'PIX/Cartão')
+                .catch((err) => logger.warn({ err, clinicId }, 'Billing receipt email failed'));
+            }
+          }
         }
         return;
       }
@@ -278,6 +294,21 @@ class BillingService {
           update: { status: 'paid', paidAt: new Date() },
         });
         await prisma.subscription.update({ where: { id: sub.id }, data: { status: 'active' } });
+
+        // Envia comprovante de pagamento para a clínica
+        if (emailService.isEnabled()) {
+          const clinic = await prisma.clinic.findUnique({
+            where: { id: sub.clinicId },
+            select: { name: true, email: true },
+          });
+          if (clinic?.email) {
+            const amount = fmtBRL(Number(obj.amount_paid ?? 0));
+            const today = new Date().toLocaleDateString('pt-BR');
+            emailService
+              .sendBillingReceipt(clinic.email, clinic.name, amount, today, 'Cartão (Stripe)')
+              .catch((err) => logger.warn({ err, clinicId: sub.clinicId }, 'Billing receipt email failed'));
+          }
+        }
         return;
       }
 
@@ -326,6 +357,10 @@ class BillingService {
         logger.info({ type }, 'stripe: evento sem handler dedicado');
     }
   }
+}
+
+function fmtBRL(cents: number): string {
+  return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 export const billingService = new BillingService();
