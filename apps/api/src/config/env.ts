@@ -18,6 +18,7 @@ const envSchema = z.object({
   WHATSAPP_SERVICE_URL: z.string().url().default('http://localhost:8010'),
   INTERNAL_SERVICE_TOKEN: z.string().min(8),
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  LANDING_URL: z.string().url().default('https://useevolua.com.br'),
 
   // Hugging Face Inference API — fallback direto quando o AI service está em cold start
   HUGGINGFACE_API_KEY: z.string().min(1).optional(),

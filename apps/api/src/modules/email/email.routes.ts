@@ -35,8 +35,8 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
     const magnet = LEAD_MAGNETS[magnetId];
     const title = magnet?.title ?? magnetId;
 
-    const frontendUrl = env.FRONTEND_URL.replace(/\/$/, '');
-    const downloadLink = `${frontendUrl}/materiais/${magnetId}`;
+    const landingUrl = env.LANDING_URL.replace(/\/$/, '');
+    const downloadLink = `${landingUrl}/materiais/${magnetId}`;
 
     const result = await emailService.sendLeadMagnetDelivery(email, email, title, downloadLink);
     if (!result.success) {
