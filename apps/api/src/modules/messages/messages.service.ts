@@ -140,6 +140,37 @@ export class MessagesService {
       },
     };
   }
+
+  // ── WhatsApp Automations ──────────────────────────────────────────────
+
+  async listAutomations(clinicId: string) {
+    return prisma.whatsAppAutomation.findMany({
+      where: { clinicId },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async findAutomation(clinicId: string, id: string) {
+    return prisma.whatsAppAutomation.findFirst({
+      where: { id, clinicId },
+    });
+  }
+
+  async updateAutomation(
+    clinicId: string,
+    id: string,
+    data: { active?: boolean; label?: string; description?: string | null; template?: string },
+  ) {
+    const exists = await prisma.whatsAppAutomation.findFirst({
+      where: { id, clinicId },
+      select: { id: true },
+    });
+    if (!exists) return null;
+    return prisma.whatsAppAutomation.update({
+      where: { id },
+      data,
+    });
+  }
 }
 
 export const messagesService = new MessagesService();

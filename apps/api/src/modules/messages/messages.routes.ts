@@ -97,13 +97,22 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
 
   const WaAutomationSchema = z.object({
     id: UuidSchema,
-    name: z.string(),
-    active: z.boolean(),
+    clinicId: UuidSchema,
+    label: z.string(),
+    description: z.string().nullable(),
     trigger: z.string(),
-    createdAt: z.string(),
+    active: z.boolean(),
+    template: z.string(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
   });
 
-  const waAutomations: Array<z.infer<typeof WaAutomationSchema>> = [];
+  const WaAutomationUpdateSchema = z.object({
+    active: z.boolean().optional(),
+    label: z.string().min(1).max(200).optional(),
+    description: z.string().max(500).optional().nullable(),
+    template: z.string().min(1).optional(),
+  });
 
   route.get(
     '/automations/whatsapp',
@@ -113,7 +122,10 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
         response: { 200: z.array(WaAutomationSchema) },
       },
     },
-    async () => waAutomations,
+    async (req) => {
+      const clinicId = await resolveClinicId(req.user.id);
+      return messagesService.listAutomations(clinicId);
+    },
   );
 
   route.patch(
@@ -122,7 +134,7 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['messages'],
         params: z.object({ id: UuidSchema }),
-        body: z.object({ active: z.boolean() }),
+        body: WaAutomationUpdateSchema,
         response: {
           200: WaAutomationSchema,
           404: ErrorResponseSchema,
@@ -130,12 +142,12 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async (req, rep) => {
-      const idx = waAutomations.findIndex((a) => a.id === req.params.id);
-      if (idx === -1) {
+      const clinicId = await resolveClinicId(req.user.id);
+      const updated = await messagesService.updateAutomation(clinicId, req.params.id, req.body);
+      if (!updated) {
         return rep.code(404).send({ error: 'NotFound', message: 'Automation not found' });
       }
-      waAutomations[idx].active = req.body.active;
-      return waAutomations[idx];
+      return updated;
     },
   );
 };

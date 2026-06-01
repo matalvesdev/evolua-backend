@@ -9,10 +9,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml ./
-RUN pip install --upgrade pip && pip install .
+RUN pip install --no-cache-dir --upgrade pip
 
 COPY . .
+RUN pip install --no-cache-dir .
+
 EXPOSE 8001
-# Render define a porta via variável de ambiente PORT.
-# O fallback 8001 mantém compatibilidade com docker-compose local.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import httpx; httpx.get('http://localhost:8001/health', timeout=5).raise_for_status()" || exit 1
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8001}"]

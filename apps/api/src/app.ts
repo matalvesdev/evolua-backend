@@ -52,6 +52,8 @@ import settingsRoutes from './modules/settings/settings.routes.js';
 import schedulerPlugin from './modules/scheduler/index.js';
 import articlesRoutes from './modules/articles/articles.routes.js';
 import blogRoutes from './modules/blog/blog.routes.js';
+import documentTemplatesRoutes from './modules/document-templates/document-templates.routes.js';
+import clinicalScalesRoutes from './modules/clinical-scales/clinical-scales.routes.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -180,6 +182,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(settingsRoutes, { prefix: '/api/settings' });
   await app.register(articlesRoutes, { prefix: '/api/articles' });
   await app.register(blogRoutes, { prefix: '/api/blog' });
+  await app.register(documentTemplatesRoutes, { prefix: '/api/document-templates' });
+  await app.register(clinicalScalesRoutes, { prefix: '/api/clinical-scales' });
   await app.register(onboardingRoutes, { prefix: '/api/onboarding' });
   await app.register(leadsRoutes, { prefix: '/api/leads' });
   await app.register(teleconsultaRoutes, { prefix: '/api/teleconsulta' });

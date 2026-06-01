@@ -49,6 +49,8 @@ model Clinic {
   teleSessions            TeleSession[]
   subscriptions           Subscription[]
   invoices                Invoice[]
+  documentTemplates       DocumentTemplate[]
+  whatsappAutomations     WhatsAppAutomation[]
 
   @@map("clinics")
 }
@@ -897,6 +899,90 @@ model BillingEvent {
   @@unique([provider, externalId])
   @@index([receivedAt(sort: Desc)])
   @@map("billing_events")
+}
+
+// ============================================================================
+// DOCUMENT TEMPLATES — Modelos de laudos, encaminhamentos, pareceres, atestados
+// ============================================================================
+
+model DocumentTemplate {
+  id        String    @id @default(uuid()) @db.Uuid
+  clinicId  String?   @map("clinic_id") @db.Uuid // null = system template
+  title     String
+  type      String // "laudo" | "encaminhamento" | "parecer" | "atestado"
+  subtype   String? // "alta" | "evolucao" | "escola" | "medico" | etc.
+  content   String // template variables like {{patientName}}
+  isSystem  Boolean   @default(false) @map("is_system")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+
+  clinic Clinic? @relation(fields: [clinicId], references: [id], onDelete: SetNull)
+
+  @@index([clinicId, type])
+  @@index([type, subtype])
+  @@map("document_templates")
+}
+
+// ============================================================================
+// WHATSAPP AUTOMATIONS — Automações de envio de mensagens no WhatsApp
+// ============================================================================
+
+model WhatsAppAutomation {
+  id          String   @id @default(uuid()) @db.Uuid
+  clinicId    String   @map("clinic_id") @db.Uuid
+  label       String
+  description String?
+  trigger     String // "welcome" | "appointment_reminder_24h" | "appointment_reminder_1h" | "post_session" | "inactive_30d"
+  active      Boolean  @default(true)
+  template    String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@unique([clinicId, trigger])
+  @@index([clinicId, active])
+  @@map("whatsapp_automations")
+}
+
+// ============================================================================
+// CLINICAL SCALES — Escalas clínicas padronizadas (GRBAS, VHI-10, etc.)
+// ============================================================================
+
+model ClinicalScale {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  category    String // "voz" | "degluticao" | "linguagem" | "fluencia" | "audicao"
+  type        String // "numeric" | "categorical"
+  domain      Json     @default("{}") // { min, max } for numeric, { options: [] } for categorical
+  isSystem    Boolean  @default(true) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  results ClinicalScaleResult[]
+
+  @@index([category])
+  @@index([name])
+  @@map("clinical_scales")
+}
+
+model ClinicalScaleResult {
+  id           String   @id @default(uuid()) @db.Uuid
+  patientId    String   @map("patient_id") @db.Uuid
+  scaleId      String   @map("scale_id") @db.Uuid
+  therapistId  String?  @map("therapist_id") @db.Uuid
+  appointmentId String? @map("appointment_id") @db.Uuid
+  score        Json     @default("{}") // flexible: { value: 2 } or { categories: ["G1", "R1"] }
+  notes        String?
+  conductedAt  DateTime @map("conducted_at") @db.Timestamptz
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  scale ClinicalScale @relation(fields: [scaleId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, scaleId, conductedAt])
+  @@index([patientId, conductedAt(sort: Desc)])
+  @@map("clinical_scale_results")
 }
 
 // ============================================================================
