@@ -33,7 +33,7 @@ const envSchema = z.object({
 
   // Resend (https://resend.com) — email transacional primário
   RESEND_API_KEY: z.string().min(1).optional(),
-  RESEND_FROM_EMAIL: z.string().email().default('onboarding@resend.dev'),
+  RESEND_FROM_EMAIL: z.string().email().default('naoresponder@useevolua.com.br'),
 
   // Notifica (https://docs.usenotifica.com.br) — email transacional fallback
   NOTIFICA_API_URL: z.string().url().default('https://app.usenotifica.com.br/v1'),
