@@ -25,7 +25,7 @@ export class ResendClient {
       return { success: false, error: 'RESEND_API_KEY not configured' };
     }
 
-    const from = env.NOTIFICA_FROM_EMAIL ?? 'naoresponder@useevolua.com.br';
+    const from = env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
 
     const payload: ResendPayload = {
       from: `${env.NOTIFICA_FROM_NAME} <${from}>`,
