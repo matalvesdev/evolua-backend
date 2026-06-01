@@ -1,62 +1,15 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { UuidSchema } from '@evolua/contracts';
+import { UuidSchema, PaginatedResponseSchema, ErrorResponseSchema } from '@evolua/contracts';
+import {
+  DocumentSchema,
+  CreateDocumentSchema,
+  UpdateDocumentSchema,
+  ListDocumentsQuerySchema,
+} from '@evolua/contracts';
 import { documentsService } from './documents.service.js';
 import { resolveClinicId } from '../auth/auth.helpers.js';
-
-const DocumentSchema = z.object({
-  id: UuidSchema,
-  patientId: UuidSchema,
-  patientName: z.string(),
-  type: z.string(),
-  title: z.string(),
-  content: z.string(),
-  status: z.enum(['draft', 'final']),
-  createdAt: z.string(),
-  updatedAt: z.string(),
-});
-
-const CreateDocumentSchema = z.object({
-  patientId: UuidSchema,
-  patientName: z.string().min(1).max(200),
-  type: z.enum(['referral', 'prescription', 'document']),
-  title: z.string().min(1).max(300),
-  content: z.string().optional(),
-  therapistName: z.string().optional(),
-  therapistCrfa: z.string().optional(),
-});
-
-const UpdateDocumentSchema = z
-  .object({
-    patientId: UuidSchema,
-    patientName: z.string().min(1).max(200),
-    type: z.enum(['referral', 'prescription', 'document']),
-    title: z.string().min(1).max(300),
-    content: z.string(),
-  })
-  .partial();
-
-const ListDocumentsQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  patientId: UuidSchema.optional(),
-});
-
-const PaginatedResponse = z.object({
-  data: z.array(DocumentSchema),
-  pagination: z.object({
-    page: z.number().int(),
-    pageSize: z.number().int(),
-    total: z.number().int(),
-    totalPages: z.number().int(),
-  }),
-});
-
-const ErrorResponse = z.object({
-  error: z.string(),
-  message: z.string(),
-});
 
 const notFound = { error: 'NotFound', message: 'Document not found' };
 
@@ -70,7 +23,7 @@ const documentsRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['documents'],
         querystring: ListDocumentsQuerySchema,
-        response: { 200: PaginatedResponse },
+        response: { 200: PaginatedResponseSchema(DocumentSchema) },
       },
     },
     async (req) => documentsService.list(await resolveClinicId(req.user.id), req.query),
@@ -99,7 +52,7 @@ const documentsRoutes: FastifyPluginAsync = async (app) => {
         tags: ['documents'],
         params: z.object({ id: UuidSchema }),
         body: UpdateDocumentSchema,
-        response: { 200: DocumentSchema, 404: ErrorResponse },
+        response: { 200: DocumentSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
@@ -118,7 +71,7 @@ const documentsRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['documents'],
         params: z.object({ id: UuidSchema }),
-        response: { 204: z.null(), 404: ErrorResponse },
+        response: { 204: z.null(), 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {

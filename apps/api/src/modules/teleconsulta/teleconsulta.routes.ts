@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import { UuidSchema, ErrorResponseSchema } from '@evolua/contracts';
+import { TeleSessionSchema, CreateTeleSessionSchema, UpdateTeleSessionSchema } from '@evolua/contracts';
 import { teleconsultaService } from './teleconsulta.service.js';
 import { resolveClinicId } from '../auth/auth.helpers.js';
 
@@ -16,18 +18,7 @@ const teleconsultaRoutes: FastifyPluginAsync = async (app) => {
         tags: ['teleconsulta'],
         summary: 'Lista sessões de teleconsulta',
         response: {
-          200: z.array(z.object({
-            id: z.string().uuid(),
-            patient: z.string(),
-            patientId: z.string().uuid(),
-            date: z.string(),
-            time: z.string(),
-            link: z.string(),
-            status: z.enum(['scheduled', 'active', 'ended']),
-            sentViaWhatsApp: z.boolean(),
-            clinicId: z.string().uuid(),
-            createdAt: z.string(),
-          })),
+          200: z.array(TeleSessionSchema),
         },
       },
     },
@@ -43,14 +34,8 @@ const teleconsultaRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['teleconsulta'],
         summary: 'Cria sessão de teleconsulta',
-        body: z.object({
-          patientId: z.string().uuid(),
-          patient: z.string().min(1),
-          date: z.string(),
-          time: z.string(),
-          sendWA: z.boolean().default(false),
-        }),
-        response: { 201: z.any() },
+        body: CreateTeleSessionSchema,
+        response: { 201: TeleSessionSchema },
       },
     },
     async (req, rep) => {
@@ -66,12 +51,9 @@ const teleconsultaRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['teleconsulta'],
         summary: 'Atualiza sessão de teleconsulta',
-        params: z.object({ id: z.string().uuid() }),
-        body: z.object({
-          status: z.enum(['scheduled', 'active', 'ended']).optional(),
-          sentViaWhatsApp: z.boolean().optional(),
-        }),
-        response: { 200: z.any(), 404: z.any() },
+        params: z.object({ id: UuidSchema }),
+        body: UpdateTeleSessionSchema,
+        response: { 200: TeleSessionSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {

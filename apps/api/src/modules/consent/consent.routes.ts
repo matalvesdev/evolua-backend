@@ -4,34 +4,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma.js';
 import { resolveClinicId } from '../auth/auth.helpers.js';
 import { auditAsync } from '../../lib/audit.js';
-import { UuidSchema, ErrorResponseSchema } from '@evolua/contracts';
-
-/**
- * Consent (LGPD Art. 7º/8º).
- *
- * Endpoints append-only para registrar e revogar consentimentos.
- * Schemas locais — adicionar a `@evolua/contracts` quando estabilizar.
- */
-
-const ConsentRecordSchema = z.object({
-  id: z.string().uuid(),
-  clinicId: z.string().uuid(),
-  patientId: z.string().uuid(),
-  grantedBy: z.string(),
-  purpose: z.string(),
-  version: z.string(),
-  granted: z.boolean(),
-  ipAddress: z.string().nullable(),
-  grantedAt: z.string().datetime(),
-  revokedAt: z.string().datetime().nullable(),
-});
-
-const GrantConsentSchema = z.object({
-  patientId: z.string().uuid(),
-  grantedBy: z.string().min(2),
-  purpose: z.string().min(2),
-  version: z.string().default('1.0'),
-});
+import { UuidSchema, ErrorResponseSchema, ConsentRecordSchema, GrantConsentSchema } from '@evolua/contracts';
 
 const consentRoutes: FastifyPluginAsync = async (app) => {
   const route = app.withTypeProvider<ZodTypeProvider>();
