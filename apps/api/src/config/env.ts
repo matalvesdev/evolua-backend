@@ -31,7 +31,10 @@ const envSchema = z.object({
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
   SENTRY_ENVIRONMENT: z.string().optional(),
 
-  // Notifica (https://docs.usenotifica.com.br) — email transacional
+  // Resend (https://resend.com) — email transacional primário
+  RESEND_API_KEY: z.string().min(1).optional(),
+
+  // Notifica (https://docs.usenotifica.com.br) — email transacional fallback
   NOTIFICA_API_URL: z.string().url().default('https://app.usenotifica.com.br/v1'),
   NOTIFICA_API_KEY: z.string().min(1).optional(),
   NOTIFICA_FROM_EMAIL: z.string().email().optional(),
