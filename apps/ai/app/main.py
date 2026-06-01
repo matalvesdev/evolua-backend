@@ -32,9 +32,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(
-                f"https://api-inference.huggingface.co/models/{settings.huggingface_chat_model}",
+                f"{settings.huggingface_base_url}/{settings.huggingface_chat_provider}/v1/chat/completions",
                 headers={"Authorization": f"Bearer {settings.huggingface_api_key}"},
-                json={"inputs": "warmup", "parameters": {"max_new_tokens": 1}},
+                json={
+                    "model": settings.huggingface_chat_model,
+                    "messages": [{"role": "user", "content": "warmup"}],
+                    "max_tokens": 1,
+                },
             )
             logger.info("HF model warmup: HTTP %s", resp.status_code)
     except Exception as exc:
@@ -75,14 +79,12 @@ def create_app() -> FastAPI:
     async def readyz() -> dict[str, str]:
         if not _warm:
             return {"status": "warming_up"}
+        # Readiness = o provedor de inferência (router.huggingface.co) é
+        # alcançável. Qualquer resposta HTTP comprova conectividade DNS/TLS;
+        # apenas falhas de rede indicam degradação.
         try:
             async with httpx.AsyncClient(timeout=5) as client:
-                resp = await client.get(
-                    f"https://api-inference.huggingface.co/status/{settings.huggingface_chat_model}",
-                    headers={"Authorization": f"Bearer {settings.huggingface_api_key}"},
-                )
-                if resp.is_error:
-                    return {"status": "degraded", "detail": "HF model unreachable"}
+                await client.get(settings.huggingface_base_url)
         except Exception as exc:
             return {"status": "degraded", "detail": str(exc)}
         return {"status": "ready"}
