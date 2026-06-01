@@ -20,6 +20,7 @@ from typing import Any
 import httpx
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from ..config import get_settings
@@ -88,6 +89,17 @@ async def _retrieve(query: str, *, top_k: int = 4) -> list[dict[str, Any]]:
     vec = embeddings[0]
     vec_literal = "[" + ",".join(f"{x:.6f}" for x in vec) + "]"
 
+    # psycopg é síncrono/bloqueante: executa em threadpool para não travar o
+    # event loop async do FastAPI.
+    return await run_in_threadpool(
+        _retrieve_sync, settings.database_url, vec_literal, top_k
+    )
+
+
+def _retrieve_sync(
+    database_url: str, vec_literal: str, top_k: int
+) -> list[dict[str, Any]]:
+    """Query pgvector síncrona (rodar via run_in_threadpool)."""
     sql = """
         SELECT id, source, title, source_url, page, snippet,
                1 - (embedding <=> %s::vector) AS similarity
@@ -97,12 +109,11 @@ async def _retrieve(query: str, *, top_k: int = 4) -> list[dict[str, Any]]:
     """
 
     try:
-        with psycopg.connect(settings.database_url, connect_timeout=5) as conn:
+        with psycopg.connect(database_url, connect_timeout=5) as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, (vec_literal, vec_literal, top_k))
                 cols = [c.name for c in cur.description or []]
-                rows = [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
-                return rows
+                return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
     except psycopg.errors.UndefinedTable:
         logger.info("library_chunks table not yet created — retrieval skipped")
         return []

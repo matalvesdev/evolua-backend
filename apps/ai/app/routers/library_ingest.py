@@ -7,7 +7,7 @@ Fluxo:
    embeddings via HuggingFace (`intfloat/multilingual-e5-small`, dim=384).
 3. Inserimos `library_documents` + `library_chunks` em transação.
 
-A migration `20260508000000_add_library_chunks` precisa estar aplicada.
+A migration `20260601000001_add_library_rag_tables` precisa estar aplicada.
 Quando a tabela não existe, retornamos 503 com instrução clara.
 """
 from __future__ import annotations
@@ -30,6 +30,7 @@ from fastapi import (
     HTTPException,
     UploadFile,
 )
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from ..config import get_settings
@@ -196,7 +197,7 @@ def _insert_document_and_chunks(
         raise HTTPException(
             503,
             "Tabelas library_documents/library_chunks não encontradas. "
-            "Aplique a migration 20260508000000_add_library_chunks.",
+            "Aplique a migration 20260601000001_add_library_rag_tables.",
         ) from e
 
 
@@ -279,8 +280,9 @@ async def ingest_document(
     if len(embeddings) != len(chunks):
         raise HTTPException(500, "Mismatch entre embeddings e chunks")
 
-    # 4. Insere
-    doc_id = _insert_document_and_chunks(
+    # 4. Insere (psycopg bloqueante → threadpool)
+    doc_id = await run_in_threadpool(
+        _insert_document_and_chunks,
         clinic_id=x_clinic_id,
         user_id=user_id,
         title=title,
@@ -346,7 +348,7 @@ async def list_documents(
     """
     sql_count = f"SELECT COUNT(*) FROM library_documents WHERE {' AND '.join(where)}"
 
-    try:
+    def _query() -> tuple[list[dict[str, Any]], int]:
         with psycopg.connect(settings.database_url, connect_timeout=5) as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, (*args, limit, offset))
@@ -355,6 +357,10 @@ async def list_documents(
                 cur.execute(sql_count, args)
                 total_row = cur.fetchone()
                 total = int(total_row[0]) if total_row else 0
+        return rows, total
+
+    try:
+        rows, total = await run_in_threadpool(_query)
     except psycopg.errors.UndefinedTable:
         return DocumentListResponse(items=[], total=0)
 
@@ -398,16 +404,23 @@ async def delete_document(
     """
     sql_chunks = "DELETE FROM library_chunks WHERE document_id = %s"
 
-    try:
+    def _delete() -> Any:
         with psycopg.connect(settings.database_url, connect_timeout=5) as conn:
             with conn.cursor() as cur:
                 cur.execute(sql, (document_id, x_clinic_id))
                 row = cur.fetchone()
                 if not row:
-                    raise HTTPException(404, "Documento não encontrado")
+                    return None
                 cur.execute(sql_chunks, (document_id,))
             conn.commit()
+        return row
+
+    try:
+        row = await run_in_threadpool(_delete)
     except psycopg.errors.UndefinedTable as e:
         raise HTTPException(503, "Tabela library_documents inexistente") from e
+
+    if not row:
+        raise HTTPException(404, "Documento não encontrado")
 
     return {"ok": True}
