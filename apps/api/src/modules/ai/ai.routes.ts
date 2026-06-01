@@ -8,8 +8,6 @@ import {
   GeneratedEvolutionSchema,
   GenerateReportRequestSchema,
   GenerateReportResponseSchema,
-  MarketingGenerateRequestSchema,
-  MarketingGenerateResponseSchema,
   LibraryDocumentListResponseSchema,
   LibraryIngestResponseSchema,
   LibraryIngestUrlRequestSchema,
@@ -199,33 +197,6 @@ const aiRoutes: FastifyPluginAsync = async (app) => {
         return reply.code(502).send({
           error: 'AiServiceError',
           message: e instanceof Error ? e.message : 'Falha ao deletar documento',
-        });
-      }
-    },
-  );
-
-  // ── Marketing ────────────────────────────────────────────────────────────
-
-  route.post(
-    '/marketing/generate',
-    {
-      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
-      schema: {
-        tags: ['ai-marketing'],
-        body: MarketingGenerateRequestSchema,
-        response: {
-          200: MarketingGenerateResponseSchema,
-          502: ErrorResponseSchema,
-        },
-      },
-    },
-    async (req, reply) => {
-      try {
-        return await aiService.generateMarketingContent(req.body, req.user.id);
-      } catch (e) {
-        return reply.code(502).send({
-          error: 'AiServiceError',
-          message: e instanceof Error ? e.message : 'Falha ao gerar conteúdo de marketing',
         });
       }
     },

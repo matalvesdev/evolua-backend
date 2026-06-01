@@ -15,7 +15,6 @@ export * from './wa-crm.js';
 export * from './caa.js';
 export * from './materials.js';
 export * from './billing.js';
-export * from './marketing.js';
 export * from './document-template.js';
 export * from './whatsapp-automation.js';
 export * from './clinical-scale.js';

@@ -7,8 +7,6 @@ import type {
   GeneratedEvolution,
   GenerateMaterialRequest,
   GeneratedMaterial,
-  MarketingGenerateRequest,
-  MarketingGenerateResponse,
   GenerateReportRequest,
   GenerateReportResponse,
   LibraryDocumentListResponse,
@@ -177,34 +175,6 @@ export class AiService {
         error: e instanceof Error ? e.message : 'Erro ao gerar relatório',
       };
     }
-  }
-
-  /**
-   * Proxy para geração de conteúdo de marketing para redes sociais.
-   */
-  async generateMarketingContent(
-    req: MarketingGenerateRequest,
-    userId: string,
-  ): Promise<MarketingGenerateResponse> {
-    const res = await fetch(`${env.AI_SERVICE_URL}/marketing/generate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-internal-token': env.INTERNAL_SERVICE_TOKEN,
-        'x-user-id': userId,
-      },
-      body: JSON.stringify({
-        topic: req.topic,
-        platform: req.platform,
-        format: req.format,
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`AI marketing ${res.status}: ${body.slice(0, 300)}`);
-    }
-    return (await res.json()) as MarketingGenerateResponse;
   }
 
   /**
