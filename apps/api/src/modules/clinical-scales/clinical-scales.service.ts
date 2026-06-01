@@ -38,7 +38,7 @@ export class ClinicalScalesService {
         scaleId: input.scaleId,
         therapistId,
         appointmentId: input.appointmentId ?? null,
-        score: input.score ?? {},
+        score: (input.score ?? {}) as object,
         notes: input.notes ?? null,
         conductedAt: input.conductedAt ? new Date(input.conductedAt) : new Date(),
       },

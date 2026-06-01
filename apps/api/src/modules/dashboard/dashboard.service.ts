@@ -138,7 +138,7 @@ export class DashboardService {
       expense: r.expense.toString(),
     }));
   }
-  async getAnalytics(clinicId: string, period: 'week' | 'month' | 'quarter') {
+  async getAnalytics(clinicId: string, period: string) {
     const now = new Date();
     const intervals: Record<string, number> = { week: 7, month: 30, quarter: 90 };
     const days = intervals[period] ?? 30;

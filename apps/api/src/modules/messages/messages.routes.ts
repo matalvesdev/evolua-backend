@@ -124,7 +124,7 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req) => {
       const clinicId = await resolveClinicId(req.user.id);
-      return messagesService.listAutomations(clinicId);
+      return messagesService.listAutomations(clinicId) as unknown as Promise<z.infer<typeof WaAutomationSchema>[]>;
     },
   );
 
@@ -147,7 +147,7 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
       if (!updated) {
         return rep.code(404).send({ error: 'NotFound', message: 'Automation not found' });
       }
-      return updated;
+      return updated as unknown as z.infer<typeof WaAutomationSchema>;
     },
   );
 };

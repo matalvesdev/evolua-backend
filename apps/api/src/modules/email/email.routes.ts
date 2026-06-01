@@ -28,7 +28,7 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
         500: z.object({ error: z.string(), message: z.string() }),
       },
     },
-  }, async (req, _rep) => {
+  }, async (req, rep) => {
     const { email, magnetId } = req.body;
     req.log.info({ email, magnetId }, 'lead magnet download requested');
 

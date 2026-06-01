@@ -9,8 +9,6 @@ import {
   UuidSchema,
 } from '@evolua/contracts';
 import { clinicalScalesService } from './clinical-scales.service.js';
-import { resolveClinicId } from '../auth/auth.helpers.js';
-
 const notFound = { error: 'NotFound', message: 'Scale or result not found' };
 
 const clinicalScalesRoutes: FastifyPluginAsync = async (app) => {
