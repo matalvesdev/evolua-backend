@@ -7,6 +7,7 @@ const contactRoutes: FastifyPluginAsync = async (app) => {
   const route = app.withTypeProvider<ZodTypeProvider>();
 
   route.post('/notify', {
+    config: { rateLimit: { max: 5, timeWindow: '10 minutes' } },
     schema: {
       tags: ['contact'],
       summary: 'Notify admin about a new contact form submission (public)',
@@ -14,7 +15,7 @@ const contactRoutes: FastifyPluginAsync = async (app) => {
         nome: z.string().min(2).max(120),
         email: z.string().email(),
         whatsapp: z.string().max(40).nullable().optional(),
-        assunto: z.string(),
+        assunto: z.string().min(1).max(200),
         mensagem: z.string().min(10).max(4000),
       }),
       response: {

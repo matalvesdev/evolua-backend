@@ -22,6 +22,20 @@ import { abacatepay } from './providers/abacatepay.js';
 import { stripe } from './providers/stripe.js';
 import { resolveClinicId } from '../auth/auth.helpers.js';
 
+// Zod schemas for webhook payload validation
+const AbacatePayWebhookSchema = z.object({
+  id: z.string(),
+  event: z.string(),
+  type: z.string().optional(),
+  data: z.record(z.unknown()).optional(),
+}).passthrough();
+
+const StripeWebhookSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  data: z.record(z.unknown()).optional(),
+}).passthrough();
+
 // ============================================================================
 // Rotas autenticadas — /api/billing/*
 // ============================================================================
@@ -117,11 +131,17 @@ export const billingWebhookRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(401).send({ error: 'invalid signature' });
     }
 
-    const evt = JSON.parse(rawBody);
+    let evt: Record<string, unknown>;
+    try {
+      evt = AbacatePayWebhookSchema.parse(JSON.parse(rawBody));
+    } catch (parseErr) {
+      req.log.warn({ err: parseErr }, 'webhook abacatepay payload inválido');
+      return reply.code(400).send({ error: 'invalid payload' });
+    }
     return billingService.processWebhook({
       provider: 'abacatepay',
-      externalId: evt.id ?? evt.event?.id,
-      type: evt.event ?? evt.type,
+      externalId: evt.id ?? (evt.event as Record<string, unknown>)?.id as string,
+      type: evt.event as string ?? evt.type as string,
       payload: evt,
     });
   });
@@ -138,11 +158,17 @@ export const billingWebhookRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(401).send({ error: 'invalid signature' });
     }
 
-    const evt = JSON.parse(rawBody);
+    let evt: Record<string, unknown>;
+    try {
+      evt = StripeWebhookSchema.parse(JSON.parse(rawBody));
+    } catch (parseErr) {
+      req.log.warn({ err: parseErr }, 'webhook stripe payload inválido');
+      return reply.code(400).send({ error: 'invalid payload' });
+    }
     return billingService.processWebhook({
       provider: 'stripe',
-      externalId: evt.id,
-      type: evt.type,
+      externalId: evt.id as string,
+      type: evt.type as string,
       payload: evt,
     });
   });

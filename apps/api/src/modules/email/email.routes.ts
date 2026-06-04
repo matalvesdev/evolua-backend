@@ -5,10 +5,11 @@ import { emailService } from './email.service.js';
 import { env } from '../../config/env.js';
 
 const LEAD_MAGNETS: Record<string, { title: string }> = {
-  'checklist-gestao': { title: 'Checklist de Gestão Clínica' },
-  'planilha-financeiro': { title: 'Planilha de Controle Financeiro' },
   'ebook-tendencias': { title: 'E-book: Tendências em Fonoaudiologia 2026' },
-  'template-relatorio': { title: 'Template de Relatório Clínico' },
+  'ebook-protocolos': { title: 'E-book: Guia de Protocolos Clínicos' },
+  'ebook-mkt-digital-fono': { title: 'E-book: Marketing Digital para Fonoaudiólogas' },
+  'infografico-marcos-fala': { title: 'Infográfico: Marcos do Desenvolvimento da Fala' },
+  'infografico-montar-clinica': { title: 'Infográfico: Como Montar sua Clínica de Fonoaudiologia' },
 };
 
 const emailRoutes: FastifyPluginAsync = async (app) => {
@@ -16,12 +17,13 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
 
   // POST /lead-magnet — public landing page endpoint
   route.post('/lead-magnet', {
+    config: { rateLimit: { max: 5, timeWindow: '10 minutes' } },
     schema: {
       tags: ['email'],
       summary: 'Request a lead magnet download (public)',
       body: z.object({
         email: z.string().email('Email inválido'),
-        magnetId: z.string().min(1),
+        magnetId: z.string().min(1).max(100),
       }),
       response: {
         200: z.object({ success: z.literal(true) }),

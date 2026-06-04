@@ -7,6 +7,7 @@ const newsletterRoutes: FastifyPluginAsync = async (app) => {
   const route = app.withTypeProvider<ZodTypeProvider>();
 
   route.post('/', {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
     schema: {
       tags: ['newsletter'],
       summary: 'Subscribe email to newsletter (public)',

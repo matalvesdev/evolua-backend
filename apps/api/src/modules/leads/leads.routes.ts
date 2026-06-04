@@ -17,6 +17,7 @@ const leadsRoutes: FastifyPluginAsync = async (app) => {
   route.post(
     '/',
     {
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
       schema: {
         tags: ['leads'],
         summary: 'Capturar lead da landing page',

@@ -201,6 +201,44 @@ def _insert_document_and_chunks(
         ) from e
 
 
+# ── Security helpers ───────────────────────────────────────────────────────
+
+
+def _validate_source_url(url: str) -> None:
+    """Valida URL de fonte para evitar SSRF.
+
+    Restringe a hosts conhecidos e seguros. Bloqueia IPs de metadata
+    de cloud providers e redes internas.
+    """
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("https",):
+        raise HTTPException(400, "source_url deve usar HTTPS")
+
+    hostname = (parsed.hostname or "").lower()
+
+    # Bloqueia IPs de metadata de cloud providers
+    BLOCKED_HOSTS = (
+        "169.254.169.254",
+        "metadata.google.internal",
+        "metadata.instance.google.internal",
+        "100.100.100.200",
+        "fd00:ec2::254",
+    )
+    if hostname in BLOCKED_HOSTS:
+        raise HTTPException(400, "source_url não permitida (host bloqueado)")
+
+    # Bloqueia endereços privados (localhost, LAN)
+    import ipaddress
+    try:
+        ip = ipaddress.ip_address(hostname)
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            raise HTTPException(400, "source_url não permitida (rede interna)")
+    except ValueError:
+        pass  # hostname, não IP — permitido
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────
 
 
@@ -241,9 +279,8 @@ async def ingest_document(
         content_type = (file.content_type or "").lower()
         source = filename
     elif source_url:
-        if not source_url.startswith("https://"):
-            raise HTTPException(400, "source_url deve ser https")
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        _validate_source_url(source_url)
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
             r = await client.get(source_url)
         if r.status_code >= 400:
             raise HTTPException(400, f"Falha ao baixar source_url: {r.status_code}")

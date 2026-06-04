@@ -180,7 +180,7 @@ export class AuthService {
     return profileToDTO(row);
   }
 
-  async changePassword(accessToken: string, newPassword: string): Promise<void> {
+  async changePassword(accessToken: string, newPassword: string, userId?: string): Promise<void> {
     const { error } = await supabaseFor(accessToken).auth.updateUser({
       password: newPassword,
     });
@@ -188,6 +188,13 @@ export class AuthService {
       const e = new Error(error.message);
       (e as Error & { statusCode: number }).statusCode = error.status ?? 400;
       throw e;
+    }
+
+    // Invalida sessões em outros dispositivos após troca de senha
+    if (userId) {
+      await supabaseAdmin.auth.admin.signOut(userId).catch((err) => {
+        logger.error({ err, userId }, 'Falha ao invalidar sessões após troca de senha');
+      });
     }
   }
 }

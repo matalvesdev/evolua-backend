@@ -10,8 +10,12 @@ const authHooksRoutes: FastifyPluginAsync = async (app) => {
       const rawBody = req.body as string;
 
       // HMAC verification
+      if (!env.SUPABASE_AUTH_HOOK_SECRET) {
+        req.log.error('SUPABASE_AUTH_HOOK_SECRET não configurado — recusando hook');
+        return rep.code(500).send({ error: 'Server configuration error' });
+      }
       const sig = (req.headers['x-supabase-auth-hook-signature'] as string) ?? '';
-      if (env.SUPABASE_AUTH_HOOK_SECRET && !authHooksService.verifySignature(rawBody, sig)) {
+      if (!authHooksService.verifySignature(rawBody, sig)) {
         return rep.code(401).send({ error: 'Invalid signature' });
       }
 

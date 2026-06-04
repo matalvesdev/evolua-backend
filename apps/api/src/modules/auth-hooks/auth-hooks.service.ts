@@ -27,7 +27,9 @@ interface AuthHookResponse {
 
 function verifySignature(rawBody: string, signature: string): boolean {
   const secret = env.SUPABASE_AUTH_HOOK_SECRET;
-  if (!secret) return true; // skip verification in dev
+  if (!secret) {
+    throw new Error('SUPABASE_AUTH_HOOK_SECRET não configurado');
+  }
   try {
     const hmac = createHmac('sha256', secret).update(rawBody).digest('hex');
     const received = signature.replace(/^sha256=/, '');

@@ -3,6 +3,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
 import { Sentry } from '../lib/sentry.js';
+import { env } from '../config/env.js';
 
 type AnyError = Error & {
   statusCode?: number;
@@ -35,8 +36,7 @@ const errorHandlerPlugin: FastifyPluginAsync = async (app) => {
       if (err.code === 'P2002') {
         return rep.code(409).send({
           error: 'Conflict',
-          message: 'Unique constraint violation',
-          fields: err.meta?.target,
+          message: 'A record with this identifier already exists',
         });
       }
     }
@@ -61,7 +61,7 @@ const errorHandlerPlugin: FastifyPluginAsync = async (app) => {
     });
     return rep.code(500).send({
       error: 'InternalServerError',
-      message: process.env.NODE_ENV === 'production' ? 'Something went wrong' : e.message,
+      message: env.NODE_ENV === 'production' ? 'Something went wrong' : e.message,
     });
   });
 };
