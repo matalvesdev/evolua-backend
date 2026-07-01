@@ -13,47 +13,19 @@ import {
   jsonSchemaTransform,
 } from 'fastify-type-provider-zod';
 
-import teleconsultaRoutes from './modules/teleconsulta/teleconsulta.routes.js';
 import { env } from './config/env.js';
 import authPlugin from './plugins/auth.js';
 import errorHandler from './plugins/error-handler.js';
 import requestIdPlugin from './plugins/request-id.js';
 import metricsPlugin from './plugins/metrics.js';
+
+// Critical modules — synchronous imports (loaded at startup)
 import healthRoutes from './modules/health/health.routes.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import patientsRoutes from './modules/patients/patients.routes.js';
 import appointmentsRoutes from './modules/appointments/appointments.routes.js';
-import reportsRoutes from './modules/reports/reports.routes.js';
-import tasksRoutes from './modules/tasks/tasks.routes.js';
-import financesRoutes from './modules/finances/finances.routes.js';
-import notificationsRoutes from './modules/notifications/notifications.routes.js';
-import treatmentPlansRoutes from './modules/treatment-plans/treatment-plans.routes.js';
-import patientGoalsRoutes from './modules/patient-goals/patient-goals.routes.js';
-import clinicalProtocolsRoutes from './modules/clinical-protocols/clinical-protocols.routes.js';
-import exercisesRoutes from './modules/exercises/exercises.routes.js';
 import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
-import patientPortalRoutes from './modules/patient-portal/patient-portal.routes.js';
-import messagesRoutes from './modules/messages/messages.routes.js';
-import audioRoutes from './modules/audio/audio.routes.js';
-import aiRoutes from './modules/ai/ai.routes.js';
-import waCrmRoutes from './modules/wa-crm/wa-crm.routes.js';
-import consentRoutes from './modules/consent/consent.routes.js';
-import caaRoutes from './modules/caa/caa.routes.js';
-import materialsRoutes from './modules/materials/materials.routes.js';
 import { billingRoutes, billingWebhookRoutes } from './modules/billing/billing.routes.js';
-import authHooksRoutes from './modules/auth-hooks/auth-hooks.routes.js';
-import emailRoutes from './modules/email/email.routes.js';
-import newsletterRoutes from './modules/newsletter/newsletter.routes.js';
-import contactRoutes from './modules/contact/contact.routes.js';
-import onboardingRoutes from './modules/onboarding/onboarding.routes.js';
-import leadsRoutes from './modules/leads/leads.routes.js';
-import documentsRoutes from './modules/documents/documents.routes.js';
-import settingsRoutes from './modules/settings/settings.routes.js';
-import schedulerPlugin from './modules/scheduler/index.js';
-import articlesRoutes from './modules/articles/articles.routes.js';
-import blogRoutes from './modules/blog/blog.routes.js';
-import documentTemplatesRoutes from './modules/document-templates/document-templates.routes.js';
-import clinicalScalesRoutes from './modules/clinical-scales/clinical-scales.routes.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -152,46 +124,15 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(authPlugin);
   await app.register(errorHandler);
 
-  // Routes
+  // Critical routes — synchronous registration
   await app.register(healthRoutes);
   await app.register(authRoutes, { prefix: '/api/auth' });
   await app.register(patientsRoutes, { prefix: '/api/patients' });
   await app.register(appointmentsRoutes, { prefix: '/api/appointments' });
-  await app.register(reportsRoutes, { prefix: '/api/reports' });
-  await app.register(tasksRoutes, { prefix: '/api/tasks' });
-  await app.register(financesRoutes, { prefix: '/api/finances' });
-  await app.register(notificationsRoutes, { prefix: '/api/notifications' });
-  await app.register(treatmentPlansRoutes, { prefix: '/api/treatment-plans' });
-  await app.register(patientGoalsRoutes, { prefix: '/api/goals' });
-  await app.register(clinicalProtocolsRoutes, { prefix: '/api/clinical-protocols' });
-  await app.register(exercisesRoutes, { prefix: '/api/exercises' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
-  await app.register(patientPortalRoutes, { prefix: '/api/portal' });
-  await app.register(messagesRoutes, { prefix: '/api/messages' });
-  await app.register(audioRoutes, { prefix: '/api/audio' });
-  await app.register(aiRoutes, { prefix: '/api/ai' });
-  await app.register(waCrmRoutes, { prefix: '/api/wa-crm' });
-  await app.register(consentRoutes, { prefix: '/api/consent' });
-  await app.register(caaRoutes, { prefix: '/api/caa' });
-  await app.register(materialsRoutes, { prefix: '/api/materials' });
   await app.register(billingRoutes, { prefix: '/api/billing' });
-  await app.register(emailRoutes, { prefix: '/api/email' });
-  await app.register(newsletterRoutes, { prefix: '/api/newsletter' });
-  await app.register(contactRoutes, { prefix: '/api/contact' });
-  await app.register(documentsRoutes, { prefix: '/api/documents' });
-  await app.register(settingsRoutes, { prefix: '/api/settings' });
-  await app.register(articlesRoutes, { prefix: '/api/articles' });
-  await app.register(blogRoutes, { prefix: '/api/blog' });
-  await app.register(documentTemplatesRoutes, { prefix: '/api/document-templates' });
-  await app.register(clinicalScalesRoutes, { prefix: '/api/clinical-scales' });
-  await app.register(onboardingRoutes, { prefix: '/api/onboarding' });
-  await app.register(leadsRoutes, { prefix: '/api/leads' });
-  await app.register(teleconsultaRoutes, { prefix: '/api/teleconsulta' });
 
-  // Scheduler — background job para lembretes de consulta
-  await app.register(schedulerPlugin);
-
-  // Webhooks & Auth Hooks — contexto encapsulado com parser raw-string para validar HMAC.
+  // Billing webhooks — contexto encapsulado com parser raw-string para validar HMAC.
   // O parser só vale dentro deste escopo; demais rotas continuam recebendo JSON parseado.
   await app.register(async (instance) => {
     instance.addContentTypeParser(
@@ -200,8 +141,48 @@ export async function buildApp(): Promise<FastifyInstance> {
       (_req, body, done) => done(null, body),
     );
     await instance.register(billingWebhookRoutes);
-    await instance.register(authHooksRoutes);
   }, { prefix: '/hooks' });
+
+  // Non-critical modules — lazy-loaded after startup via dynamic imports
+  // This reduces cold start time by deferring ~30 route modules
+  app.addHook('onReady', async () => {
+    const lazyModules = [
+      { import: () => import('./modules/reports/reports.routes.js'), prefix: '/api/reports' },
+      { import: () => import('./modules/tasks/tasks.routes.js'), prefix: '/api/tasks' },
+      { import: () => import('./modules/finances/finances.routes.js'), prefix: '/api/finances' },
+      { import: () => import('./modules/notifications/notifications.routes.js'), prefix: '/api/notifications' },
+      { import: () => import('./modules/treatment-plans/treatment-plans.routes.js'), prefix: '/api/treatment-plans' },
+      { import: () => import('./modules/patient-goals/patient-goals.routes.js'), prefix: '/api/goals' },
+      { import: () => import('./modules/clinical-protocols/clinical-protocols.routes.js'), prefix: '/api/clinical-protocols' },
+      { import: () => import('./modules/exercises/exercises.routes.js'), prefix: '/api/exercises' },
+      { import: () => import('./modules/patient-portal/patient-portal.routes.js'), prefix: '/api/portal' },
+      { import: () => import('./modules/messages/messages.routes.js'), prefix: '/api/messages' },
+      { import: () => import('./modules/audio/audio.routes.js'), prefix: '/api/audio' },
+      { import: () => import('./modules/ai/ai.routes.js'), prefix: '/api/ai' },
+      { import: () => import('./modules/wa-crm/wa-crm.routes.js'), prefix: '/api/wa-crm' },
+      { import: () => import('./modules/consent/consent.routes.js'), prefix: '/api/consent' },
+      { import: () => import('./modules/caa/caa.routes.js'), prefix: '/api/caa' },
+      { import: () => import('./modules/materials/materials.routes.js'), prefix: '/api/materials' },
+      { import: () => import('./modules/auth-hooks/auth-hooks.routes.js'), prefix: '/hooks' },
+      { import: () => import('./modules/email/email.routes.js'), prefix: '/api/email' },
+      { import: () => import('./modules/newsletter/newsletter.routes.js'), prefix: '/api/newsletter' },
+      { import: () => import('./modules/contact/contact.routes.js'), prefix: '/api/contact' },
+      { import: () => import('./modules/onboarding/onboarding.routes.js'), prefix: '/api/onboarding' },
+      { import: () => import('./modules/leads/leads.routes.js'), prefix: '/api/leads' },
+      { import: () => import('./modules/documents/documents.routes.js'), prefix: '/api/documents' },
+      { import: () => import('./modules/settings/settings.routes.js'), prefix: '/api/settings' },
+      { import: () => import('./modules/scheduler/index.js'), prefix: '/api/scheduler' },
+      { import: () => import('./modules/articles/articles.routes.js'), prefix: '/api/articles' },
+      { import: () => import('./modules/blog/blog.routes.js'), prefix: '/api/blog' },
+      { import: () => import('./modules/document-templates/document-templates.routes.js'), prefix: '/api/document-templates' },
+      { import: () => import('./modules/clinical-scales/clinical-scales.routes.js'), prefix: '/api/clinical-scales' },
+      { import: () => import('./modules/teleconsulta/teleconsulta.routes.js'), prefix: '/api/teleconsulta' },
+    ];
+    for (const mod of lazyModules) {
+      const m = await mod.import();
+      await app.register(m.default, { prefix: mod.prefix });
+    }
+  });
 
   return app;
 }
