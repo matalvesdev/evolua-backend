@@ -9,6 +9,7 @@ const bodySchema = z.object({
   cidade: z.string().optional(),
   pacientesMes: z.string().optional(),
   comoConheceu: z.string().optional(),
+  magnetId: z.string().optional(),
 });
 
 const leadsRoutes: FastifyPluginAsync = async (app) => {

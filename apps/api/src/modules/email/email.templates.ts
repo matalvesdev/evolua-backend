@@ -171,10 +171,10 @@ export function newsletterConfirmation(email: string, confirmLink: string): { su
   return { subject: 'Confirme sua inscrição na newsletter — Evolua', html: baseHtml(body) };
 }
 
-export function leadMagnetDelivery(email: string, magnetTitle: string, downloadLink: string): { subject: string; html: string } {
+export function leadMagnetDelivery(recipientName: string, magnetTitle: string, downloadLink: string): { subject: string; html: string } {
   const body = `
     <h2 style="margin:0 0 16px;font-size:20px;color:#1E1E2C">Seu material está pronto!</h2>
-    <p style="margin:0 0 16px">Olá <strong>${email}</strong>,</p>
+    <p style="margin:0 0 16px">Olá <strong>${recipientName}</strong>,</p>
     <p style="margin:0 0 16px">Conforme solicitado, o material <strong>"${magnetTitle}"</strong> já está disponível para download.</p>
     ${ctaButton(downloadLink, 'Baixar material')}
     <p style="margin:16px 0 0;font-size:14px;color:#8a8aa0">

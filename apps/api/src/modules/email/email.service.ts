@@ -61,8 +61,8 @@ export class EmailService {
     return this.notifica.sendEmail({ to, subject, html });
   }
 
-  async sendLeadMagnetDelivery(to: string, email: string, magnetTitle: string, downloadLink: string): Promise<{ success: boolean; error?: string }> {
-    const { subject, html } = leadMagnetDelivery(email, magnetTitle, downloadLink);
+  async sendLeadMagnetDelivery(to: string, recipientName: string, magnetTitle: string, downloadLink: string): Promise<{ success: boolean; error?: string }> {
+    const { subject, html } = leadMagnetDelivery(recipientName, magnetTitle, downloadLink);
     logger.info({ to, template: 'leadMagnetDelivery' }, 'Sending lead magnet delivery');
     return this.notifica.sendEmail({ to, subject, html });
   }

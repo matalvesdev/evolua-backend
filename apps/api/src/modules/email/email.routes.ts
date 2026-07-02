@@ -5,6 +5,7 @@ import { emailService } from './email.service.js';
 import { env } from '../../config/env.js';
 
 const LEAD_MAGNETS: Record<string, { title: string }> = {
+  'ebook-whatsapp-profissional': { title: 'E-book: WhatsApp Profissional para Fonoaudiólogas' },
   'ebook-tendencias': { title: 'E-book: Tendências em Fonoaudiologia 2026' },
   'ebook-protocolos': { title: 'E-book: Guia de Protocolos Clínicos' },
   'ebook-mkt-digital-fono': { title: 'E-book: Marketing Digital para Fonoaudiólogas' },
@@ -24,6 +25,7 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
       body: z.object({
         email: z.string().email('Email inválido'),
         magnetId: z.string().min(1).max(100),
+        nome: z.string().optional(),
       }),
       response: {
         200: z.object({ success: z.literal(true) }),
@@ -31,7 +33,7 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
       },
     },
   }, async (req, rep) => {
-    const { email, magnetId } = req.body;
+    const { email, magnetId, nome } = req.body;
     req.log.info({ email, magnetId }, 'lead magnet download requested');
 
     const magnet = LEAD_MAGNETS[magnetId];
@@ -40,7 +42,8 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
     const landingUrl = env.LANDING_URL.replace(/\/$/, '');
     const downloadLink = `${landingUrl}/materiais/${magnetId}`;
 
-    const result = await emailService.sendLeadMagnetDelivery(email, email, title, downloadLink);
+    const recipientName = nome || email;
+    const result = await emailService.sendLeadMagnetDelivery(email, recipientName, title, downloadLink);
     if (!result.success) {
       req.log.error({ email, magnetId, error: result.error }, 'lead magnet delivery email failed');
       return rep.code(500).send({ error: 'SendFailed', message: 'Falha ao enviar email' });
