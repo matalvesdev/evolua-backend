@@ -10,6 +10,7 @@ Documentação: https://huggingface.co/docs/inference-providers/index
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -56,12 +57,9 @@ class HuggingFaceClient:
         max_tokens: int = 800,
         temperature: float = 0.2,
         timeout: float = 60.0,
+        retries: int = 2,
     ) -> str:
-        """Chama /v1/chat/completions no provider configurado.
-
-        Retorna apenas o texto da primeira escolha. Levanta HuggingFaceError
-        em falha. Compatível com modelos de chat instruct (Llama 3.x, Qwen, etc.).
-        """
+        """Chama /v1/chat/completions com retry em falhas transitórias."""
         if not self._api_key:
             raise HuggingFaceError("HUGGINGFACE_API_KEY não configurada")
 
@@ -78,23 +76,39 @@ class HuggingFaceClient:
             "Content-Type": "application/json",
         }
 
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            r = await client.post(url, json=payload, headers=headers)
+        last_error = None
+        for attempt in range(retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    r = await client.post(url, json=payload, headers=headers)
 
-        if r.status_code == 503:
-            raise HuggingFaceModelLoading(f"Modelo carregando: {r.text[:200]}")
-        if r.status_code >= 400:
-            raise HuggingFaceError(f"HF chat {r.status_code}: {r.text[:300]}")
+                if r.status_code == 503:
+                    raise HuggingFaceModelLoading(f"Modelo carregando: {r.text[:200]}")
+                if r.status_code >= 500 and attempt < retries:
+                    logger.warning("HF chat %d (attempt %d/%d), retrying...", r.status_code, attempt + 1, retries + 1)
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                if r.status_code >= 400:
+                    raise HuggingFaceError(f"HF chat {r.status_code}: {r.text[:300]}")
 
-        data: dict[str, Any] = r.json()
-        choices = data.get("choices") or []
-        if not choices:
-            raise HuggingFaceError(f"HF chat retornou sem choices: {data}")
-        message = choices[0].get("message") or {}
-        content = message.get("content")
-        if not isinstance(content, str):
-            raise HuggingFaceError(f"HF chat sem content: {choices[0]}")
-        return content.strip()
+                data: dict[str, Any] = r.json()
+                choices = data.get("choices") or []
+                if not choices:
+                    raise HuggingFaceError(f"HF chat retornou sem choices: {data}")
+                message = choices[0].get("message") or {}
+                content = message.get("content")
+                if not isinstance(content, str):
+                    raise HuggingFaceError(f"HF chat sem content: {choices[0]}")
+                return content.strip()
+            except (httpx.HTTPError, httpx.TimeoutException) as e:
+                last_error = e
+                if attempt < retries:
+                    logger.warning("HF chat network error (attempt %d/%d): %s", attempt + 1, retries + 1, e)
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                raise HuggingFaceError(f"HF chat network error: {e}") from e
+
+        raise HuggingFaceError(f"HF chat failed after {retries + 1} attempts: {last_error}")
 
     # ── Embeddings ─────────────────────────────────────────────────────
 

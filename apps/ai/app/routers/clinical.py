@@ -306,11 +306,13 @@ async def generate_report(
 
     schema_keys = ", ".join(f'"{sid}"' for sid, _ in sections_def)
     system = (
-        "Você é um terapeuta clínico redigindo um relatório formal em português do Brasil, "
-        "baseado exclusivamente na transcrição fornecida. Use linguagem profissional, "
-        "objetiva e respeitosa. NÃO invente informações ausentes do transcript — quando "
-        f"faltar dado, escreva 'Não informado'. Responda em JSON com as chaves: {schema_keys}. "
-        "Cada valor deve ser um parágrafo de texto claro, sem markdown."
+        "Você é um fonoaudiólogo experiente redigindo um relatório clínico formal em português do Brasil. "
+        "Baseie-se EXCLUSIVAMENTE na transcrição fornecida. Use linguagem profissional, objetiva e "
+        "respeitosa. NUNCA invente informações ausentes — quando faltar dado, escreva 'Não informado'. "
+        f"O relatório deve seguir o modelo '{req.template}' com as seções especificadas. "
+        f"Cada seção deve ser um parágrafo claro e bem estruturado, com minimum 2 frases. "
+        f"Responda APENAS em JSON válido com as chaves especificadas: {schema_keys}. "
+        "Responda APENAS em JSON válido com as chaves especificadas, sem texto adicional."
     )
     user = (
         f"Paciente: {req.patient_name or 'Não informado'}\n"
@@ -318,10 +320,13 @@ async def generate_report(
         f"TRANSCRIÇÃO:\n{req.transcription}"
     )
 
+    logger.info("Generating report: template=%s, patient=%s, transcription_len=%d",
+                req.template, req.patient_name or 'unknown', len(req.transcription))
+
     try:
         raw = await hf_client.chat(
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            max_tokens=1400,
+            max_tokens=2000,
             temperature=0.2,
         )
     except HuggingFaceModelLoading as e:
@@ -339,6 +344,7 @@ async def generate_report(
         )
         for sid, label in sections_def
     ]
+    logger.info("Report generated: sections=%d, success=%s", len(sections), True)
     return GenerateReportResponse(success=True, sections=sections)
 
 
@@ -416,20 +422,37 @@ async def transcribe_audio(
 
 def _safe_json(raw: str) -> dict | None:
     """Tenta decodificar JSON, lidando com possíveis cercas markdown do LLM."""
+    if not raw or not raw.strip():
+        return None
+
     candidate = raw.strip()
+
+    # Remove cerca markdown
     if candidate.startswith("```"):
-        # Remove cerca: ```json\n...\n``` ou ```\n...\n```
-        candidate = candidate.split("```", 2)[1]
-        if candidate.startswith("json"):
-            candidate = candidate[4:]
-        candidate = candidate.strip("`\n ")
-    # Localiza primeira chave '{' e última '}' caso o LLM tenha adicionado prólogo.
+        lines = candidate.split("\n")
+        # Remove first and last lines (``` markers)
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        candidate = "\n".join(lines).strip()
+
+    # Localiza primeira chave '{' e última '}'
     start = candidate.find("{")
     end = candidate.rfind("}")
     if start >= 0 and end > start:
         candidate = candidate[start : end + 1]
+
     try:
         return json.loads(candidate)
+    except json.JSONDecodeError:
+        pass
+
+    # Fallback: tenta limpar caracteres problemáticos
+    try:
+        import re
+        cleaned = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', ' ', candidate)
+        return json.loads(cleaned)
     except json.JSONDecodeError as e:
-        logger.warning("JSON parse failed: %s | raw=%s", e, raw[:200])
+        logger.warning("JSON parse failed after cleanup: %s | raw=%s", e, raw[:200])
         return None
