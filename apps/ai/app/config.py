@@ -29,6 +29,12 @@ class Settings(BaseSettings):
 
     database_url: str
 
+    # OpenRouter (AI content generation — ebooks, infográficos, materiais)
+    openrouter_api_key: str = ""
+    openrouter_default_model: str = "openai/gpt-4o"
+    openrouter_site_url: str = "https://useevolua.com.br"
+    openrouter_site_name: str = "Evolua"
+
     otel_enabled: bool = False
 
     # Sentry (opcional). Em produção é recomendado para captura de exceções.

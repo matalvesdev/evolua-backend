@@ -25,6 +25,7 @@ import authRoutes from './modules/auth/auth.routes.js';
 import patientsRoutes from './modules/patients/patients.routes.js';
 import appointmentsRoutes from './modules/appointments/appointments.routes.js';
 import dashboardRoutes from './modules/dashboard/dashboard.routes.js';
+import dashboardHomeRoutes from './modules/dashboard/dashboard-home.routes.js';
 import { billingRoutes, billingWebhookRoutes } from './modules/billing/billing.routes.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -130,6 +131,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(patientsRoutes, { prefix: '/api/patients' });
   await app.register(appointmentsRoutes, { prefix: '/api/appointments' });
   await app.register(dashboardRoutes, { prefix: '/api/dashboard' });
+  await app.register(dashboardHomeRoutes, { prefix: '/api/dashboard' });
   await app.register(billingRoutes, { prefix: '/api/billing' });
 
   // Billing webhooks — contexto encapsulado com parser raw-string para validar HMAC.

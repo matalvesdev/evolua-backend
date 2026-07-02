@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import clinical, library, library_ingest
+from .routers import clinical, library, library_ingest, content_generation
 from .sentry_init import init_sentry
 
 # Sentry deve ser inicializado o mais cedo possível, antes do FastAPI.
@@ -70,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(library.router)
     app.include_router(library_ingest.router)
     app.include_router(clinical.router)
+    app.include_router(content_generation.router)
 
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict[str, str]:
