@@ -31,6 +31,14 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "ASYNC"]
+ignore = [
+    "E501",     # Black/Ruff formatter does not split long strings or SQL literals.
+    "ASYNC109", # Public client timeout parameters configure httpx request timeouts.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"app/routers/*.py" = ["B008"] # FastAPI dependency/file declarations require call defaults.
+"app/routers/clinical.py" = ["N815"] # CamelCase fields are an existing frontend JSON contract.
 
 [tool.mypy]
 python_version = "3.11"

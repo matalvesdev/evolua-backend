@@ -122,12 +122,13 @@ export class AudioService {
   async getTranscription(
     clinicId: string,
     id: string,
-  ): Promise<{ transcription: string; transcriptionStatus: string } | null> {
+  ): Promise<{ transcription: string; transcriptionStatus: string; transcriptionError: string | null } | null> {
     const s = await this.findOne(clinicId, id);
     if (!s) return null;
     return {
       transcription: s.transcription ?? '',
       transcriptionStatus: s.transcriptionStatus ?? 'pending',
+      transcriptionError: s.transcriptionError,
     };
   }
 

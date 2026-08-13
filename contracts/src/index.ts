@@ -21,3 +21,4 @@ export * from './clinical-scale.js';
 export * from './document.js';
 export * from './consent.js';
 export * from './teleconsulta.js';
+export * from './medical-record.js';

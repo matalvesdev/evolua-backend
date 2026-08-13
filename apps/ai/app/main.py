@@ -1,14 +1,15 @@
 """Bootstrap do serviço AI (FastAPI)."""
+
 import logging
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import clinical, library, library_ingest, content_generation
+from .routers import clinical, content_generation, library, library_ingest
 from .sentry_init import init_sentry
 
 # Sentry deve ser inicializado o mais cedo possível, antes do FastAPI.

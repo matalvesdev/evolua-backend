@@ -1,4 +1,5 @@
 """Geração clínica: evolução pós-sessão, materiais, transcrição e relatórios."""
+
 from __future__ import annotations
 
 import json
@@ -11,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..deps import get_user_id, verify_internal_token
-from ..hf_client import HuggingFaceError, HuggingFaceModelLoading, hf_client
+from ..hf_client import HuggingFaceError, HuggingFaceModelLoadingError, hf_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/clinical", tags=["clinical-ai"])
@@ -75,7 +76,7 @@ async def generate_evolution(
 
     try:
         raw = await hf_client.chat(messages, max_tokens=900, temperature=0.2)
-    except HuggingFaceModelLoading as e:
+    except HuggingFaceModelLoadingError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except HuggingFaceError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
@@ -93,7 +94,9 @@ async def generate_evolution(
             "plan": str(soap.get("plan", "")),
         },
         summary=str(parsed.get("summary", "")),
-        next_session_suggestions=[str(s) for s in (parsed.get("next_session_suggestions") or [])][:5],
+        next_session_suggestions=[str(s) for s in (parsed.get("next_session_suggestions") or [])][
+            :5
+        ],
     )
 
 
@@ -101,8 +104,15 @@ async def generate_evolution(
 
 
 TherapyArea = Literal[
-    "linguagem", "fala", "fluencia", "voz",
-    "degluticao", "fonologia", "mof", "tea", "caa",
+    "linguagem",
+    "fala",
+    "fluencia",
+    "voz",
+    "degluticao",
+    "fonologia",
+    "mof",
+    "tea",
+    "caa",
 ]
 MaterialFormat = Literal["atividade", "brincadeira", "jogo", "historia", "exercicio", "roteiro"]
 AgeGroup = Literal["bebe", "infantil", "escolar", "adolescente", "adulto"]
@@ -209,15 +219,14 @@ async def generate_material(
 
     try:
         raw = await hf_client.chat(messages, max_tokens=1100, temperature=0.5)
-    except HuggingFaceModelLoading as e:
+    except HuggingFaceModelLoadingError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except HuggingFaceError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
 
     parsed = _safe_json(raw) or {}
     title = str(parsed.get("title") or "").strip() or (
-        f"{FORMAT_LABELS.get(req.format, req.format)} de "
-        f"{AREA_LABELS.get(req.area, req.area)}"
+        f"{FORMAT_LABELS.get(req.format, req.format)} de {AREA_LABELS.get(req.area, req.area)}"
     )
     return GeneratedMaterial(
         title=title[:120],
@@ -320,8 +329,12 @@ async def generate_report(
         f"TRANSCRIÇÃO:\n{req.transcription}"
     )
 
-    logger.info("Generating report: template=%s, patient=%s, transcription_len=%d",
-                req.template, req.patient_name or 'unknown', len(req.transcription))
+    logger.info(
+        "Generating report: template=%s, patient=%s, transcription_len=%d",
+        req.template,
+        req.patient_name or "unknown",
+        len(req.transcription),
+    )
 
     try:
         raw = await hf_client.chat(
@@ -329,7 +342,7 @@ async def generate_report(
             max_tokens=2000,
             temperature=0.2,
         )
-    except HuggingFaceModelLoading as e:
+    except HuggingFaceModelLoadingError as e:
         return GenerateReportResponse(success=False, error=str(e))
     except HuggingFaceError as e:
         return GenerateReportResponse(success=False, error=str(e))
@@ -370,7 +383,8 @@ def _is_allowed_audio_url(url: str) -> bool:
         parsed = urlparse(url)
         if parsed.scheme != "https" or not parsed.hostname:
             return False
-        return any(parsed.hostname.endswith(h) for h in _ALLOWED_AUDIO_HOSTS)
+        hostname = parsed.hostname.lower()
+        return any(hostname == host or hostname.endswith(f".{host}") for host in _ALLOWED_AUDIO_HOSTS)
     except ValueError:
         return False
 
@@ -404,12 +418,17 @@ async def transcribe_audio(
 
     audio_bytes = audio_resp.content
     content_type = audio_resp.headers.get("content-type", "audio/webm")
-    logger.info("Transcribing %d bytes (%s) for session %s", len(audio_bytes), content_type, req.audio_session_id)
+    logger.info(
+        "Transcribing %d bytes (%s) for session %s",
+        len(audio_bytes),
+        content_type,
+        req.audio_session_id,
+    )
 
     # 2. Envia ao Whisper.
     try:
         text = await hf_client.transcribe(audio_bytes, content_type=content_type)
-    except HuggingFaceModelLoading as e:
+    except HuggingFaceModelLoadingError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except HuggingFaceError as e:
         raise HTTPException(status_code=502, detail=str(e)) from e
@@ -451,7 +470,8 @@ def _safe_json(raw: str) -> dict | None:
     # Fallback: tenta limpar caracteres problemáticos
     try:
         import re
-        cleaned = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', ' ', candidate)
+
+        cleaned = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", " ", candidate)
         return json.loads(cleaned)
     except json.JSONDecodeError as e:
         logger.warning("JSON parse failed after cleanup: %s | raw=%s", e, raw[:200])

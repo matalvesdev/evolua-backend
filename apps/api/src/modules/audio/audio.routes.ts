@@ -88,7 +88,11 @@ const audioRoutes: FastifyPluginAsync = async (app) => {
         tags: ['audio'],
         params: z.object({ id: UuidSchema }),
         response: {
-          200: z.object({ transcription: z.string(), transcriptionStatus: z.string() }),
+          200: z.object({
+            transcription: z.string(),
+            transcriptionStatus: z.string(),
+            transcriptionError: z.string().nullable(),
+          }),
           404: ErrorResponseSchema,
         },
       },

@@ -8,6 +8,7 @@ Cobre três usos:
 
 Documentação: https://huggingface.co/docs/inference-providers/index
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -25,7 +26,7 @@ class HuggingFaceError(RuntimeError):
     """Erro inesperado da HuggingFace Inference API."""
 
 
-class HuggingFaceModelLoading(HuggingFaceError):
+class HuggingFaceModelLoadingError(HuggingFaceError):
     """503 — modelo aquecendo. Caller deve tentar novamente."""
 
 
@@ -83,10 +84,15 @@ class HuggingFaceClient:
                     r = await client.post(url, json=payload, headers=headers)
 
                 if r.status_code == 503:
-                    raise HuggingFaceModelLoading(f"Modelo carregando: {r.text[:200]}")
+                    raise HuggingFaceModelLoadingError(f"Modelo carregando: {r.text[:200]}")
                 if r.status_code >= 500 and attempt < retries:
-                    logger.warning("HF chat %d (attempt %d/%d), retrying...", r.status_code, attempt + 1, retries + 1)
-                    await asyncio.sleep(2 ** attempt)
+                    logger.warning(
+                        "HF chat %d (attempt %d/%d), retrying...",
+                        r.status_code,
+                        attempt + 1,
+                        retries + 1,
+                    )
+                    await asyncio.sleep(2**attempt)
                     continue
                 if r.status_code >= 400:
                     raise HuggingFaceError(f"HF chat {r.status_code}: {r.text[:300]}")
@@ -103,8 +109,10 @@ class HuggingFaceClient:
             except (httpx.HTTPError, httpx.TimeoutException) as e:
                 last_error = e
                 if attempt < retries:
-                    logger.warning("HF chat network error (attempt %d/%d): %s", attempt + 1, retries + 1, e)
-                    await asyncio.sleep(2 ** attempt)
+                    logger.warning(
+                        "HF chat network error (attempt %d/%d): %s", attempt + 1, retries + 1, e
+                    )
+                    await asyncio.sleep(2**attempt)
                     continue
                 raise HuggingFaceError(f"HF chat network error: {e}") from e
 
@@ -132,7 +140,7 @@ class HuggingFaceClient:
             r = await client.post(url, json=payload, headers=headers)
 
         if r.status_code == 503:
-            raise HuggingFaceModelLoading(f"Embedding model carregando: {r.text[:200]}")
+            raise HuggingFaceModelLoadingError(f"Embedding model carregando: {r.text[:200]}")
         if r.status_code >= 400:
             raise HuggingFaceError(f"HF embed {r.status_code}: {r.text[:300]}")
 
@@ -141,10 +149,22 @@ class HuggingFaceClient:
         if isinstance(out, list) and out and isinstance(out[0], (int, float)):
             return [out]  # type: ignore[list-item]
         # Sentence-level: list[list[float]]
-        if isinstance(out, list) and out and isinstance(out[0], list) and out[0] and isinstance(out[0][0], (int, float)):
+        if (
+            isinstance(out, list)
+            and out
+            and isinstance(out[0], list)
+            and out[0]
+            and isinstance(out[0][0], (int, float))
+        ):
             return out  # type: ignore[return-value]
         # Token-level: list[list[list[float]]] — média manual.
-        if isinstance(out, list) and out and isinstance(out[0], list) and out[0] and isinstance(out[0][0], list):
+        if (
+            isinstance(out, list)
+            and out
+            and isinstance(out[0], list)
+            and out[0]
+            and isinstance(out[0][0], list)
+        ):
             return [_mean_pool(seq) for seq in out]  # type: ignore[arg-type]
         raise HuggingFaceError(f"Formato de embedding inesperado: {type(out)}")
 
@@ -171,7 +191,7 @@ class HuggingFaceClient:
             r = await client.post(url, headers=headers, content=audio_bytes)
 
         if r.status_code == 503:
-            raise HuggingFaceModelLoading(
+            raise HuggingFaceModelLoadingError(
                 "Modelo de transcrição está carregando. Tente novamente em alguns segundos."
             )
         if r.status_code >= 400:

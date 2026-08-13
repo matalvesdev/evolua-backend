@@ -138,10 +138,23 @@ export const billingWebhookRoutes: FastifyPluginAsync = async (app) => {
       req.log.warn({ err: parseErr }, 'webhook abacatepay payload inválido');
       return reply.code(400).send({ error: 'invalid payload' });
     }
+    const nestedEvent = typeof evt.event === 'object' && evt.event !== null
+      ? evt.event as Record<string, unknown>
+      : undefined;
+    const externalId = typeof evt.id === 'string'
+      ? evt.id
+      : typeof nestedEvent?.id === 'string' ? nestedEvent.id : undefined;
+    const eventType = typeof evt.event === 'string'
+      ? evt.event
+      : typeof evt.type === 'string' ? evt.type : undefined;
+    if (!externalId || !eventType) {
+      req.log.warn('webhook abacatepay sem id ou tipo');
+      return reply.code(400).send({ error: 'invalid payload' });
+    }
     return billingService.processWebhook({
       provider: 'abacatepay',
-      externalId: evt.id ?? (evt.event as Record<string, unknown>)?.id as string,
-      type: evt.event as string ?? evt.type as string,
+      externalId,
+      type: eventType,
       payload: evt,
     });
   });

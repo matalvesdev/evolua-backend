@@ -4,10 +4,9 @@ import json
 import logging
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from ..config import get_settings
 from ..deps import verify_internal_token
 from ..openrouter_client import openrouter_client
 
@@ -117,7 +116,7 @@ async def generate_content(
 
 Publico-alvo: {req.target_audience}
 Tom: {req.tone}
-Palavras-chave: {', '.join(req.keywords) if req.keywords else 'nenhuma'}
+Palavras-chave: {", ".join(req.keywords) if req.keywords else "nenhuma"}
 
 Responda APENAS com o JSON, sem markdown, sem comentarios."""
 
@@ -131,7 +130,7 @@ Responda APENAS com o JSON, sem markdown, sem comentarios."""
             temperature=0.7,
         )
     except Exception as e:
-        raise HTTPException(502, f"OpenRouter falhou: {e}")
+        raise HTTPException(502, f"OpenRouter falhou: {e}") from e
 
     raw_clean = raw.strip()
     if raw_clean.startswith("```"):
@@ -143,7 +142,9 @@ Responda APENAS com o JSON, sem markdown, sem comentarios."""
     try:
         content = json.loads(raw_clean)
     except json.JSONDecodeError as e:
-        raise HTTPException(502, f"Resposta JSON invalida do modelo: {e}. Resposta: {raw_clean[:500]}")
+        raise HTTPException(
+            502, f"Resposta JSON invalida do modelo: {e}. Resposta: {raw_clean[:500]}"
+        ) from e
 
     return ContentResponse(
         format=req.format,

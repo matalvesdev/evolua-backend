@@ -1,4 +1,5 @@
 """Configuração do serviço AI."""
+
 from functools import lru_cache
 from typing import Literal
 

@@ -1,0 +1,2 @@
+{"id":"rag-001","query":"qual documento descreve a escala grbas","relevant_doc_ids":["escala-grbas"],"retrieved_doc_ids":["escala-grbas","protocolo-voz","guia-geral"]}
+{"id":"rag-002","query":"onde estão as regras de consentimento lgpd","relevant_doc_ids":["politica-consentimento"],"retrieved_doc_ids":["politica-consentimento","seguranca","retencao"]}

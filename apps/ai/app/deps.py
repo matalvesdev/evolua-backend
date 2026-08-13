@@ -1,4 +1,5 @@
 """Dependências FastAPI: autenticação interna entre serviços."""
+
 from fastapi import Header, HTTPException, status
 
 from .config import get_settings

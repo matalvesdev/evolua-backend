@@ -11,6 +11,7 @@ Estratégia atual:
 A geração usa HuggingFace chat completion (provider hf-inference) com prompt
 de sistema fortemente instrucional para citar fontes quando houver.
 """
+
 from __future__ import annotations
 
 import logging
@@ -25,7 +26,7 @@ from pydantic import BaseModel, Field
 
 from ..config import get_settings
 from ..deps import get_user_id, verify_internal_token
-from ..hf_client import HuggingFaceError, HuggingFaceModelLoading, hf_client
+from ..hf_client import HuggingFaceError, HuggingFaceModelLoadingError, hf_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/library", tags=["library-rag"])
@@ -91,14 +92,10 @@ async def _retrieve(query: str, *, top_k: int = 4) -> list[dict[str, Any]]:
 
     # psycopg é síncrono/bloqueante: executa em threadpool para não travar o
     # event loop async do FastAPI.
-    return await run_in_threadpool(
-        _retrieve_sync, settings.database_url, vec_literal, top_k
-    )
+    return await run_in_threadpool(_retrieve_sync, settings.database_url, vec_literal, top_k)
 
 
-def _retrieve_sync(
-    database_url: str, vec_literal: str, top_k: int
-) -> list[dict[str, Any]]:
+def _retrieve_sync(database_url: str, vec_literal: str, top_k: int) -> list[dict[str, Any]]:
     """Query pgvector síncrona (rodar via run_in_threadpool)."""
     sql = """
         SELECT id, source, title, source_url, page, snippet,
@@ -175,7 +172,7 @@ async def chat_with_library(
 
     try:
         answer = await hf_client.chat(messages, max_tokens=900, temperature=0.2)
-    except HuggingFaceModelLoading as e:
+    except HuggingFaceModelLoadingError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     except HuggingFaceError as e:
         logger.error("HF chat failed: %s", e)

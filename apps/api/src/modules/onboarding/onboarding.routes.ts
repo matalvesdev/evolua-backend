@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { onboardingService } from './onboarding.service.js';
 
@@ -9,7 +10,7 @@ const bodySchema = z.object({
 });
 
 const onboardingRoutes: FastifyPluginAsync = async (app) => {
-  const route = app.withTypeProvider<any>();
+  const route = app.withTypeProvider<ZodTypeProvider>();
 
   route.post(
     '/:stepId',

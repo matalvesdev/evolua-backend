@@ -10,6 +10,7 @@ Fluxo:
 A migration `20260601000001_add_library_rag_tables` precisa estar aplicada.
 Quando a tabela não existe, retornamos 503 com instrução clara.
 """
+
 from __future__ import annotations
 
 import io
@@ -31,11 +32,11 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ..config import get_settings
 from ..deps import get_user_id, verify_internal_token
-from ..hf_client import HuggingFaceError, HuggingFaceModelLoading, hf_client
+from ..hf_client import HuggingFaceError, HuggingFaceModelLoadingError, hf_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/library", tags=["library-ingest"])
@@ -174,9 +175,7 @@ def _insert_document_and_chunks(
                     raise HTTPException(500, "Falha ao inserir library_document")
                 doc_id = str(row[0])
 
-                for idx, ((page, snippet), emb) in enumerate(
-                    zip(chunks, embeddings, strict=True)
-                ):
+                for idx, ((page, snippet), emb) in enumerate(zip(chunks, embeddings, strict=True)):
                     cur.execute(
                         sql_chunk,
                         (
@@ -219,18 +218,19 @@ def _validate_source_url(url: str) -> None:
     hostname = (parsed.hostname or "").lower()
 
     # Bloqueia IPs de metadata de cloud providers
-    BLOCKED_HOSTS = (
+    blocked_hosts = (
         "169.254.169.254",
         "metadata.google.internal",
         "metadata.instance.google.internal",
         "100.100.100.200",
         "fd00:ec2::254",
     )
-    if hostname in BLOCKED_HOSTS:
+    if hostname in blocked_hosts:
         raise HTTPException(400, "source_url não permitida (host bloqueado)")
 
     # Bloqueia endereços privados (localhost, LAN)
     import ipaddress
+
     try:
         ip = ipaddress.ip_address(hostname)
         if ip.is_private or ip.is_loopback or ip.is_link_local:
@@ -308,7 +308,7 @@ async def ingest_document(
     snippets = [c[1] for c in chunks]
     try:
         embeddings = await _embed_in_batches(snippets, batch=16)
-    except HuggingFaceModelLoading as e:
+    except HuggingFaceModelLoadingError as e:
         raise HTTPException(503, str(e)) from e
     except HuggingFaceError as e:
         logger.error("HF embed failed: %s", e)
@@ -339,9 +339,7 @@ async def ingest_document(
     )
 
 
-async def _embed_in_batches(
-    texts: list[str], *, batch: int = 16
-) -> list[list[float]]:
+async def _embed_in_batches(texts: list[str], *, batch: int = 16) -> list[list[float]]:
     out: list[list[float]] = []
     for i in range(0, len(texts), batch):
         sub = [f"passage: {t}" for t in texts[i : i + batch]]
@@ -379,7 +377,7 @@ async def list_documents(
         SELECT id, title, source, source_url, author, specialty, language,
                chunk_count, created_at
         FROM library_documents
-        WHERE {' AND '.join(where)}
+        WHERE {" AND ".join(where)}
         ORDER BY created_at DESC
         LIMIT %s OFFSET %s
     """
