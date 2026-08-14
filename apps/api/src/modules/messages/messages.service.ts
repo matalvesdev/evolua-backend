@@ -1,7 +1,7 @@
 import type { Prisma, Message } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
-import { notificaClient } from '../../lib/notifica.js';
+import { emailClient } from '../../lib/email-client.js';
 import { logger } from '../../lib/logger.js';
 import type { CreateMessageInput, ListMessagesQuery } from '@evolua/contracts';
 
@@ -97,7 +97,7 @@ export class MessagesService {
     input: CreateMessageInput,
     messageId: string,
   ): Promise<void> {
-    const result = await notificaClient.sendEmail({
+    const result = await emailClient.sendEmail({
       to: input.recipientEmail!,
       subject: input.subject!,
       html: input.htmlBody ?? `<p>${escapeHtml(input.content)}</p>`,
@@ -107,7 +107,7 @@ export class MessagesService {
     if (!result.success) {
       logger.warn(
         { error: result.error, messageId, patientId: input.patientId },
-        'messages: notifica email dispatch failed',
+        'messages: email dispatch failed',
       );
     }
   }

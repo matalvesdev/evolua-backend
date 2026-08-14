@@ -20,6 +20,7 @@ export class ResendClient {
     subject: string;
     html: string;
     text?: string;
+    idempotencyKey?: string;
   }): Promise<{ success: boolean; error?: string }> {
     if (!env.RESEND_API_KEY) {
       return { success: false, error: 'RESEND_API_KEY not configured' };
@@ -28,7 +29,7 @@ export class ResendClient {
     const from = env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev';
 
     const payload: ResendPayload = {
-      from: `${env.NOTIFICA_FROM_NAME} <${from}>`,
+      from: `${env.RESEND_FROM_NAME} <${from}>`,
       to: params.to,
       subject: params.subject,
       html: params.html,
@@ -41,6 +42,7 @@ export class ResendClient {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          ...(params.idempotencyKey ? { 'Idempotency-Key': params.idempotencyKey } : {}),
         },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(15_000),

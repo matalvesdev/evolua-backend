@@ -69,7 +69,7 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
       if (!emailService.isEnabled()) {
         return rep.code(400).send({
           error: 'EmailNotConfigured',
-          message: 'Notifica não está configurado (NOTIFICA_API_KEY ausente)',
+          message: 'E-mail não está configurado (RESEND_API_KEY ou SMTP_HOST ausente)',
         });
       }
 

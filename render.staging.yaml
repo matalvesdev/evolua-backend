@@ -1,16 +1,19 @@
 services:
-  # Backend API (Fastify/Node.js)
   - type: web
-    name: evolua-api
+    name: evolua-api-staging
     env: docker
-    region: sao-paulo
+    region: virginia
     plan: free
+    branch: develop
+    autoDeployTrigger: 'off'
     dockerfilePath: ./Dockerfile
-    rootDir: .
+    dockerContext: .
     healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
         value: production
+      - key: LOG_LEVEL
+        value: info
       - key: DATABASE_URL
         sync: false
       - key: SUPABASE_URL
@@ -23,46 +26,50 @@ services:
         sync: false
       - key: INTERNAL_SERVICE_TOKEN
         generateValue: true
-      - key: CORS_ORIGINS
-        value: https://app.useevolua.com.br
-      - key: FRONTEND_URL
-        value: https://app.useevolua.com.br
       - key: AI_SERVICE_URL
+        value: https://evolua-ai-staging.onrender.com
+      - key: CORS_ORIGINS
         sync: false
-      - key: HUGGINGFACE_API_KEY
+      - key: FRONTEND_URL
+        sync: false
+      - key: LANDING_URL
         sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM_EMAIL
         value: naoresponder@useevolua.com.br
-      - key: PIX_KEY
+      - key: HUGGINGFACE_API_KEY
         sync: false
-      - key: PIX_MERCHANT_NAME
-        value: EVOLUA CLINICA
-      - key: PIX_MERCHANT_CITY
-        value: SAO PAULO
       - key: SENTRY_DSN
         sync: false
-      - key: SENTRY_TRACES_SAMPLE_RATE
-        value: '0.1'
       - key: SENTRY_ENVIRONMENT
-        value: production
+        value: staging
 
-  # AI Service (Python/FastAPI)
   - type: web
-    name: evolua-ai
+    name: evolua-ai-staging
     env: docker
-    region: sao-paulo
+    region: virginia
     plan: free
-    dockerfilePath: ./Dockerfile
+    branch: develop
+    autoDeployTrigger: 'off'
     rootDir: ./apps/ai
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /healthz
     envVars:
-      - key: HUGGINGFACE_API_KEY
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
         sync: false
       - key: INTERNAL_SERVICE_TOKEN
         sync: false
-      - key: DATABASE_URL
+      - key: HUGGINGFACE_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
+      - key: OPENROUTER_SITE_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: staging

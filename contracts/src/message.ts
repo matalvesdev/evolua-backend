@@ -31,7 +31,7 @@ export const CreateMessageSchema = z
     channel: MessageChannelEnum.default('whatsapp'),
     // WhatsApp/SMS
     recipientPhone: z.string().min(8).max(32).optional(),
-    // Email (Notifica)
+    // Email (Resend/SMTP)
     recipientEmail: z.string().email().max(254).optional(),
     subject: z.string().min(1).max(200).optional(),
     htmlBody: z.string().max(50_000).optional(),

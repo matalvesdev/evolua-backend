@@ -35,14 +35,9 @@ const envSchema = z.object({
   // Resend (https://resend.com) — email transacional primário
   RESEND_API_KEY: z.string().min(1).optional(),
   RESEND_FROM_EMAIL: z.string().email().default('naoresponder@useevolua.com.br'),
+  RESEND_FROM_NAME: z.string().default('Evolua'),
 
-  // Notifica (https://docs.usenotifica.com.br) — email transacional fallback
-  NOTIFICA_API_URL: z.string().url().default('https://app.usenotifica.com.br/v1'),
-  NOTIFICA_API_KEY: z.string().min(1).optional(),
-  NOTIFICA_FROM_EMAIL: z.string().email().optional(),
-  NOTIFICA_FROM_NAME: z.string().default('Evolua'),
-
-  // SMTP fallback — usado quando Notifica falha
+  // SMTP fallback — usado quando Resend falha
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
   SMTP_SECURE: z.coerce.boolean().default(false),

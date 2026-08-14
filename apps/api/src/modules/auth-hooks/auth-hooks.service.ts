@@ -51,7 +51,7 @@ export class AuthHooksService {
       case 'user.signup': {
         logger.info({ userId: user.id, email: user.email }, 'Auth hook: signup');
 
-        // Envia email de boas-vindas via Notifica
+        // Envia email de boas-vindas pelo provedor configurado
         const name =
           (user.user_metadata?.full_name as string) ??
           (user.user_metadata?.fullName as string) ??
