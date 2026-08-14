@@ -2,8 +2,8 @@ services:
   # Backend API (Fastify/Node.js)
   - type: web
     name: evolua-api
-    env: docker
-    region: sao-paulo
+    runtime: docker
+    region: virginia
     plan: free
     dockerfilePath: ./Dockerfile
     rootDir: .
@@ -22,13 +22,19 @@ services:
       - key: SUPABASE_JWT_SECRET
         sync: false
       - key: INTERNAL_SERVICE_TOKEN
-        generateValue: true
+        fromService:
+          type: web
+          name: evolua-ai
+          envVarKey: INTERNAL_SERVICE_TOKEN
       - key: CORS_ORIGINS
         value: https://app.useevolua.com.br
       - key: FRONTEND_URL
         value: https://app.useevolua.com.br
       - key: AI_SERVICE_URL
-        sync: false
+        fromService:
+          type: web
+          name: evolua-ai
+          envVarKey: RENDER_EXTERNAL_URL
       - key: HUGGINGFACE_API_KEY
         sync: false
       - key: RESEND_API_KEY
@@ -51,8 +57,8 @@ services:
   # AI Service (Python/FastAPI)
   - type: web
     name: evolua-ai
-    env: docker
-    region: sao-paulo
+    runtime: docker
+    region: virginia
     plan: free
     dockerfilePath: ./Dockerfile
     rootDir: ./apps/ai
@@ -61,7 +67,7 @@ services:
       - key: HUGGINGFACE_API_KEY
         sync: false
       - key: INTERNAL_SERVICE_TOKEN
-        sync: false
+        generateValue: true
       - key: DATABASE_URL
         sync: false
       - key: OPENROUTER_API_KEY

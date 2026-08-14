@@ -1,7 +1,7 @@
 services:
   - type: web
     name: evolua-api-staging
-    env: docker
+    runtime: docker
     region: virginia
     plan: free
     branch: develop
@@ -25,9 +25,15 @@ services:
       - key: SUPABASE_JWT_SECRET
         sync: false
       - key: INTERNAL_SERVICE_TOKEN
-        generateValue: true
+        fromService:
+          type: web
+          name: evolua-ai-staging
+          envVarKey: INTERNAL_SERVICE_TOKEN
       - key: AI_SERVICE_URL
-        value: https://evolua-ai-staging.onrender.com
+        fromService:
+          type: web
+          name: evolua-ai-staging
+          envVarKey: RENDER_EXTERNAL_URL
       - key: CORS_ORIGINS
         sync: false
       - key: FRONTEND_URL
@@ -47,7 +53,7 @@ services:
 
   - type: web
     name: evolua-ai-staging
-    env: docker
+    runtime: docker
     region: virginia
     plan: free
     branch: develop
@@ -62,7 +68,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: INTERNAL_SERVICE_TOKEN
-        sync: false
+        generateValue: true
       - key: HUGGINGFACE_API_KEY
         sync: false
       - key: OPENROUTER_API_KEY

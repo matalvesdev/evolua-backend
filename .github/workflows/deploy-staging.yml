@@ -20,7 +20,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Validate staging deployment configuration
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+          RENDER_DEPLOY_HOOK_AI: ${{ secrets.RENDER_DEPLOY_HOOK_AI }}
+          API_URL: ${{ secrets.API_URL }}
+          AI_URL: ${{ secrets.AI_URL }}
+        run: |
+          missing=0
+          for name in DIRECT_URL RENDER_DEPLOY_HOOK_API RENDER_DEPLOY_HOOK_AI API_URL AI_URL; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing staging secret: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
   migrate:
+    needs: preflight
     runs-on: ubuntu-latest
     environment: staging
     steps:
