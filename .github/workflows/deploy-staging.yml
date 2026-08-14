@@ -33,6 +33,7 @@ jobs:
       - name: Apply Prisma migrations to staging
         env:
           DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
         run: npx prisma migrate deploy --schema=prisma/schema.prisma
 
   deploy:
