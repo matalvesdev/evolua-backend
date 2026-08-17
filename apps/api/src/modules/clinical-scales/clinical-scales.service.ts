@@ -35,8 +35,25 @@ export class ClinicalScalesService {
     therapistId: string,
     input: RecordScaleResultInput,
   ): Promise<ClinicalScaleResult | null> {
-    const patient = await this.assertPatientBelongsToClinic(clinicId, input.patientId);
-    if (!patient) return null;
+    const [patient, scale, appointment] = await Promise.all([
+      this.assertPatientBelongsToClinic(clinicId, input.patientId),
+      prisma.clinicalScale.findUnique({
+        where: { id: input.scaleId },
+        select: { id: true },
+      }),
+      input.appointmentId
+        ? prisma.appointment.findFirst({
+          where: {
+            id: input.appointmentId,
+            clinicId,
+            patientId: input.patientId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        })
+        : Promise.resolve(null),
+    ]);
+    if (!patient || !scale || (input.appointmentId && !appointment)) return null;
     const row = await prisma.clinicalScaleResult.create({
       data: {
         patientId: input.patientId,

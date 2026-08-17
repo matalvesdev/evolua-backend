@@ -59,6 +59,7 @@ export class FinancesService {
     userId: string,
     input: CreateTransactionInput,
   ): Promise<Transaction> {
+    const references = await this.resolveReferences(clinicId, input.patientId, input.appointmentId);
     const row = await prisma.transaction.create({
       data: {
         clinicId,
@@ -68,8 +69,8 @@ export class FinancesService {
         amount: new Prisma.Decimal(input.amount),
         description: input.description ?? null,
         dueDate: new Date(input.dueDate),
-        patientId: input.patientId ?? null,
-        appointmentId: input.appointmentId ?? null,
+        patientId: references.patientId,
+        appointmentId: references.appointmentId,
         notes: input.notes ?? null,
       },
     });
@@ -83,9 +84,14 @@ export class FinancesService {
   ): Promise<Transaction | null> {
     const exists = await prisma.transaction.findFirst({
       where: { id, clinicId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, patientId: true, appointmentId: true },
     });
     if (!exists) return null;
+    const references = await this.resolveReferences(
+      clinicId,
+      input.patientId === undefined ? exists.patientId : input.patientId,
+      input.appointmentId === undefined ? exists.appointmentId : input.appointmentId,
+    );
     const row = await prisma.transaction.update({
       where: { id },
       data: {
@@ -94,8 +100,7 @@ export class FinancesService {
         ...(input.amount !== undefined && { amount: new Prisma.Decimal(input.amount) }),
         ...(input.description !== undefined && { description: input.description }),
         ...(input.dueDate !== undefined && { dueDate: new Date(input.dueDate) }),
-        ...(input.patientId !== undefined && { patientId: input.patientId }),
-        ...(input.appointmentId !== undefined && { appointmentId: input.appointmentId }),
+        ...(input.patientId !== undefined || input.appointmentId !== undefined ? references : {}),
         ...(input.notes !== undefined && { notes: input.notes }),
       },
     });
@@ -250,6 +255,17 @@ export class FinancesService {
       profit: Number(r.revenue) - Number(r.expenses),
       sessions: Number(r.sessions),
     }));
+  }
+
+  private async resolveReferences(clinicId: string, patientId?: string | null, appointmentId?: string | null) {
+    const [patient, appointment] = await Promise.all([
+      patientId ? prisma.patient.findFirst({ where: { id: patientId, clinicId, deletedAt: null }, select: { id: true } }) : Promise.resolve(null),
+      appointmentId ? prisma.appointment.findFirst({ where: { id: appointmentId, clinicId, deletedAt: null }, select: { id: true, patientId: true } }) : Promise.resolve(null),
+    ]);
+    if ((patientId && !patient) || (appointmentId && !appointment) || (patient && appointment && patient.id !== appointment.patientId)) {
+      throw Object.assign(new Error('Patient and appointment must belong to the same clinic'), { statusCode: 404 });
+    }
+    return { patientId: patient?.id ?? appointment?.patientId ?? null, appointmentId: appointment?.id ?? null };
   }
 }
 

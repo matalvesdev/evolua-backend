@@ -73,7 +73,12 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
           text: z.string().min(1).max(10000),
           type: z.enum(['whatsapp', 'sms', 'email']).default('whatsapp'),
         }),
-        response: { 201: z.object({ success: z.boolean(), messageId: z.string().optional() }), 404: ErrorResponseSchema, 500: ErrorResponseSchema },
+        response: {
+          201: z.object({ success: z.boolean(), messageId: z.string().optional() }),
+          400: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+          500: ErrorResponseSchema,
+        },
       },
     },
     async (req, rep) => {
@@ -97,6 +102,9 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
         logger.info({ messageId: message.id, channel: req.body.type }, 'messages: sent');
         return rep.code(201).send({ success: true, messageId: message.id });
       } catch (e) {
+        if (e instanceof Error && 'statusCode' in e && e.statusCode === 400) {
+          return rep.code(400).send({ error: 'BadRequest', message: e.message });
+        }
         logger.error({ err: e }, 'messages: send error');
         return rep.code(500).send({ error: 'InternalError', message: 'Falha ao enviar mensagem' });
       }
@@ -134,7 +142,12 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req) => {
       const clinicId = await resolveClinicId(req.user.id);
-      return messagesService.listAutomations(clinicId) as unknown as Promise<z.infer<typeof WaAutomationSchema>[]>;
+      const automations = await messagesService.listAutomations(clinicId);
+      return automations.map((automation) => ({
+        ...automation,
+        createdAt: automation.createdAt.toISOString(),
+        updatedAt: automation.updatedAt.toISOString(),
+      }));
     },
   );
 
@@ -157,7 +170,11 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
       if (!updated) {
         return rep.code(404).send({ error: 'NotFound', message: 'Automation not found' });
       }
-      return updated as unknown as z.infer<typeof WaAutomationSchema>;
+      return {
+        ...updated,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      };
     },
   );
 };

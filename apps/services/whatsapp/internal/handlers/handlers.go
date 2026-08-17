@@ -260,7 +260,7 @@ func (p evolutionWebhookPayload) toCanonical() (canonicalInbound, bool) {
 
 func (h *Handler) forwardToGateway(ctx context.Context, msg canonicalInbound) error {
 	if h.gatewayURL == "" {
-		return nil
+		return &gatewayError{code: http.StatusServiceUnavailable}
 	}
 	body, _ := json.Marshal(msg)
 	url := h.gatewayURL + "/api/wa-crm/webhook/inbound"

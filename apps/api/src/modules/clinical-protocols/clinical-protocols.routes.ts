@@ -68,7 +68,7 @@ const clinicalProtocolsRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['clinical-protocols'],
         body: CreateProtocolEntrySchema,
-        response: { 201: ClinicalProtocolEntrySchema },
+        response: { 201: ClinicalProtocolEntrySchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
@@ -77,7 +77,9 @@ const clinicalProtocolsRoutes: FastifyPluginAsync = async (app) => {
         req.user.id,
         req.body,
       );
-      return rep.code(201).send(r);
+      return r
+        ? rep.code(201).send(r)
+        : rep.code(404).send({ error: 'NotFound', message: 'Patient, template, plan or appointment not found' });
     },
   );
 

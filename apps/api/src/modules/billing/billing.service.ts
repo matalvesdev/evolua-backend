@@ -130,9 +130,9 @@ class BillingService {
 
   // ── Webhook processing (idempotente) ─────────────────────────────────────
   /**
-   * 1. Tenta inserir em billing_events (UNIQUE provider+externalId)
-   * 2. Se já existe → ignora (idempotência)
-   * 3. Senão processa o evento e marca processedAt
+   * A chave única deduplica eventos concluídos. Eventos que falharam podem ser
+   * reivindicados novamente por uma redelivery do provider; apenas uma
+   * instância processa o evento por vez.
    */
   async processWebhook(input: {
     provider: BillingProvider;
@@ -140,6 +140,7 @@ class BillingService {
     type: string;
     payload: unknown;
   }) {
+    const now = new Date();
     try {
       await prisma.billingEvent.create({
         data: {
@@ -147,15 +148,33 @@ class BillingService {
           externalId: input.externalId,
           type: input.type,
           payload: input.payload as object,
+          processingAt: now,
         },
       });
     } catch (err: unknown) {
-      // P2002 = unique constraint → evento já recebido
+      // P2002 may mean a completed duplicate or a failed/stale event. Only
+      // claim the latter so concurrent redeliveries remain idempotent.
       if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
-        logger.info({ provider: input.provider, externalId: input.externalId }, 'webhook duplicado ignorado');
-        return { duplicate: true };
+        const staleBefore = new Date(Date.now() - 5 * 60 * 1000);
+        const retry = await prisma.billingEvent.updateMany({
+          where: {
+            provider: input.provider,
+            externalId: input.externalId,
+            processedAt: null,
+            OR: [
+              { processingAt: null },
+              { processingAt: { lt: staleBefore } },
+            ],
+          },
+          data: { processingAt: now, error: null },
+        });
+        if (retry.count === 0) {
+          logger.info({ provider: input.provider, externalId: input.externalId }, 'webhook duplicate or in progress');
+          return { duplicate: true };
+        }
+      } else {
+        throw err;
       }
-      throw err;
     }
 
     try {
@@ -169,7 +188,7 @@ class BillingService {
 
       await prisma.billingEvent.updateMany({
         where: { provider: input.provider, externalId: input.externalId },
-        data: { processedAt: new Date() },
+        data: { processedAt: new Date(), processingAt: null, error: null },
       });
 
       return { ok: true };
@@ -177,7 +196,7 @@ class BillingService {
       const message = err instanceof Error ? err.message : String(err);
       await prisma.billingEvent.updateMany({
         where: { provider: input.provider, externalId: input.externalId },
-        data: { error: message },
+        data: { error: message, processingAt: null },
       });
       throw err;
     }

@@ -153,10 +153,7 @@ export class AppointmentsService {
   }
 
   async confirm(clinicId: string, id: string): Promise<Appointment | null> {
-    const appt = await this.findById(clinicId, id);
-    if (!appt) return null;
-
-    const updated = await this.transition(clinicId, id, {
+    const updated = await this.transition(clinicId, id, ['scheduled'], {
       status: 'confirmed',
       confirmedAt: new Date(),
     });
@@ -214,7 +211,7 @@ export class AppointmentsService {
   }
 
   async start(clinicId: string, id: string): Promise<Appointment | null> {
-    return this.transition(clinicId, id, {
+    return this.transition(clinicId, id, ['scheduled', 'confirmed'], {
       status: 'in_progress',
       startedAt: new Date(),
     });
@@ -233,7 +230,7 @@ export class AppointmentsService {
     const appt = await prisma.appointment.findFirst({
       where: { id, clinicId, deletedAt: null },
     });
-    if (!appt) return null;
+    if (!appt || appt.status !== 'in_progress') return null;
 
     const updated = await prisma.appointment.update({
       where: { id },
@@ -259,7 +256,11 @@ export class AppointmentsService {
         year: 'numeric',
       });
 
-      await prisma.report.create({
+      const existingEvolution = await prisma.report.findFirst({
+        where: { clinicId, appointmentId: id, type: 'evolution', deletedAt: null },
+        select: { id: true },
+      });
+      if (!existingEvolution) await prisma.report.create({
         data: {
           clinicId,
           patientId: appt.patientId,
@@ -289,7 +290,7 @@ export class AppointmentsService {
     const appt = await prisma.appointment.findFirst({
       where: { id, clinicId, deletedAt: null },
     });
-    if (!appt) return null;
+    if (!appt || appt.status === 'completed' || appt.status === 'cancelled') return null;
 
     const updated = await prisma.appointment.update({
       where: { id },
@@ -335,10 +336,11 @@ export class AppointmentsService {
   private async transition(
     clinicId: string,
     id: string,
+    allowedStatuses: string[],
     data: Prisma.AppointmentUpdateInput,
   ): Promise<Appointment | null> {
     const exists = await prisma.appointment.findFirst({
-      where: { id, clinicId, deletedAt: null },
+      where: { id, clinicId, deletedAt: null, status: { in: allowedStatuses } },
       select: { id: true },
     });
     if (!exists) return null;

@@ -167,11 +167,28 @@ export class TreatmentPlansService {
   ): Promise<TreatmentSession | null> {
     return prisma.$transaction(async (tx) => {
       const plan = await tx.treatmentPlan.findFirst({
-        where: { id: planId, clinicId, deletedAt: null },
+        where: { id: planId, clinicId, deletedAt: null, status: 'active' },
       });
       if (!plan) return null;
 
-      const sessionNumber = plan.usedSessions + 1;
+      if (input.appointmentId) {
+        const appointment = await tx.appointment.findFirst({
+          where: {
+            id: input.appointmentId,
+            clinicId,
+            patientId: plan.patientId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        if (!appointment) return null;
+      }
+
+      if (plan.usedSessions >= plan.totalSessions) return null;
+
+      const sessionNumber = await tx.treatmentSession.count({
+        where: { treatmentPlanId: planId },
+      }) + 1;
 
       const session = await tx.treatmentSession.create({
         data: {
@@ -187,7 +204,7 @@ export class TreatmentPlansService {
       await tx.treatmentPlan.update({
         where: { id: planId },
         data: {
-          usedSessions: sessionNumber,
+          usedSessions: { increment: 1 },
           ...(sessionNumber >= plan.totalSessions && {
             status: 'completed',
             completedAt: new Date(),
@@ -196,7 +213,7 @@ export class TreatmentPlansService {
       });
 
       return sessionToDTO(session);
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 }
 

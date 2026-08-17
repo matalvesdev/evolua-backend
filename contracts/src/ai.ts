@@ -44,9 +44,9 @@ export const ReportTemplateEnum = z.enum([
 export type ReportTemplate = z.infer<typeof ReportTemplateEnum>;
 
 export const GenerateReportRequestSchema = z.object({
+  patientId: z.string().uuid(),
   transcription: z.string().min(10).max(50000),
   template: ReportTemplateEnum,
-  patientName: z.string().max(200).optional(),
 });
 export type GenerateReportRequest = z.infer<typeof GenerateReportRequestSchema>;
 

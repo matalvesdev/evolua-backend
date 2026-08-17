@@ -63,6 +63,7 @@ export class AiService {
   async generateEvolution(
     req: GenerateEvolutionRequest,
     userId: string,
+    clinicId: string,
   ): Promise<GeneratedEvolution> {
     const res = await fetch(`${env.AI_SERVICE_URL}/clinical/evolution/generate`, {
       method: 'POST',
@@ -70,6 +71,7 @@ export class AiService {
         'Content-Type': 'application/json',
         'x-internal-token': env.INTERNAL_SERVICE_TOKEN,
         'x-user-id': userId,
+        'x-clinic-id': clinicId,
       },
       body: JSON.stringify({
         patient_id: req.patientId,
@@ -148,6 +150,7 @@ export class AiService {
   async generateReport(
     req: GenerateReportRequest,
     userId: string,
+    clinicId: string,
   ): Promise<GenerateReportResponse> {
     try {
       const res = await fetch(`${env.AI_SERVICE_URL}/clinical/report/generate`, {
@@ -156,11 +159,11 @@ export class AiService {
           'Content-Type': 'application/json',
           'x-internal-token': env.INTERNAL_SERVICE_TOKEN,
           'x-user-id': userId,
+          'x-clinic-id': clinicId,
         },
         body: JSON.stringify({
           transcription: req.transcription,
           template: req.template,
-          patient_name: req.patientName,
         }),
         signal: AbortSignal.timeout(60_000),
       });

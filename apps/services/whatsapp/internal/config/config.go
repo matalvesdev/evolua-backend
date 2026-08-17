@@ -65,6 +65,9 @@ func Load() (*Config, error) {
 	if (cfg.Environment == "production" || cfg.Environment == "staging") && cfg.WebhookSecret == "" {
 		return nil, fmt.Errorf("missing EVOLUTION_WEBHOOK_SECRET in %s", cfg.Environment)
 	}
+	if (cfg.Environment == "production" || cfg.Environment == "staging") && os.Getenv("GATEWAY_URL") == "" {
+		return nil, fmt.Errorf("missing GATEWAY_URL in %s", cfg.Environment)
+	}
 	return cfg, nil
 }
 

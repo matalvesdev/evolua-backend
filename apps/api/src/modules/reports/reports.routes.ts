@@ -260,7 +260,7 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
       const existing = await prisma.report.findFirst({
-        where: { id: req.params.id, clinicId, deletedAt: null },
+        where: { id: req.params.id, clinicId, deletedAt: null, type: { in: ['laudo', 'atestado', 'declaracao', 'relatorio'] } },
         select: { id: true },
       });
       if (!existing) return rep.code(404).send(notFound);
@@ -286,8 +286,12 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
-      const r = await reportsService.remove(clinicId, req.params.id);
-      if (!r) return rep.code(404).send(notFound);
+      const existing = await prisma.report.findFirst({
+        where: { id: req.params.id, clinicId, deletedAt: null, type: { in: ['laudo', 'atestado', 'declaracao', 'relatorio'] } },
+        select: { id: true },
+      });
+      if (!existing) return rep.code(404).send(notFound);
+      await reportsService.remove(clinicId, req.params.id);
       auditAsync({
         clinicId, userId: req.user.id, action: 'DELETE', resource: 'Report',
         resourceId: req.params.id, ipAddress: req.ip, userAgent: req.headers['user-agent'] ?? null,

@@ -51,6 +51,7 @@ export class ReportsService {
     input: CreateReportInput,
   ): Promise<Report> {
     const patient = await this.assertPatientBelongsToClinic(clinicId, input.patientId);
+    await this.assertAppointmentBelongsToPatient(clinicId, input.patientId, input.appointmentId);
     const row = await prisma.report.create({
       data: {
         clinicId,
@@ -236,6 +237,21 @@ export class ReportsService {
     const err = new Error('Patient not found');
     (err as Error & { statusCode: number }).statusCode = 404;
     throw err;
+  }
+
+  private async assertAppointmentBelongsToPatient(
+    clinicId: string,
+    patientId: string,
+    appointmentId?: string | null,
+  ): Promise<void> {
+    if (!appointmentId) return;
+    const appointment = await prisma.appointment.findFirst({
+      where: { id: appointmentId, clinicId, patientId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!appointment) {
+      throw Object.assign(new Error('Appointment not found for this patient'), { statusCode: 404 });
+    }
   }
 }
 

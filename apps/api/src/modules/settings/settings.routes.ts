@@ -13,14 +13,21 @@ const SettingsSchema = z.object({
   clinicName: z.string(),
   clinicPhone: z.string(),
   clinicEmail: z.string(),
+  clinicAddress: z.string(),
   workingHours: WorkingHoursSchema,
   appointmentDuration: z.number(),
+  sessionDuration: z.number(),
   allowTeleconsulta: z.boolean(),
   notificationEmail: z.boolean(),
   notificationWhatsApp: z.boolean(),
   autoSendReminders: z.boolean(),
   reminder24h: z.boolean(),
   reminder1h: z.boolean(),
+  notifSessao: z.boolean(),
+  notifReport: z.boolean(),
+  notifPagamento: z.boolean(),
+  notifWhatsapp: z.boolean(),
+  notifEmail: z.boolean(),
 });
 
 const UpdateSettingsSchema = SettingsSchema.partial();

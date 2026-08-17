@@ -30,7 +30,7 @@ const onboardingRoutes: FastifyPluginAsync = async (app) => {
     async (req) => {
       const params = paramsSchema.parse(req.params);
       const body = bodySchema.parse(req.body);
-      return onboardingService.completeStep(req.user.id, params.stepId, body.data);
+      return onboardingService.completeStep(req.user.id, params.stepId, body.data, body.completed);
     },
   );
 
