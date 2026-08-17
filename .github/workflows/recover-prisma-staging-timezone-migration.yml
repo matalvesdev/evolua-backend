@@ -1,0 +1,58 @@
+name: Recover Prisma timezone migration in staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digite "RECOVER_STAGING" para reconciliar a migration de timezone em staging'
+        required: true
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prisma-migrations-staging
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: reconcile failed timezone migration (staging)
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - name: Validate branch and confirmation
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "develop" ]; then
+            echo "::error::A reconciliação de staging só pode ser disparada a partir de develop."
+            exit 1
+          fi
+          if [ "${{ github.event.inputs.confirm }}" != "RECOVER_STAGING" ]; then
+            echo "::error::Confirmação inválida. Digite exatamente 'RECOVER_STAGING'."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Mark only the known failed migration as rolled back
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: >-
+          npx prisma migrate resolve --rolled-back
+          20260817000200_add_clinic_timezone
+          --schema=prisma/schema.prisma
+      - name: Apply reconciled migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate deploy --schema=prisma/schema.prisma
+      - name: Confirm final status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate status --schema=prisma/schema.prisma
