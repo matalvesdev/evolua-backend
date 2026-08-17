@@ -38,7 +38,7 @@ describe('NewsletterService', () => {
   it('cancels a subscription using only the opaque token', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
-    const token = '00000000-0000-4000-8000-000000000000';
+    const token = 'test-unsubscribe-token';
 
     const result = await new NewsletterService().unsubscribe(token);
 
