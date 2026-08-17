@@ -24,6 +24,7 @@ const TWENTY_FOUR_H_WINDOW_END_MS = 25 * 60 * 60 * 1000;
 /** 1h reminder window: 30min–90min ahead */
 const ONE_H_WINDOW_START_MS = 0.5 * 60 * 60 * 1000;
 const ONE_H_WINDOW_END_MS = 1.5 * 60 * 60 * 1000;
+const REMINDER_CLAIM_TIMEOUT_MS = 15 * 60 * 1000;
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -84,6 +85,7 @@ interface AppointmentWithPatient {
   id: string;
   clinicId: string;
   patientId: string;
+  therapistId: string | null;
   dateTime: Date;
   patient: {
     name: string;
@@ -100,6 +102,26 @@ async function sendReminders(
 ): Promise<void> {
   for (const appointment of appointments) {
     try {
+      const staleBefore = new Date(Date.now() - REMINDER_CLAIM_TIMEOUT_MS);
+      const claimed = type === '24h'
+        ? await prisma.appointment.updateMany({
+          where: {
+            id: appointment.id,
+            reminder24hSentAt: null,
+            OR: [{ reminder24hClaimedAt: null }, { reminder24hClaimedAt: { lt: staleBefore } }],
+          },
+          data: { reminder24hClaimedAt: new Date() },
+        })
+        : await prisma.appointment.updateMany({
+          where: {
+            id: appointment.id,
+            reminder1hSentAt: null,
+            OR: [{ reminder1hClaimedAt: null }, { reminder1hClaimedAt: { lt: staleBefore } }],
+          },
+          data: { reminder1hClaimedAt: new Date() },
+        });
+      if (claimed.count === 0) continue;
+
       const date = formatDate(appointment.dateTime);
       const time = formatTime(appointment.dateTime);
       const recipientName = getRecipientName(
@@ -111,11 +133,24 @@ async function sendReminders(
         appointment.patient.phone,
       );
       const email = appointment.patient.email;
+      const preferences = appointment.therapistId
+        ? await prisma.notificationPreference.findUnique({
+          where: {
+            userId_clinicId: {
+              userId: appointment.therapistId,
+              clinicId: appointment.clinicId,
+            },
+          },
+          select: { emailEnabled: true, appointmentRemindersEnabled: true },
+        })
+        : null;
+      const remindersEnabled = preferences?.appointmentRemindersEnabled ?? true;
+      const emailEnabled = preferences?.emailEnabled ?? true;
 
       const errors: string[] = [];
 
       // 1. Send via email if patient has an email address
-      if (email) {
+      if (email && remindersEnabled && emailEnabled) {
         try {
           if (type === '24h') {
             await emailService.sendAppointmentReminder24h(email, recipientName, date, time);
@@ -123,21 +158,21 @@ async function sendReminders(
             await emailService.sendAppointmentReminder1h(email, recipientName, date, time);
           }
           logger.debug(
-            { appointmentId: appointment.id, type, channel: 'email', to: email },
+            { appointmentId: appointment.id, type, channel: 'email' },
             'Reminder email sent',
           );
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           errors.push(`email: ${msg}`);
           logger.error(
-            { err, appointmentId: appointment.id, type, channel: 'email', to: email },
+            { err, appointmentId: appointment.id, type, channel: 'email' },
             'Failed to send reminder email',
           );
         }
       }
 
       // 2. Send via WhatsApp if phone is available
-      if (phone) {
+      if (phone && remindersEnabled) {
         try {
           const message =
             type === '24h'
@@ -150,14 +185,14 @@ async function sendReminders(
             type: 'text',
           });
           logger.debug(
-            { appointmentId: appointment.id, type, channel: 'whatsapp', to: phone },
+            { appointmentId: appointment.id, type, channel: 'whatsapp' },
             'Reminder WhatsApp sent',
           );
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           errors.push(`whatsapp: ${msg}`);
           logger.error(
-            { err, appointmentId: appointment.id, type, channel: 'whatsapp', to: phone },
+            { err, appointmentId: appointment.id, type, channel: 'whatsapp' },
             'Failed to send reminder WhatsApp',
           );
         }
@@ -165,8 +200,9 @@ async function sendReminders(
 
       // 3. Update the sentAt field — even if one channel failed, we mark it sent
       //    to avoid re-sending and flooding the patient.
-      const updateField =
-        type === '24h' ? { reminder24hSentAt: new Date() } : { reminder1hSentAt: new Date() };
+      const updateField = type === '24h'
+        ? { reminder24hSentAt: new Date(), reminder24hClaimedAt: null }
+        : { reminder1hSentAt: new Date(), reminder1hClaimedAt: null };
 
       await prisma.appointment.update({
         where: { id: appointment.id },
@@ -190,6 +226,13 @@ async function sendReminders(
         );
       }
     } catch (err) {
+      const releaseClaim = type === '24h'
+        ? { reminder24hClaimedAt: null }
+        : { reminder1hClaimedAt: null };
+      await prisma.appointment.update({
+        where: { id: appointment.id },
+        data: releaseClaim,
+      }).catch(() => null);
       // Catastrophic failure for this single appointment — log and continue
       logger.error(
         { err, appointmentId: appointment.id, type },

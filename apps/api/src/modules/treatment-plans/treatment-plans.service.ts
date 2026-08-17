@@ -66,6 +66,17 @@ export class TreatmentPlansService {
   }
 
   async create(clinicId: string, input: CreateTreatmentPlanInput) {
+    const [patient, therapist] = await Promise.all([
+      prisma.patient.findFirst({
+        where: { id: input.patientId, clinicId, deletedAt: null },
+        select: { id: true },
+      }),
+      prisma.user.findFirst({
+        where: { id: input.therapistId, clinicId },
+        select: { id: true },
+      }),
+    ]);
+    if (!patient || !therapist) return null;
     const row = await prisma.treatmentPlan.create({
       data: {
         clinicId,

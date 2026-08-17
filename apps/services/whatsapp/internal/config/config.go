@@ -16,8 +16,8 @@ type Config struct {
 	InternalServiceToken string
 
 	// Evolution API (WhatsApp provider)
-	EvolutionAPIURL  string
-	EvolutionAPIKey  string
+	EvolutionAPIURL   string
+	EvolutionAPIKey   string
 	EvolutionInstance string
 
 	// Legacy / Meta (mantido p/ compatibilidade — não usado quando Evolution está ativo)
@@ -61,6 +61,9 @@ func Load() (*Config, error) {
 		GatewayURL: getEnv("GATEWAY_URL", "http://localhost:3000"),
 
 		WebhookSecret: os.Getenv("EVOLUTION_WEBHOOK_SECRET"),
+	}
+	if (cfg.Environment == "production" || cfg.Environment == "staging") && cfg.WebhookSecret == "" {
+		return nil, fmt.Errorf("missing EVOLUTION_WEBHOOK_SECRET in %s", cfg.Environment)
 	}
 	return cfg, nil
 }

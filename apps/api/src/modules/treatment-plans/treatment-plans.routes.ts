@@ -56,7 +56,7 @@ const treatmentPlansRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['treatment-plans'],
         body: CreateTreatmentPlanSchema,
-        response: { 201: TreatmentPlanSchema },
+        response: { 201: TreatmentPlanSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
@@ -64,6 +64,12 @@ const treatmentPlansRoutes: FastifyPluginAsync = async (app) => {
         await resolveClinicId(req.user.id),
         req.body,
       );
+      if (!r) {
+        return rep.code(404).send({
+          error: 'NotFound',
+          message: 'Patient or therapist not found in this clinic',
+        });
+      }
       return rep.code(201).send(r);
     },
   );

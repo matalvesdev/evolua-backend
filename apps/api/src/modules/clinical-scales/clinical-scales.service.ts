@@ -18,7 +18,9 @@ export class ClinicalScalesService {
     return row ? scaleToDTO(row) : null;
   }
 
-  async listResults(patientId: string, scaleId?: string) {
+  async listResults(clinicId: string, patientId: string, scaleId?: string) {
+    const patient = await this.assertPatientBelongsToClinic(clinicId, patientId);
+    if (!patient) return null;
     const where: { patientId: string; scaleId?: string } = { patientId };
     if (scaleId) where.scaleId = scaleId;
     const rows = await prisma.clinicalScaleResult.findMany({
@@ -29,9 +31,12 @@ export class ClinicalScalesService {
   }
 
   async recordResult(
+    clinicId: string,
     therapistId: string,
     input: RecordScaleResultInput,
-  ): Promise<ClinicalScaleResult> {
+  ): Promise<ClinicalScaleResult | null> {
+    const patient = await this.assertPatientBelongsToClinic(clinicId, input.patientId);
+    if (!patient) return null;
     const row = await prisma.clinicalScaleResult.create({
       data: {
         patientId: input.patientId,
@@ -46,14 +51,23 @@ export class ClinicalScalesService {
     return resultToDTO(row);
   }
 
-  async removeResult(id: string): Promise<ClinicalScaleResult | null> {
+  async removeResult(clinicId: string, id: string): Promise<boolean> {
     const exists = await prisma.clinicalScaleResult.findUnique({
       where: { id },
+      select: { id: true, patientId: true },
+    });
+    if (!exists) return false;
+    const patient = await this.assertPatientBelongsToClinic(clinicId, exists.patientId);
+    if (!patient) return false;
+    await prisma.clinicalScaleResult.delete({ where: { id } });
+    return true;
+  }
+
+  private async assertPatientBelongsToClinic(clinicId: string, patientId: string) {
+    return prisma.patient.findFirst({
+      where: { id: patientId, clinicId, deletedAt: null },
       select: { id: true },
     });
-    if (!exists) return null;
-    await prisma.clinicalScaleResult.delete({ where: { id } });
-    return exists as unknown as ClinicalScaleResult;
   }
 }
 

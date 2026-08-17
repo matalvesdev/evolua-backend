@@ -35,13 +35,20 @@ const documentsRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['documents'],
         body: CreateDocumentSchema,
-        response: { 201: DocumentSchema },
+        response: { 201: DocumentSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
-      const d = await documentsService.create(clinicId, req.user.id, req.body);
-      return rep.code(201).send(d);
+      try {
+        const d = await documentsService.create(clinicId, req.user.id, req.body);
+        return rep.code(201).send(d);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'Patient not found in this clinic') {
+          return rep.code(404).send({ error: 'NotFound', message: 'Patient not found' });
+        }
+        throw error;
+      }
     },
   );
 

@@ -3,10 +3,12 @@ import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
 import type {
+  CreateAudioUploadInput,
   CreateAudioSessionInput,
   ListAudioSessionsQuery,
   TranscribeAudioInput,
 } from '@evolua/contracts';
+import { randomUUID } from 'node:crypto';
 
 export interface PaginatedAudioSessions {
   data: AudioSession[];
@@ -15,6 +17,10 @@ export interface PaginatedAudioSessions {
 
 const BUCKET = 'audio-sessions';
 const SIGN_TTL_SECONDS = 3600; // 1h
+const AUDIO_EXTENSION_BY_CONTENT_TYPE: Record<CreateAudioUploadInput['contentType'], string> = {
+  'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3',
+  'audio/wav': 'wav', 'audio/mp4': 'mp4', 'audio/m4a': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac',
+};
 
 /**
  * Gera signed URL para um path do bucket privado `audio-sessions`.
@@ -49,6 +55,49 @@ export class AudioService {
     return createSignedUrl(path);
   }
 
+  async createUploadTarget(
+    clinicId: string,
+    input: CreateAudioUploadInput,
+  ): Promise<{ path: string; token: string }> {
+    const patient = await prisma.patient.findFirst({
+      where: { id: input.patientId, clinicId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!patient) {
+      const error = new Error('Patient not found in this clinic');
+      Object.assign(error, { statusCode: 404 });
+      throw error;
+    }
+
+    const extension = AUDIO_EXTENSION_BY_CONTENT_TYPE[input.contentType];
+    const path = `${patient.id}/${randomUUID()}.${extension}`;
+    const url = `${env.SUPABASE_URL}/storage/v1/object/upload/sign/${BUCKET}/${path}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ upsert: false }),
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) {
+      throw new Error('Unable to create signed audio upload target');
+    }
+    const data: unknown = await response.json();
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      !('token' in data) ||
+      typeof data.token !== 'string' ||
+      data.token.length === 0
+    ) {
+      throw new Error('Storage signed upload response is invalid');
+    }
+    return { path, token: data.token };
+  }
+
   async create(
     clinicId: string,
     therapistId: string,
@@ -62,6 +111,23 @@ export class AudioService {
       const err = new Error('Patient not found in this clinic');
       (err as Error & { statusCode: number }).statusCode = 404;
       throw err;
+    }
+
+    if (input.appointmentId) {
+      const appointment = await prisma.appointment.findFirst({
+        where: {
+          id: input.appointmentId,
+          clinicId,
+          patientId: input.patientId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!appointment) {
+        const err = new Error('Appointment not found for this patient in this clinic');
+        Object.assign(err, { statusCode: 404 });
+        throw err;
+      }
     }
 
     // Path obrigatório precisa começar com o patientId (defesa em profundidade).
@@ -157,10 +223,20 @@ export class AudioService {
     const session = await this.findOne(clinicId, input.audioSessionId);
     if (!session) return null;
 
-    const updated = await prisma.audioSession.update({
-      where: { id: session.id },
+    const claimed = await prisma.audioSession.updateMany({
+      where: {
+        id: session.id,
+        clinicId,
+        deletedAt: null,
+        transcriptionStatus: { in: ['pending', 'failed'] },
+      },
       data: { transcriptionStatus: 'processing', transcriptionError: null },
     });
+
+    if (claimed.count === 0) return this.findOne(clinicId, session.id);
+
+    const updated = await this.findOne(clinicId, session.id);
+    if (!updated) return null;
 
     void this.dispatchTranscription(updated, therapistId, input.language).catch(() => {
       logger.warn('audio: transcription dispatch failed');
@@ -287,11 +363,30 @@ export class AudioService {
 
     try {
       // 1. Baixa o áudio do signed URL
-      const audioRes = await fetch(signedUrl, { signal: AbortSignal.timeout(30_000) });
+      const audioRes = await fetch(signedUrl, {
+        signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
+      });
       if (!audioRes.ok) {
         return { success: false, error: `Failed to download audio: ${audioRes.status}` };
       }
+      const contentLength = Number(audioRes.headers.get('content-length'));
+      const maxAudioBytes = 50 * 1024 * 1024;
+      if (Number.isFinite(contentLength) && contentLength > maxAudioBytes) {
+        return { success: false, error: 'Audio exceeds maximum size' };
+      }
+      const contentType = (audioRes.headers.get('content-type') ?? '').split(';', 1)[0];
+      const allowedContentTypes = new Set([
+        'audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/mp3', 'audio/wav',
+        'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac',
+      ]);
+      if (!allowedContentTypes.has(contentType)) {
+        return { success: false, error: 'Unsupported audio content type' };
+      }
       const audioBytes = await audioRes.arrayBuffer();
+      if (audioBytes.byteLength > maxAudioBytes) {
+        return { success: false, error: 'Audio exceeds maximum size' };
+      }
 
       // 2. Envia para Hugging Face Inference API
       const hfRes = await fetch(
@@ -300,7 +395,7 @@ export class AudioService {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${env.HUGGINGFACE_API_KEY}`,
-            'Content-Type': 'audio/webm',
+          'Content-Type': contentType,
           },
           body: audioBytes,
           signal: AbortSignal.timeout(120_000),

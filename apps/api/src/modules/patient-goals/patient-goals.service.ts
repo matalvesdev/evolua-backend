@@ -71,6 +71,11 @@ export class PatientGoalsService {
   }
 
   async create(clinicId: string, therapistId: string, input: CreateGoalInput) {
+    const patient = await prisma.patient.findFirst({
+      where: { id: input.patientId, clinicId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!patient) return null;
     const row = await prisma.patientGoal.create({
       data: {
         clinicId,

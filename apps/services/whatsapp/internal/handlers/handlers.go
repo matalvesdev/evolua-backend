@@ -19,7 +19,7 @@ import (
 )
 
 type SendMessageRequest struct {
-	To        string  `json:"to"`   // E.164 ou número BR — Evolution normaliza
+	To        string  `json:"to"` // E.164 ou número BR — Evolution normaliza
 	Body      string  `json:"body"`
 	PatientID *string `json:"patientId,omitempty"`
 }
@@ -37,6 +37,9 @@ type Handler struct {
 	verifyToken   string
 	webhookSecret string
 }
+
+const maxWebhookBodyBytes = 1 << 20
+const maxSendBodyBytes = 64 << 10
 
 type Options struct {
 	Evolution            *evolution.Client
@@ -75,7 +78,6 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 			respondJSON(w, http.StatusServiceUnavailable, map[string]string{
 				"status": "degraded",
 				"state":  state,
-				"error":  err.Error(),
 			})
 			return
 		}
@@ -94,6 +96,7 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 // SendMessage: envia mensagem WhatsApp via Evolution API.
 func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	var req SendMessageRequest
+	r.Body = http.MaxBytesReader(w, r.Body, maxSendBodyBytes)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "InvalidPayload", err.Error())
 		return
@@ -160,6 +163,7 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBodyBytes)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "InvalidPayload", err.Error())
@@ -184,7 +188,10 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.forwardToGateway(r.Context(), canonical); err != nil {
 		h.logger.Error().Err(err).Msg("failed to forward inbound message to gateway")
-		// Ainda retornamos 200 para evitar reentregas em loop pelo Evolution
+		// Falhas transitórias devem receber retry do provider. A deduplicação
+		// persistente no gateway evita duplicar mensagens em uma nova entrega.
+		respondError(w, http.StatusBadGateway, "GatewayUnavailable", "Unable to process webhook")
+		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -196,14 +203,14 @@ type evolutionWebhookPayload struct {
 	Instance string `json:"instance"`
 	Data     struct {
 		Key struct {
-			ID         string `json:"id"`
-			RemoteJid  string `json:"remoteJid"`
-			FromMe     bool   `json:"fromMe"`
+			ID          string `json:"id"`
+			RemoteJid   string `json:"remoteJid"`
+			FromMe      bool   `json:"fromMe"`
 			Participant string `json:"participant,omitempty"`
 		} `json:"key"`
 		PushName string `json:"pushName"`
 		Message  struct {
-			Conversation       string `json:"conversation"`
+			Conversation        string `json:"conversation"`
 			ExtendedTextMessage struct {
 				Text string `json:"text"`
 			} `json:"extendedTextMessage"`
@@ -213,11 +220,12 @@ type evolutionWebhookPayload struct {
 }
 
 type canonicalInbound struct {
-	MessageID   string `json:"messageId"`
-	From        string `json:"senderPhone"`
-	PushName    string `json:"pushName"`
-	Text        string `json:"text"`
-	Timestamp   int64  `json:"timestamp"`
+	Instance  string `json:"instance"`
+	MessageID string `json:"messageId"`
+	From      string `json:"senderPhone"`
+	PushName  string `json:"pushName"`
+	Text      string `json:"text"`
+	Timestamp int64  `json:"timestamp"`
 }
 
 func (p evolutionWebhookPayload) toCanonical() (canonicalInbound, bool) {
@@ -241,6 +249,7 @@ func (p evolutionWebhookPayload) toCanonical() (canonicalInbound, bool) {
 	}
 
 	return canonicalInbound{
+		Instance:  p.Instance,
 		MessageID: p.Data.Key.ID,
 		From:      from,
 		PushName:  p.Data.PushName,

@@ -16,6 +16,17 @@ import type { BillingProvider } from '@evolua/contracts';
 const DEFAULT_SUCCESS_URL = `${env.APP_URL ?? 'http://localhost:5173'}/dashboard/billing?status=success`;
 const DEFAULT_CANCEL_URL = `${env.APP_URL ?? 'http://localhost:5173'}/dashboard/billing?status=canceled`;
 
+function resolveCheckoutReturnUrl(candidate: string | undefined, fallback: string): string {
+  if (!candidate) return fallback;
+  try {
+    const allowedOrigin = new URL(env.APP_URL ?? env.FRONTEND_URL).origin;
+    const requested = new URL(candidate);
+    return requested.origin === allowedOrigin ? requested.toString() : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 class BillingService {
   // ── Plans ────────────────────────────────────────────────────────────────
   async listPlans() {
@@ -52,8 +63,8 @@ class BillingService {
       throw Object.assign(new Error('Plano gratuito não exige checkout'), { statusCode: 400 });
     }
 
-    const successUrl = input.successUrl ?? DEFAULT_SUCCESS_URL;
-    const cancelUrl = input.cancelUrl ?? DEFAULT_CANCEL_URL;
+    const successUrl = resolveCheckoutReturnUrl(input.successUrl, DEFAULT_SUCCESS_URL);
+    const cancelUrl = resolveCheckoutReturnUrl(input.cancelUrl, DEFAULT_CANCEL_URL);
 
     if (input.provider === 'abacatepay') {
       if (!plan.abacatepayProductId) {

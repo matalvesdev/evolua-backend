@@ -19,7 +19,7 @@ export class MessagesService {
     // Confirma que o paciente pertence à clínica
     const patient = await prisma.patient.findFirst({
       where: { id: input.patientId, clinicId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, name: true, phone: true, guardianPhone: true, email: true },
     });
     if (!patient) {
       const err = new Error('Patient not found in this clinic');
@@ -27,36 +27,55 @@ export class MessagesService {
       throw err;
     }
 
-    // Recipient address: telefone (whatsapp/sms) ou email (email).
-    // O schema Message.recipientPhone armazena o identificador do destinatário.
-    const recipient =
-      input.channel === 'email'
-        ? input.recipientEmail!
-        : input.recipientPhone!;
+    if (input.channel === 'sms') {
+      const err = new Error('SMS delivery is not supported');
+      Object.assign(err, { statusCode: 400 });
+      throw err;
+    }
+
+    // Destinatário clínico é derivado do paciente/responsável autorizado no
+    // servidor. Dados enviados pelo navegador não são autoridade.
+    const recipient = input.channel === 'email'
+      ? patient.email
+      : patient.guardianPhone ?? patient.phone;
+    if (!recipient) {
+      const err = new Error(input.channel === 'email'
+        ? 'Patient has no email address'
+        : 'Patient has no phone number');
+      Object.assign(err, { statusCode: 400 });
+      throw err;
+    }
+    const normalizedInput = {
+      ...input,
+      recipientName: patient.name,
+      recipientPhone: input.channel === 'whatsapp' ? recipient : undefined,
+      recipientEmail: input.channel === 'email' ? recipient : undefined,
+      subject: input.channel === 'email' ? input.subject ?? 'Mensagem da clínica' : undefined,
+    };
 
     const message = await prisma.message.create({
       data: {
         clinicId,
         therapistId,
-        patientId: input.patientId,
-        content: input.content,
-        templateType: input.templateType,
+        patientId: patient.id,
+        content: normalizedInput.content,
+        templateType: normalizedInput.templateType,
         recipientPhone: recipient,
-        recipientName: input.recipientName,
-        channel: input.channel,
+        recipientName: patient.name,
+        channel: normalizedInput.channel,
       },
     });
 
     // Dispatch best-effort por canal.
-    if (input.channel === 'whatsapp') {
-      void this.dispatchWhatsApp(input, therapistId).catch((err) => {
+    if (normalizedInput.channel === 'whatsapp') {
+      void this.dispatchWhatsApp(normalizedInput, therapistId).catch((err) => {
         logger.warn(
           { err, patientId: input.patientId, channel: 'whatsapp' },
           'messages: whatsapp dispatch error',
         );
       });
-    } else if (input.channel === 'email') {
-      void this.dispatchEmail(input, message.id).catch((err) => {
+    } else if (normalizedInput.channel === 'email') {
+      void this.dispatchEmail(normalizedInput, message.id).catch((err) => {
         logger.warn(
           { err, patientId: input.patientId, channel: 'email' },
           'messages: email dispatch error',

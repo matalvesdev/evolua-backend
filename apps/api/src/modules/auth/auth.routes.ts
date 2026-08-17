@@ -127,7 +127,7 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     async (req, rep) => {
       const auth = req.headers.authorization ?? '';
       const token = auth.replace(/^Bearer\s+/i, '');
-      await authService.changePassword(token, req.body.newPassword);
+      await authService.changePassword(token, req.body.newPassword, req.user.id);
       return rep.code(204).send(null);
     },
   );

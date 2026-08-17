@@ -4,31 +4,33 @@ import { authHooksService } from './auth-hooks.service.js';
 import { env } from '../../config/env.js';
 
 const authHooksRoutes: FastifyPluginAsync = async (app) => {
+  // A assinatura do Supabase cobre os bytes originais. Este parser é
+  // encapsulado neste plugin para não alterar o parsing JSON das demais rotas.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    done(null, body);
+  });
+
   app.post<{ Body: string }>(
     '/auth-hook',
     async (req, rep) => {
-      const rawBody = req.body as string;
+      const rawBody = req.body;
 
       // HMAC verification
       if (!env.SUPABASE_AUTH_HOOK_SECRET) {
         req.log.error('SUPABASE_AUTH_HOOK_SECRET não configurado — recusando hook');
         return rep.code(500).send({ error: 'Server configuration error' });
       }
-      const sig = (req.headers['x-supabase-auth-hook-signature'] as string) ?? '';
+      const signatureHeader = req.headers['x-supabase-auth-hook-signature'];
+      const sig = typeof signatureHeader === 'string' ? signatureHeader : '';
       if (!authHooksService.verifySignature(rawBody, sig)) {
         return rep.code(401).send({ error: 'Invalid signature' });
       }
 
-      let payload: Record<string, unknown>;
+      let payload: unknown;
       try {
         payload = JSON.parse(rawBody);
       } catch {
         return rep.code(400).send({ error: 'Invalid JSON' });
-      }
-
-      const event = payload.event as string;
-      if (!event) {
-        return rep.code(400).send({ error: 'Missing event' });
       }
 
       // Validação Zod do payload
@@ -42,7 +44,7 @@ const authHooksRoutes: FastifyPluginAsync = async (app) => {
             user_metadata: z.record(z.unknown()).optional(),
             app_metadata: z.record(z.unknown()).optional(),
           }),
-          redirect_to: z.string().optional(),
+          redirect_to: z.string().url().optional(),
         })
         .safeParse(payload);
 

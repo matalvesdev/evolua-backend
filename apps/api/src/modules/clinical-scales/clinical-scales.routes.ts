@@ -9,6 +9,7 @@ import {
   UuidSchema,
 } from '@evolua/contracts';
 import { clinicalScalesService } from './clinical-scales.service.js';
+import { resolveClinicId } from '../auth/auth.helpers.js';
 const notFound = { error: 'NotFound', message: 'Scale or result not found' };
 
 const clinicalScalesRoutes: FastifyPluginAsync = async (app) => {
@@ -50,10 +51,17 @@ const clinicalScalesRoutes: FastifyPluginAsync = async (app) => {
           patientId: UuidSchema,
           scaleId: UuidSchema.optional(),
         }),
-        response: { 200: z.array(ClinicalScaleResultSchema) },
+        response: { 200: z.array(ClinicalScaleResultSchema), 404: ErrorResponseSchema },
       },
     },
-    async (req) => clinicalScalesService.listResults(req.query.patientId, req.query.scaleId),
+    async (req, rep) => {
+      const results = await clinicalScalesService.listResults(
+        await resolveClinicId(req.user.id),
+        req.query.patientId,
+        req.query.scaleId,
+      );
+      return results ?? rep.code(404).send(notFound);
+    },
   );
 
   route.post(
@@ -62,12 +70,16 @@ const clinicalScalesRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['clinical-scales'],
         body: RecordScaleResultSchema,
-        response: { 201: ClinicalScaleResultSchema },
+        response: { 201: ClinicalScaleResultSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
-      const r = await clinicalScalesService.recordResult(req.user.id, req.body);
-      return rep.code(201).send(r);
+      const r = await clinicalScalesService.recordResult(
+        await resolveClinicId(req.user.id),
+        req.user.id,
+        req.body,
+      );
+      return r ? rep.code(201).send(r) : rep.code(404).send(notFound);
     },
   );
 
@@ -81,8 +93,11 @@ const clinicalScalesRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async (req, rep) => {
-      const r = await clinicalScalesService.removeResult(req.params.id);
-      if (!r) return rep.code(404).send(notFound);
+      const removed = await clinicalScalesService.removeResult(
+        await resolveClinicId(req.user.id),
+        req.params.id,
+      );
+      if (!removed) return rep.code(404).send(notFound);
       return rep.code(204).send(null);
     },
   );

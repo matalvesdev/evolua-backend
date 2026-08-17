@@ -106,8 +106,8 @@ class ContentResponse(BaseModel):
 @router.post("/generate", response_model=ContentResponse)
 async def generate_content(
     req: ContentRequest,
-    _=Depends(verify_internal_token),
-):
+    _: object = Depends(verify_internal_token),
+) -> ContentResponse:
     if not openrouter_client.is_enabled():
         raise HTTPException(400, "OpenRouter nao configurado. Defina OPENROUTER_API_KEY.")
 
@@ -144,7 +144,7 @@ Responda APENAS com o JSON, sem markdown, sem comentarios."""
     raw_clean = raw_clean.strip()
 
     try:
-        content = json.loads(raw_clean)
+        parsed_content: object = json.loads(raw_clean)
     except json.JSONDecodeError as exc:
         logger.warning("Content generation returned invalid JSON")
         raise HTTPException(
@@ -152,10 +152,17 @@ Responda APENAS com o JSON, sem markdown, sem comentarios."""
             "O serviço de IA retornou um formato inválido. Tente novamente mais tarde.",
         ) from exc
 
+    if not isinstance(parsed_content, dict):
+        logger.warning("Content generation returned a non-object JSON payload")
+        raise HTTPException(
+            502,
+            "O serviço de IA retornou um formato inválido. Tente novamente mais tarde.",
+        )
+
     return ContentResponse(
         format=req.format,
         topic=req.topic,
-        content=content,
+        content={str(key): value for key, value in parsed_content.items()},
         model=openrouter_client._default_model,
         generated_tokens=len(raw_clean.split()),
     )

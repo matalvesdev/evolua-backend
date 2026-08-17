@@ -3,6 +3,8 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import {
   AudioSessionSchema,
+  AudioUploadTargetSchema,
+  CreateAudioUploadSchema,
   CreateAudioSessionSchema,
   ListAudioSessionsQuerySchema,
   TranscribeAudioSchema,
@@ -22,17 +24,52 @@ const audioRoutes: FastifyPluginAsync = async (app) => {
   route.addHook('onRequest', app.authenticate);
 
   route.post(
+    '/upload-target',
+    {
+      schema: {
+        tags: ['audio'],
+        body: CreateAudioUploadSchema,
+        response: { 201: AudioUploadTargetSchema, 404: ErrorResponseSchema, 502: ErrorResponseSchema },
+      },
+    },
+    async (req, rep) => {
+      const clinicId = await resolveClinicId(req.user.id);
+      try {
+        const target = await audioService.createUploadTarget(clinicId, req.body);
+        return rep.code(201).send(target);
+      } catch (error) {
+        if (error instanceof Error && 'statusCode' in error && error.statusCode === 404) {
+          return rep.code(404).send({ error: 'NotFound', message: 'Patient not found' });
+        }
+        req.log.error({ err: error }, 'audio: signed upload target failed');
+        return rep.code(502).send({ error: 'StorageUnavailable', message: 'Unable to prepare audio upload' });
+      }
+    },
+  );
+
+  route.post(
     '/',
     {
       schema: {
         tags: ['audio'],
         body: CreateAudioSessionSchema,
-        response: { 201: AudioSessionSchema, 404: ErrorResponseSchema },
+        response: { 201: AudioSessionSchema, 400: ErrorResponseSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
-      const s = await audioService.create(clinicId, req.user.id, req.body);
+      let s;
+      try {
+        s = await audioService.create(clinicId, req.user.id, req.body);
+      } catch (error) {
+        if (error instanceof Error && 'statusCode' in error && error.statusCode === 404) {
+          return rep.code(404).send({ error: 'NotFound', message: error.message });
+        }
+        if (error instanceof Error && 'statusCode' in error && error.statusCode === 400) {
+          return rep.code(400).send({ error: 'BadRequest', message: error.message });
+        }
+        throw error;
+      }
       auditAsync({
         clinicId, userId: req.user.id, action: 'CREATE', resource: 'AudioSession',
         resourceId: s.id, ipAddress: req.ip, userAgent: req.headers['user-agent'] ?? null,

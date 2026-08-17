@@ -93,6 +93,7 @@ export type WaSendPaymentLinkResponse = z.infer<typeof WaSendPaymentLinkResponse
 // ── Webhook inbound (chamado pelo Go service) ──────────────────────────
 
 export const WaInboundWebhookSchema = z.object({
+  instance: z.string().min(1).max(200),
   senderPhone: z.string().min(5).max(32),
   pushName: z.string().max(200).optional().default(''),
   messageId: z.string().max(200),

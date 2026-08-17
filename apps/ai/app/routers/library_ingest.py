@@ -209,7 +209,7 @@ def _resolve_public_addresses(hostname: str) -> set[str]:
     """Resolve hostname e rejeita destinos que não sejam IPs públicos."""
     try:
         addresses = {
-            item[4][0]
+            str(item[4][0])
             for item in socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)
         }
     except socket.gaierror as exc:

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, TypeGuard
 
 import httpx
 
@@ -28,6 +28,10 @@ class HuggingFaceError(RuntimeError):
 
 class HuggingFaceModelLoadingError(HuggingFaceError):
     """503 — modelo aquecendo. Caller deve tentar novamente."""
+
+
+def _is_number_vector(value: object) -> TypeGuard[list[float]]:
+    return isinstance(value, list) and all(isinstance(item, (int, float)) for item in value)
 
 
 class HuggingFaceClient:
@@ -146,26 +150,34 @@ class HuggingFaceClient:
 
         out = r.json()
         # Para single-text alguns modelos retornam vetor 1D; normalizamos.
-        if isinstance(out, list) and out and isinstance(out[0], (int, float)):
-            return [out]  # type: ignore[list-item]
-        # Sentence-level: list[list[float]]
-        if (
-            isinstance(out, list)
-            and out
-            and isinstance(out[0], list)
-            and out[0]
-            and isinstance(out[0][0], (int, float))
-        ):
-            return out  # type: ignore[return-value]
-        # Token-level: list[list[list[float]]] — média manual.
-        if (
-            isinstance(out, list)
-            and out
-            and isinstance(out[0], list)
-            and out[0]
-            and isinstance(out[0][0], list)
-        ):
-            return [_mean_pool(seq) for seq in out]  # type: ignore[arg-type]
+        if _is_number_vector(out):
+            return [out]
+        if isinstance(out, list):
+            sentence_vectors: list[list[float]] = []
+            for item in out:
+                if not _is_number_vector(item):
+                    break
+                sentence_vectors.append(item)
+            else:
+                return sentence_vectors
+
+            pooled_vectors: list[list[float]] = []
+            for sentence in out:
+                if not isinstance(sentence, list):
+                    break
+                token_vectors: list[list[float]] = []
+                for token in sentence:
+                    if not _is_number_vector(token):
+                        break
+                    token_vectors.append(token)
+                else:
+                    if not token_vectors:
+                        break
+                    pooled_vectors.append(_mean_pool(token_vectors))
+                    continue
+                break
+            else:
+                return pooled_vectors
         raise HuggingFaceError(f"Formato de embedding inesperado: {type(out)}")
 
     # ── Whisper / ASR ──────────────────────────────────────────────────

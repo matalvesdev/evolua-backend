@@ -25,13 +25,23 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['messages'],
         body: CreateMessageSchema,
-        response: { 201: MessageSchema, 404: ErrorResponseSchema },
+        response: { 201: MessageSchema, 400: ErrorResponseSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
-      const clinicId = await resolveClinicId(req.user.id);
-      const m = await messagesService.create(clinicId, req.user.id, req.body);
-      return rep.code(201).send(messageMapper.toDto(m));
+      try {
+        const clinicId = await resolveClinicId(req.user.id);
+        const m = await messagesService.create(clinicId, req.user.id, req.body);
+        return rep.code(201).send(messageMapper.toDto(m));
+      } catch (error) {
+        if (error instanceof Error && 'statusCode' in error && error.statusCode === 404) {
+          return rep.code(404).send({ error: 'NotFound', message: 'Patient not found' });
+        }
+        if (error instanceof Error && 'statusCode' in error && error.statusCode === 400) {
+          return rep.code(400).send({ error: 'BadRequest', message: error.message });
+        }
+        throw error;
+      }
     },
   );
 

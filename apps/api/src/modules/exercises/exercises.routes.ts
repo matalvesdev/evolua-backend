@@ -49,7 +49,10 @@ const exercisesRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async (req, rep) => {
-      const r = await exercisesService.findById(req.params.id);
+      const r = await exercisesService.findById(
+        await resolveClinicId(req.user.id),
+        req.params.id,
+      );
       return r ?? rep.code(404).send(notFound);
     },
   );
@@ -134,7 +137,7 @@ const exercisesRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['exercises'],
         body: PrescribeExerciseSchema,
-        response: { 201: PatientExercisePrescriptionSchema },
+        response: { 201: PatientExercisePrescriptionSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
@@ -143,6 +146,12 @@ const exercisesRoutes: FastifyPluginAsync = async (app) => {
         req.user.id,
         req.body,
       );
+      if (!r) {
+        return rep.code(404).send({
+          error: 'NotFound',
+          message: 'Patient, exercise or plan not found',
+        });
+      }
       return rep.code(201).send(r);
     },
   );

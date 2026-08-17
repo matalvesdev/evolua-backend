@@ -58,7 +58,7 @@ const patientGoalsRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['patient-goals'],
         body: CreateGoalSchema,
-        response: { 201: PatientGoalSchema },
+        response: { 201: PatientGoalSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
@@ -67,6 +67,7 @@ const patientGoalsRoutes: FastifyPluginAsync = async (app) => {
         req.user.id,
         req.body,
       );
+      if (!r) return rep.code(404).send({ error: 'NotFound', message: 'Patient not found' });
       return rep.code(201).send(r);
     },
   );

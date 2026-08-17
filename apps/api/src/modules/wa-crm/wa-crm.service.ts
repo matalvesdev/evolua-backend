@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import type {
   WaConversation as PrismaWaConversation,
   WaMessage as PrismaWaMessage,
@@ -176,6 +177,14 @@ export class WaCrmService {
   // ── Inbound webhook (chamado pelo Go service) ────────────────────────
 
   async handleInbound(payload: WaInboundWebhook): Promise<void> {
+    const connection = await prisma.whatsAppConnection.findFirst({
+      where: { instance: payload.instance, isActive: true },
+      select: { clinicId: true },
+    });
+    if (!connection) {
+      throw new HttpError(503, 'WhatsApp instance is not mapped to an active clinic');
+    }
+    const clinicId = connection.clinicId;
     const phoneVariants = this.phoneVariants(payload.senderPhone);
 
     // Idempotência: ignora se já temos a mensagem
@@ -189,7 +198,7 @@ export class WaCrmService {
 
     // 1. Conversa existente?
     const existing = await prisma.waConversation.findFirst({
-      where: { phone: { in: phoneVariants } },
+      where: { clinicId, phone: { in: phoneVariants } },
     });
     if (existing) {
       await this.saveInbound(existing.id, payload.messageId, payload.text);
@@ -203,6 +212,7 @@ export class WaCrmService {
     // 2. Paciente pelo telefone?
     const patient = await prisma.patient.findFirst({
       where: {
+        clinicId,
         deletedAt: null,
         OR: [
           { phone: { in: phoneVariants } },
@@ -227,6 +237,7 @@ export class WaCrmService {
       const lead = await prisma.lead.create({
         data: {
           name: payload.pushName ?? 'Lead WhatsApp',
+          clinicId,
           phone: payload.senderPhone,
           source: 'whatsapp',
           message: payload.text,
@@ -234,12 +245,12 @@ export class WaCrmService {
         },
       });
       logger.info(
-        { leadId: lead.id, phone: payload.senderPhone, pushName: payload.pushName },
+        { leadId: lead.id, clinicId },
         'wa-crm: lead criado a partir de inbound desconhecido',
       );
     } catch (e) {
       logger.warn(
-        { err: e, phone: payload.senderPhone },
+        { err: e, clinicId },
         'wa-crm: falha ao criar lead para inbound desconhecido',
       );
     }
@@ -309,16 +320,21 @@ export class WaCrmService {
     evolutionId: string,
     content: string,
   ): Promise<void> {
-    await prisma.waMessage.create({
-      data: {
-        conversationId,
-        direction: 'inbound',
-        type: 'text',
-        content,
-        evolutionId: evolutionId || null,
-        status: 'delivered',
-      },
-    });
+    try {
+      await prisma.waMessage.create({
+        data: {
+          conversationId,
+          direction: 'inbound',
+          type: 'text',
+          content,
+          evolutionId: evolutionId || null,
+          status: 'delivered',
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return;
+      throw error;
+    }
   }
 
   /** Variantes de busca: com e sem DDI 55. */

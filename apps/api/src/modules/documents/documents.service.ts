@@ -46,6 +46,13 @@ function toDTO(r: {
 }
 
 export class DocumentsService {
+  private async findPatient(clinicId: string, patientId: string) {
+    return prisma.patient.findFirst({
+      where: { id: patientId, clinicId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+  }
+
   async list(clinicId: string, q: ListDocumentsQuery) {
     const where: Prisma.ReportWhereInput = {
       clinicId,
@@ -86,14 +93,23 @@ export class DocumentsService {
       therapistCrfa?: string;
     },
   ): Promise<DocumentDTO> {
+    const patient = await this.findPatient(clinicId, input.patientId);
+    if (!patient) {
+      const error = new Error('Patient not found in this clinic');
+      Object.assign(error, { statusCode: 404 });
+      throw error;
+    }
+
     const row = await prisma.report.create({
       data: {
         clinicId,
-        patientId: input.patientId,
-        patientName: input.patientName,
+        patientId: patient.id,
+        patientName: patient.name,
         therapistId,
-        therapistName: input.therapistName ?? '',
-        therapistCrfa: input.therapistCrfa ?? '',
+        // Identificação profissional deve vir do perfil autenticado; o contrato
+        // legado ainda aceita estes campos, mas não os usa como autoridade.
+        therapistName: '',
+        therapistCrfa: '',
         type: input.type,
         title: input.title,
         content: input.content ?? '',
@@ -115,17 +131,23 @@ export class DocumentsService {
   ): Promise<DocumentDTO | null> {
     const exists = await prisma.report.findFirst({
       where: { id, clinicId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, patientId: true },
     });
     if (!exists) return null;
+
+    const nextPatientId = input.patientId ?? exists.patientId;
+    const patient = await this.findPatient(clinicId, nextPatientId);
+    if (!patient) return null;
+
     const row = await prisma.report.update({
       where: { id },
       data: {
         ...(input.title !== undefined && { title: input.title }),
         ...(input.content !== undefined && { content: input.content }),
         ...(input.type !== undefined && { type: input.type }),
-        ...(input.patientId !== undefined && { patientId: input.patientId }),
-        ...(input.patientName !== undefined && { patientName: input.patientName }),
+        ...(input.patientId !== undefined && { patientId: patient.id }),
+        // O nome é sempre derivado do cadastro do paciente, não do cliente.
+        ...(input.patientId !== undefined && { patientName: patient.name }),
       },
     });
     return toDTO(row);
