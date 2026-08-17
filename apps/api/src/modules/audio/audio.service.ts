@@ -2,11 +2,15 @@ import type { Prisma, AudioSession } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
+import { recordTranscriptionAttempt } from '../../plugins/metrics.js';
 import type {
+  CreateAudioUploadInput,
   CreateAudioSessionInput,
   ListAudioSessionsQuery,
   TranscribeAudioInput,
 } from '@evolua/contracts';
+import { randomUUID } from 'node:crypto';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 
 export interface PaginatedAudioSessions {
   data: AudioSession[];
@@ -15,6 +19,10 @@ export interface PaginatedAudioSessions {
 
 const BUCKET = 'audio-sessions';
 const SIGN_TTL_SECONDS = 3600; // 1h
+const AUDIO_EXTENSION_BY_CONTENT_TYPE: Record<CreateAudioUploadInput['contentType'], string> = {
+  'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp3': 'mp3',
+  'audio/wav': 'wav', 'audio/mp4': 'mp4', 'audio/m4a': 'm4a', 'audio/x-m4a': 'm4a', 'audio/aac': 'aac',
+};
 
 /**
  * Gera signed URL para um path do bucket privado `audio-sessions`.
@@ -49,6 +57,49 @@ export class AudioService {
     return createSignedUrl(path);
   }
 
+  async createUploadTarget(
+    clinicId: string,
+    input: CreateAudioUploadInput,
+  ): Promise<{ path: string; token: string }> {
+    const patient = await prisma.patient.findFirst({
+      where: { id: input.patientId, clinicId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!patient) {
+      const error = new Error('Patient not found in this clinic');
+      Object.assign(error, { statusCode: 404 });
+      throw error;
+    }
+
+    const extension = AUDIO_EXTENSION_BY_CONTENT_TYPE[input.contentType];
+    const path = `${patient.id}/${randomUUID()}.${extension}`;
+    const url = `${env.SUPABASE_URL}/storage/v1/object/upload/sign/${BUCKET}/${path}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ upsert: false }),
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!response.ok) {
+      throw new Error('Unable to create signed audio upload target');
+    }
+    const data: unknown = await response.json();
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      !('token' in data) ||
+      typeof data.token !== 'string' ||
+      data.token.length === 0
+    ) {
+      throw new Error('Storage signed upload response is invalid');
+    }
+    return { path, token: data.token };
+  }
+
   async create(
     clinicId: string,
     therapistId: string,
@@ -62,6 +113,23 @@ export class AudioService {
       const err = new Error('Patient not found in this clinic');
       (err as Error & { statusCode: number }).statusCode = 404;
       throw err;
+    }
+
+    if (input.appointmentId) {
+      const appointment = await prisma.appointment.findFirst({
+        where: {
+          id: input.appointmentId,
+          clinicId,
+          patientId: input.patientId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!appointment) {
+        const err = new Error('Appointment not found for this patient in this clinic');
+        Object.assign(err, { statusCode: 404 });
+        throw err;
+      }
     }
 
     // Path obrigatório precisa começar com o patientId (defesa em profundidade).
@@ -122,18 +190,20 @@ export class AudioService {
   async getTranscription(
     clinicId: string,
     id: string,
-  ): Promise<{ transcription: string; transcriptionStatus: string } | null> {
+  ): Promise<{ transcription: string; transcriptionStatus: string; transcriptionError: string | null } | null> {
     const s = await this.findOne(clinicId, id);
     if (!s) return null;
     return {
       transcription: s.transcription ?? '',
       transcriptionStatus: s.transcriptionStatus ?? 'pending',
+      transcriptionError: s.transcriptionError,
     };
   }
 
-  async remove(clinicId: string, id: string): Promise<boolean> {
+  async remove(clinicId: string, actorId: string, id: string): Promise<boolean> {
     const s = await this.findOne(clinicId, id);
     if (!s) return false;
+    await requireResourceOwnerOrClinicAdmin(actorId, s.therapistId);
     await prisma.audioSession.update({
       where: { id },
       data: { deletedAt: new Date() },
@@ -155,17 +225,25 @@ export class AudioService {
   ): Promise<AudioSession | null> {
     const session = await this.findOne(clinicId, input.audioSessionId);
     if (!session) return null;
+    await requireResourceOwnerOrClinicAdmin(therapistId, session.therapistId);
 
-    const updated = await prisma.audioSession.update({
-      where: { id: session.id },
+    const claimed = await prisma.audioSession.updateMany({
+      where: {
+        id: session.id,
+        clinicId,
+        deletedAt: null,
+        transcriptionStatus: { in: ['pending', 'failed'] },
+      },
       data: { transcriptionStatus: 'processing', transcriptionError: null },
     });
 
-    void this.dispatchTranscription(updated, therapistId, input.language).catch((err) => {
-      logger.warn(
-        { err, sessionId: updated.id, patientId: updated.patientId },
-        'audio: transcription dispatch failed',
-      );
+    if (claimed.count === 0) return this.findOne(clinicId, session.id);
+
+    const updated = await this.findOne(clinicId, session.id);
+    if (!updated) return null;
+
+    void this.dispatchTranscription(updated, therapistId, input.language).catch(() => {
+      logger.warn('audio: transcription dispatch failed');
     });
 
     return updated;
@@ -185,18 +263,20 @@ export class AudioService {
 
       if (aiResult.success && aiResult.transcription) {
         await this.saveTranscription(session.id, aiResult.transcription);
+        recordTranscriptionAttempt('completed');
         return;
       }
 
       // Fallback: Hugging Face Inference API direto (serverless, sem cold start)
       logger.info(
-        { sessionId: session.id, fallback: 'huggingface' },
+        { fallback: 'huggingface' },
         'audio: AI service unavailable, falling back to Hugging Face Inference API',
       );
 
       const hfResult = await this.tryHuggingFaceFallback(signedUrl);
       if (hfResult.success && hfResult.transcription) {
         await this.saveTranscription(session.id, hfResult.transcription);
+        recordTranscriptionAttempt('completed');
         return;
       }
 
@@ -205,15 +285,16 @@ export class AudioService {
         where: { id: session.id },
         data: {
           transcriptionStatus: 'failed',
-          transcriptionError: `AI service: ${aiResult.error} | HF fallback: ${hfResult.error}`,
+          transcriptionError: 'Transcrição indisponível. Tente novamente mais tarde.',
         },
       });
-    } catch (e) {
+      recordTranscriptionAttempt('failed');
+    } catch {
       await prisma.audioSession.update({
         where: { id: session.id },
         data: {
           transcriptionStatus: 'failed',
-          transcriptionError: e instanceof Error ? e.message : String(e),
+          transcriptionError: 'Transcrição indisponível. Tente novamente mais tarde.',
         },
       });
     }
@@ -234,7 +315,7 @@ export class AudioService {
       if (attempt > 0) {
         const delay = delays[attempt - 1] ?? 20_000;
         logger.info(
-          { sessionId, attempt, delayMs: delay },
+          { attempt, delayMs: delay },
           'audio: retrying AI service after cold start',
         );
         await new Promise(r => setTimeout(r, delay));
@@ -268,8 +349,8 @@ export class AudioService {
         if (res.status !== 502 && res.status !== 503) {
           return { success: false, error: lastError };
         }
-      } catch (e) {
-        lastError = e instanceof Error ? e.message : 'unknown';
+      } catch {
+        lastError = 'network_or_timeout';
         // Timeout ou network error — pode ser cold start
         if (attempt < maxRetries) continue;
         return { success: false, error: lastError };
@@ -289,11 +370,31 @@ export class AudioService {
 
     try {
       // 1. Baixa o áudio do signed URL
-      const audioRes = await fetch(signedUrl, { signal: AbortSignal.timeout(30_000) });
+      const audioRes = await fetch(signedUrl, {
+        signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
+      });
+      recordTranscriptionAttempt('failed');
       if (!audioRes.ok) {
         return { success: false, error: `Failed to download audio: ${audioRes.status}` };
       }
+      const contentLength = Number(audioRes.headers.get('content-length'));
+      const maxAudioBytes = 50 * 1024 * 1024;
+      if (Number.isFinite(contentLength) && contentLength > maxAudioBytes) {
+        return { success: false, error: 'Audio exceeds maximum size' };
+      }
+      const contentType = (audioRes.headers.get('content-type') ?? '').split(';', 1)[0];
+      const allowedContentTypes = new Set([
+        'audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/mp3', 'audio/wav',
+        'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac',
+      ]);
+      if (!allowedContentTypes.has(contentType)) {
+        return { success: false, error: 'Unsupported audio content type' };
+      }
       const audioBytes = await audioRes.arrayBuffer();
+      if (audioBytes.byteLength > maxAudioBytes) {
+        return { success: false, error: 'Audio exceeds maximum size' };
+      }
 
       // 2. Envia para Hugging Face Inference API
       const hfRes = await fetch(
@@ -302,7 +403,7 @@ export class AudioService {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${env.HUGGINGFACE_API_KEY}`,
-            'Content-Type': 'audio/webm',
+          'Content-Type': contentType,
           },
           body: audioBytes,
           signal: AbortSignal.timeout(120_000),
@@ -310,8 +411,7 @@ export class AudioService {
       );
 
       if (!hfRes.ok) {
-        const body = await hfRes.text().catch(() => '');
-        return { success: false, error: `HF API ${hfRes.status}: ${body.slice(0, 200)}` };
+        return { success: false, error: `HF API ${hfRes.status}` };
       }
 
       const data = (await hfRes.json()) as { text?: string };
@@ -320,8 +420,8 @@ export class AudioService {
       }
 
       return { success: true, transcription: data.text };
-    } catch (e) {
-      return { success: false, error: e instanceof Error ? e.message : 'unknown' };
+    } catch {
+      return { success: false, error: 'network_or_timeout' };
     }
   }
 

@@ -22,6 +22,7 @@ model Clinic {
   zipCode   String?  @map("zip_code")
   phone     String?
   email     String?
+  timeZone  String   @default("America/Sao_Paulo") @map("time_zone")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
   settings  Json?     @default("{}")
@@ -30,6 +31,7 @@ model Clinic {
   patients                Patient[]
   appointments            Appointment[]
   reports                 Report[]
+  medicalRecords          MedicalRecord[]
   tasks                   Task[]
   audioSessions           AudioSession[]
   transactions            Transaction[]
@@ -51,6 +53,8 @@ model Clinic {
   invoices                Invoice[]
   documentTemplates       DocumentTemplate[]
   whatsappAutomations     WhatsAppAutomation[]
+  whatsappConnections     WhatsAppConnection[]
+  leads                   Lead[]
 
   @@map("clinics")
 }
@@ -92,6 +96,7 @@ model User {
   therapeuticMaterials    TherapeuticMaterial[]
   exercisePrescriptions   PatientExercisePrescription[]
   caaBoards               CaaBoard[]
+  medicalRecords          MedicalRecord[]               @relation("MedicalRecordAuthor")
 
   @@map("users")
 }
@@ -122,6 +127,7 @@ model Patient {
   therapist             User?                         @relation("TherapistPatients", fields: [therapistId], references: [id], onDelete: SetNull)
   appointments          Appointment[]
   reports               Report[]
+  medicalRecord         MedicalRecord?
   tasks                 Task[]
   audioSessions         AudioSession[]
   transactions          Transaction[]
@@ -164,6 +170,8 @@ model Appointment {
   confirmationTokenExpiresAt DateTime? @map("confirmation_token_expires_at") @db.Timestamptz
   reminder24hSentAt          DateTime? @map("reminder_24h_sent_at") @db.Timestamptz // MED-08
   reminder1hSentAt           DateTime? @map("reminder_1h_sent_at") @db.Timestamptz // MED-08
+  reminder24hClaimedAt       DateTime? @map("reminder_24h_claimed_at") @db.Timestamptz
+  reminder1hClaimedAt        DateTime? @map("reminder_1h_claimed_at") @db.Timestamptz
   createdAt                  DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   deletedAt                  DateTime? @map("deleted_at") @db.Timestamptz
@@ -227,6 +235,28 @@ model Report {
   @@index([clinicId, patientId])
   @@index([therapistId, createdAt])
   @@map("reports")
+}
+
+model MedicalRecord {
+  id              String   @id @default(uuid()) @db.Uuid
+  clinicId        String   @map("clinic_id") @db.Uuid
+  patientId       String   @unique @map("patient_id") @db.Uuid
+  createdBy       String?  @map("created_by") @db.Uuid
+  clinicalArea    String   @default("linguagem") @map("clinical_area")
+  diagnosis       String   @default("")
+  anamnesis       String   @default("")
+  scales          Json     @default("{}")
+  objectives      String[] @default([])
+  latestEvolution String   @default("") @map("latest_evolution")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  author  User?   @relation("MedicalRecordAuthor", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([clinicId, updatedAt(sort: Desc)])
+  @@map("medical_records")
 }
 
 model AudioSession {
@@ -340,6 +370,12 @@ model Message {
   recipientName  String   @map("recipient_name")
   channel        String   @default("whatsapp")
   sentAt         DateTime @default(now()) @map("sent_at") @db.Timestamptz
+  deliveryStatus String   @default("sent") @map("delivery_status")
+  deliveryAttempts Int    @default(0) @map("delivery_attempts")
+  deliveryError  String?  @map("delivery_error")
+  deliveryAttemptedAt DateTime? @map("delivery_attempted_at") @db.Timestamptz
+  deliveredAt    DateTime? @map("delivered_at") @db.Timestamptz
+  idempotencyKey String?  @map("idempotency_key")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   clinic    Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
@@ -349,6 +385,7 @@ model Message {
   @@index([clinicId, sentAt])
   @@index([patientId, sentAt])
   @@index([therapistId, sentAt])
+  @@unique([clinicId, idempotencyKey])
   @@map("messages")
 }
 
@@ -566,7 +603,7 @@ model TreatmentSession {
   plan        TreatmentPlan @relation(fields: [treatmentPlanId], references: [id], onDelete: Cascade)
   appointment Appointment?  @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
 
-  @@index([treatmentPlanId, sessionNumber])
+  @@unique([treatmentPlanId, sessionNumber])
   @@map("treatment_sessions")
 }
 
@@ -631,11 +668,29 @@ model Lead {
   notes     String?
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  clinicId  String?  @map("clinic_id") @db.Uuid
+
+  clinic Clinic? @relation(fields: [clinicId], references: [id], onDelete: SetNull)
 
   @@index([status])
+  @@index([clinicId, createdAt(sort: Desc)])
   @@index([source])
   @@index([createdAt(sort: Desc)])
   @@map("leads")
+}
+
+model WhatsAppConnection {
+  id        String   @id @default(uuid()) @db.Uuid
+  clinicId  String   @map("clinic_id") @db.Uuid
+  instance  String   @unique
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  clinic Clinic @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId, isActive])
+  @@map("whatsapp_connections")
 }
 
 // ============================================================================
@@ -675,6 +730,7 @@ model WaMessage {
   conversation WaConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, sentAt])
+  @@unique([evolutionId])
   @@map("wa_messages")
 }
 
@@ -893,6 +949,7 @@ model BillingEvent {
   type        String    // ex: 'invoice.paid', 'subscription.canceled'
   payload     Json
   processedAt DateTime? @map("processed_at") @db.Timestamptz
+  processingAt DateTime? @map("processing_at") @db.Timestamptz
   error       String?
   receivedAt  DateTime  @default(now()) @map("received_at") @db.Timestamptz
 
@@ -1008,11 +1065,12 @@ model BlogPost {
 }
 
 model NewsletterSubscriber {
-  id            String    @id @default(uuid()) @db.Uuid
-  email         String    @unique
-  name          String?
-  subscribedAt  DateTime  @default(now()) @map("subscribed_at") @db.Timestamptz
-  unsubscribedAt DateTime? @map("unsubscribed_at") @db.Timestamptz
+  id               String    @id @default(uuid()) @db.Uuid
+  email            String    @unique
+  name             String?
+  subscribedAt     DateTime  @default(now()) @map("subscribed_at") @db.Timestamptz
+  unsubscribedAt   DateTime? @map("unsubscribed_at") @db.Timestamptz
+  unsubscribeToken String    @unique @default(uuid()) @map("unsubscribe_token") @db.Uuid
 
   @@index([subscribedAt(sort: Desc)])
   @@map("newsletter_subscribers")

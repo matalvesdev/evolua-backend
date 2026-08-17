@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 import type {
   ExerciseTemplate as PrismaExercise,
   PatientExercisePrescription as PrismaPrescription,
@@ -69,8 +70,10 @@ export class ExercisesService {
     return rows.map(exerciseToDTO);
   }
 
-  async findById(id: string) {
-    const row = await prisma.exerciseTemplate.findUnique({ where: { id } });
+  async findById(clinicId: string, id: string) {
+    const row = await prisma.exerciseTemplate.findFirst({
+      where: { id, OR: [{ isSystem: true }, { clinicId }] },
+    });
     return row ? exerciseToDTO(row) : null;
   }
 
@@ -147,7 +150,32 @@ export class ExercisesService {
     clinicId: string,
     therapistId: string,
     input: PrescribeExerciseInput,
-  ) {
+  ): Promise<PatientExercisePrescription | null> {
+    const [patient, exercise] = await Promise.all([
+      prisma.patient.findFirst({
+        where: { id: input.patientId, clinicId, deletedAt: null },
+        select: { id: true },
+      }),
+      prisma.exerciseTemplate.findFirst({
+        where: { id: input.exerciseId, OR: [{ isSystem: true }, { clinicId }] },
+        select: { id: true },
+      }),
+    ]);
+    if (!patient || !exercise) return null;
+
+    if (input.treatmentPlanId) {
+      const plan = await prisma.treatmentPlan.findFirst({
+        where: {
+          id: input.treatmentPlanId,
+          clinicId,
+          patientId: input.patientId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (!plan) return null;
+    }
+
     const row = await prisma.patientExercisePrescription.create({
       data: {
         clinicId,
@@ -166,12 +194,13 @@ export class ExercisesService {
     return prescriptionToDTO(row);
   }
 
-  async cancelPrescription(clinicId: string, id: string) {
+  async cancelPrescription(clinicId: string, actorId: string, id: string) {
     const exists = await prisma.patientExercisePrescription.findFirst({
       where: { id, clinicId },
-      select: { id: true },
+      select: { id: true, therapistId: true },
     });
     if (!exists) return null;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.therapistId);
     const row = await prisma.patientExercisePrescription.update({
       where: { id },
       data: { status: 'cancelled' },

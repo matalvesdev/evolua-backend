@@ -44,6 +44,7 @@ export class TasksService {
   }
 
   async create(clinicId: string, userId: string, input: CreateTaskInput): Promise<Task> {
+    const references = await this.resolveReferences(clinicId, input.patientId, input.appointmentId);
     const row = await prisma.task.create({
       data: {
         clinicId,
@@ -53,8 +54,8 @@ export class TasksService {
         type: input.type,
         priority: input.priority,
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
-        patientId: input.patientId ?? null,
-        appointmentId: input.appointmentId ?? null,
+        patientId: references.patientId,
+        appointmentId: references.appointmentId,
       },
     });
     return taskToDTO(row);
@@ -65,8 +66,13 @@ export class TasksService {
     id: string,
     input: UpdateTaskInput,
   ): Promise<Task | null> {
-    const exists = await prisma.task.findFirst({ where: { id, clinicId }, select: { id: true } });
+    const exists = await prisma.task.findFirst({ where: { id, clinicId }, select: { id: true, patientId: true, appointmentId: true } });
     if (!exists) return null;
+    const references = await this.resolveReferences(
+      clinicId,
+      input.patientId === undefined ? exists.patientId : input.patientId,
+      input.appointmentId === undefined ? exists.appointmentId : input.appointmentId,
+    );
     const row = await prisma.task.update({
       where: { id },
       data: {
@@ -81,8 +87,7 @@ export class TasksService {
         ...(input.dueDate !== undefined && {
           dueDate: input.dueDate ? new Date(input.dueDate) : null,
         }),
-        ...(input.patientId !== undefined && { patientId: input.patientId }),
-        ...(input.appointmentId !== undefined && { appointmentId: input.appointmentId }),
+        ...(input.patientId !== undefined || input.appointmentId !== undefined ? references : {}),
       },
     });
     return taskToDTO(row);
@@ -97,6 +102,17 @@ export class TasksService {
     if (!exists) return false;
     await prisma.task.delete({ where: { id } });
     return true;
+  }
+
+  private async resolveReferences(clinicId: string, patientId?: string | null, appointmentId?: string | null) {
+    const [patient, appointment] = await Promise.all([
+      patientId ? prisma.patient.findFirst({ where: { id: patientId, clinicId, deletedAt: null }, select: { id: true } }) : Promise.resolve(null),
+      appointmentId ? prisma.appointment.findFirst({ where: { id: appointmentId, clinicId, deletedAt: null }, select: { id: true, patientId: true } }) : Promise.resolve(null),
+    ]);
+    if ((patientId && !patient) || (appointmentId && !appointment) || (patient && appointment && patient.id !== appointment.patientId)) {
+      throw Object.assign(new Error('Patient and appointment must belong to the same clinic'), { statusCode: 404 });
+    }
+    return { patientId: patient?.id ?? appointment?.patientId ?? null, appointmentId: appointment?.id ?? null };
   }
 }
 

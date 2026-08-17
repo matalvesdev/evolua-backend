@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 import type {
   CreateReportInput,
   UpdateReportInput,
@@ -11,6 +12,8 @@ import type {
 import { reportToDTO } from './reports.mapper.js';
 
 export class ReportsService {
+  private static readonly IMMUTABLE_STATUSES = new Set(['approved', 'sent', 'signed']);
+
   async list(clinicId: string, q: ListReportsQuery) {
     const where: Prisma.ReportWhereInput = {
       clinicId,
@@ -50,14 +53,17 @@ export class ReportsService {
     therapistId: string,
     input: CreateReportInput,
   ): Promise<Report> {
+    const patient = await this.assertPatientBelongsToClinic(clinicId, input.patientId);
+    await this.assertAppointmentBelongsToPatient(clinicId, input.patientId, input.appointmentId);
+    const therapist = await this.assertTherapistBelongsToClinic(clinicId, therapistId);
     const row = await prisma.report.create({
       data: {
         clinicId,
         patientId: input.patientId,
-        patientName: input.patientName,
+        patientName: patient.name,
         therapistId,
-        therapistName: input.therapistName,
-        therapistCrfa: input.therapistCrfa,
+        therapistName: therapist.fullName,
+        therapistCrfa: therapist.crfa ?? '',
         type: input.type,
         title: input.title,
         content: input.content,
@@ -72,14 +78,17 @@ export class ReportsService {
 
   async update(
     clinicId: string,
+    actorId: string,
     id: string,
     input: UpdateReportInput,
   ): Promise<Report | null> {
     const exists = await prisma.report.findFirst({
       where: { id, clinicId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, status: true, therapistId: true },
     });
     if (!exists) return null;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.therapistId);
+    this.assertMutable(exists.status);
     const row = await prisma.report.update({
       where: { id },
       data: {
@@ -101,7 +110,8 @@ export class ReportsService {
     return reportToDTO(row);
   }
 
-  async submitForReview(clinicId: string, id: string): Promise<Report | null> {
+  async submitForReview(clinicId: string, actorId: string, id: string): Promise<Report | null> {
+    await this.assertReportOwnership(clinicId, id, actorId);
     return this.transition(clinicId, id, { status: 'review' });
   }
 
@@ -111,6 +121,7 @@ export class ReportsService {
     reviewerId: string,
     input: ReviewReportInput,
   ): Promise<Report | null> {
+    await this.assertReportOwnership(clinicId, id, reviewerId);
     return this.transition(clinicId, id, {
       status: 'review',
       reviewer: { connect: { id: reviewerId } },
@@ -136,11 +147,17 @@ export class ReportsService {
     id: string,
     input: SendReportInput,
   ): Promise<Report | null> {
-    return this.transition(clinicId, id, {
-      status: 'sent',
-      sentAt: new Date(),
-      sentTo: input.recipients,
-    });
+    // Não há transporte seguro de documento (arquivo assinado, expiração,
+    // consentimento e confirmação do provider) implementado neste módulo.
+    // Marcar o laudo como enviado sem entregar conteúdo é uma violação de
+    // integridade clínica; manter o endpoint explícito até a entrega existir.
+    void clinicId;
+    void id;
+    void input;
+    throw Object.assign(
+      new Error('Secure report delivery is not configured'),
+      { statusCode: 501 },
+    );
   }
 
   async listLaudos(clinicId: string, q: { page: number; pageSize: number; patientId?: string; status?: string }) {
@@ -175,16 +192,18 @@ export class ReportsService {
   async createLaudo(
     clinicId: string,
     therapistId: string,
-    input: { patientId: string; patientName: string; therapistName: string; therapistCrfa: string; type: string; title: string; content: string },
+    input: { patientId: string; type: string; title: string; content: string },
   ): Promise<Report> {
+    const patient = await this.assertPatientBelongsToClinic(clinicId, input.patientId);
+    const therapist = await this.assertTherapistBelongsToClinic(clinicId, therapistId);
     const row = await prisma.report.create({
       data: {
         clinicId,
         patientId: input.patientId,
-        patientName: input.patientName,
+        patientName: patient.name,
         therapistId,
-        therapistName: input.therapistName,
-        therapistCrfa: input.therapistCrfa,
+        therapistName: therapist.fullName,
+        therapistCrfa: therapist.crfa ?? '',
         type: input.type,
         title: input.title,
         content: input.content,
@@ -194,12 +213,14 @@ export class ReportsService {
     return reportToDTO(row);
   }
 
-  async remove(clinicId: string, id: string): Promise<Report | null> {
+  async remove(clinicId: string, actorId: string, id: string): Promise<Report | null> {
     const exists = await prisma.report.findFirst({
       where: { id, clinicId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, status: true, therapistId: true },
     });
     if (!exists) return null;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.therapistId);
+    this.assertMutable(exists.status);
     const row = await prisma.report.update({
       where: { id },
       data: { deletedAt: new Date() },
@@ -219,6 +240,67 @@ export class ReportsService {
     if (!exists) return null;
     const row = await prisma.report.update({ where: { id }, data });
     return reportToDTO(row);
+  }
+
+  private assertMutable(status: string): void {
+    if (!ReportsService.IMMUTABLE_STATUSES.has(status)) return;
+    const error = new Error('Finalized clinical records cannot be changed or deleted');
+    Object.assign(error, { statusCode: 409 });
+    throw error;
+  }
+
+  private async assertPatientBelongsToClinic(
+    clinicId: string,
+    patientId: string,
+  ): Promise<{ id: string; name: string }> {
+    const patient = await prisma.patient.findFirst({
+      where: { id: patientId, clinicId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (patient) return patient;
+
+    const err = new Error('Patient not found');
+    (err as Error & { statusCode: number }).statusCode = 404;
+    throw err;
+  }
+
+  private async assertTherapistBelongsToClinic(
+    clinicId: string,
+    therapistId: string,
+  ): Promise<{ fullName: string; crfa: string | null }> {
+    const therapist = await prisma.user.findFirst({
+      where: { id: therapistId, clinicId },
+      select: { fullName: true, crfa: true },
+    });
+    if (therapist) return therapist;
+
+    throw Object.assign(new Error('Authenticated professional is not part of this clinic'), {
+      statusCode: 403,
+    });
+  }
+
+  private async assertAppointmentBelongsToPatient(
+    clinicId: string,
+    patientId: string,
+    appointmentId?: string | null,
+  ): Promise<void> {
+    if (!appointmentId) return;
+    const appointment = await prisma.appointment.findFirst({
+      where: { id: appointmentId, clinicId, patientId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!appointment) {
+      throw Object.assign(new Error('Appointment not found for this patient'), { statusCode: 404 });
+    }
+  }
+
+  private async assertReportOwnership(clinicId: string, id: string, actorId: string): Promise<void> {
+    const report = await prisma.report.findFirst({
+      where: { id, clinicId, deletedAt: null },
+      select: { therapistId: true },
+    });
+    if (!report) return;
+    await requireResourceOwnerOrClinicAdmin(actorId, report.therapistId);
   }
 }
 

@@ -3,6 +3,7 @@
 No-op se SENTRY_DSN não estiver configurado (dev local).
 Em produção, o operador deve garantir o DSN no env.
 """
+
 from __future__ import annotations
 
 import sentry_sdk

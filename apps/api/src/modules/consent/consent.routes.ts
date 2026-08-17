@@ -41,11 +41,18 @@ const consentRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['consent'],
         body: GrantConsentSchema,
-        response: { 201: ConsentRecordSchema },
+        response: { 201: ConsentRecordSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
+      const patient = await prisma.patient.findFirst({
+        where: { id: req.body.patientId, clinicId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!patient) {
+        return rep.code(404).send({ error: 'NotFound', message: 'Patient not found' });
+      }
       const created = await prisma.consentRecord.create({
         data: {
           clinicId,

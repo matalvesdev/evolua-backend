@@ -16,6 +16,17 @@ import type { BillingProvider } from '@evolua/contracts';
 const DEFAULT_SUCCESS_URL = `${env.APP_URL ?? 'http://localhost:5173'}/dashboard/billing?status=success`;
 const DEFAULT_CANCEL_URL = `${env.APP_URL ?? 'http://localhost:5173'}/dashboard/billing?status=canceled`;
 
+function resolveCheckoutReturnUrl(candidate: string | undefined, fallback: string): string {
+  if (!candidate) return fallback;
+  try {
+    const allowedOrigin = new URL(env.APP_URL ?? env.FRONTEND_URL).origin;
+    const requested = new URL(candidate);
+    return requested.origin === allowedOrigin ? requested.toString() : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 class BillingService {
   // ── Plans ────────────────────────────────────────────────────────────────
   async listPlans() {
@@ -52,8 +63,8 @@ class BillingService {
       throw Object.assign(new Error('Plano gratuito não exige checkout'), { statusCode: 400 });
     }
 
-    const successUrl = input.successUrl ?? DEFAULT_SUCCESS_URL;
-    const cancelUrl = input.cancelUrl ?? DEFAULT_CANCEL_URL;
+    const successUrl = resolveCheckoutReturnUrl(input.successUrl, DEFAULT_SUCCESS_URL);
+    const cancelUrl = resolveCheckoutReturnUrl(input.cancelUrl, DEFAULT_CANCEL_URL);
 
     if (input.provider === 'abacatepay') {
       if (!plan.abacatepayProductId) {
@@ -119,9 +130,9 @@ class BillingService {
 
   // ── Webhook processing (idempotente) ─────────────────────────────────────
   /**
-   * 1. Tenta inserir em billing_events (UNIQUE provider+externalId)
-   * 2. Se já existe → ignora (idempotência)
-   * 3. Senão processa o evento e marca processedAt
+   * A chave única deduplica eventos concluídos. Eventos que falharam podem ser
+   * reivindicados novamente por uma redelivery do provider; apenas uma
+   * instância processa o evento por vez.
    */
   async processWebhook(input: {
     provider: BillingProvider;
@@ -129,6 +140,7 @@ class BillingService {
     type: string;
     payload: unknown;
   }) {
+    const now = new Date();
     try {
       await prisma.billingEvent.create({
         data: {
@@ -136,15 +148,33 @@ class BillingService {
           externalId: input.externalId,
           type: input.type,
           payload: input.payload as object,
+          processingAt: now,
         },
       });
     } catch (err: unknown) {
-      // P2002 = unique constraint → evento já recebido
+      // P2002 may mean a completed duplicate or a failed/stale event. Only
+      // claim the latter so concurrent redeliveries remain idempotent.
       if (err && typeof err === 'object' && 'code' in err && err.code === 'P2002') {
-        logger.info({ provider: input.provider, externalId: input.externalId }, 'webhook duplicado ignorado');
-        return { duplicate: true };
+        const staleBefore = new Date(Date.now() - 5 * 60 * 1000);
+        const retry = await prisma.billingEvent.updateMany({
+          where: {
+            provider: input.provider,
+            externalId: input.externalId,
+            processedAt: null,
+            OR: [
+              { processingAt: null },
+              { processingAt: { lt: staleBefore } },
+            ],
+          },
+          data: { processingAt: now, error: null },
+        });
+        if (retry.count === 0) {
+          logger.info({ provider: input.provider, externalId: input.externalId }, 'webhook duplicate or in progress');
+          return { duplicate: true };
+        }
+      } else {
+        throw err;
       }
-      throw err;
     }
 
     try {
@@ -158,7 +188,7 @@ class BillingService {
 
       await prisma.billingEvent.updateMany({
         where: { provider: input.provider, externalId: input.externalId },
-        data: { processedAt: new Date() },
+        data: { processedAt: new Date(), processingAt: null, error: null },
       });
 
       return { ok: true };
@@ -166,7 +196,7 @@ class BillingService {
       const message = err instanceof Error ? err.message : String(err);
       await prisma.billingEvent.updateMany({
         where: { provider: input.provider, externalId: input.externalId },
-        data: { error: message },
+        data: { error: message, processingAt: null },
       });
       throw err;
     }
@@ -226,7 +256,7 @@ class BillingService {
               const today = new Date().toLocaleDateString('pt-BR');
               emailService
                 .sendBillingReceipt(clinic.email, clinic.name, amount, today, 'PIX/Cartão')
-                .catch((err) => logger.warn({ err, clinicId }, 'Billing receipt email failed'));
+                .catch(() => logger.warn('Billing receipt email failed'));
             }
           }
         }
@@ -306,7 +336,7 @@ class BillingService {
             const today = new Date().toLocaleDateString('pt-BR');
             emailService
               .sendBillingReceipt(clinic.email, clinic.name, amount, today, 'Cartão (Stripe)')
-              .catch((err) => logger.warn({ err, clinicId: sub.clinicId }, 'Billing receipt email failed'));
+              .catch(() => logger.warn('Billing receipt email failed'));
           }
         }
         return;

@@ -22,6 +22,7 @@ venv/
 # Go
 apps/services/*/bin/
 apps/services/*/coverage.out
+apps/services/*/*.exe
 
 # Prisma
 prisma/dev.db

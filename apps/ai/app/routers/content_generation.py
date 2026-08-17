@@ -4,10 +4,9 @@ import json
 import logging
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from ..config import get_settings
 from ..deps import verify_internal_token
 from ..openrouter_client import openrouter_client
 
@@ -107,8 +106,8 @@ class ContentResponse(BaseModel):
 @router.post("/generate", response_model=ContentResponse)
 async def generate_content(
     req: ContentRequest,
-    _=Depends(verify_internal_token),
-):
+    _: object = Depends(verify_internal_token),
+) -> ContentResponse:
     if not openrouter_client.is_enabled():
         raise HTTPException(400, "OpenRouter nao configurado. Defina OPENROUTER_API_KEY.")
 
@@ -117,7 +116,7 @@ async def generate_content(
 
 Publico-alvo: {req.target_audience}
 Tom: {req.tone}
-Palavras-chave: {', '.join(req.keywords) if req.keywords else 'nenhuma'}
+Palavras-chave: {", ".join(req.keywords) if req.keywords else "nenhuma"}
 
 Responda APENAS com o JSON, sem markdown, sem comentarios."""
 
@@ -130,8 +129,12 @@ Responda APENAS com o JSON, sem markdown, sem comentarios."""
             max_tokens=8192,
             temperature=0.7,
         )
-    except Exception as e:
-        raise HTTPException(502, f"OpenRouter falhou: {e}")
+    except Exception as exc:
+        logger.warning("Content generation provider unavailable")
+        raise HTTPException(
+            502,
+            "Não foi possível gerar o conteúdo agora. Tente novamente mais tarde.",
+        ) from exc
 
     raw_clean = raw.strip()
     if raw_clean.startswith("```"):
@@ -141,14 +144,25 @@ Responda APENAS com o JSON, sem markdown, sem comentarios."""
     raw_clean = raw_clean.strip()
 
     try:
-        content = json.loads(raw_clean)
-    except json.JSONDecodeError as e:
-        raise HTTPException(502, f"Resposta JSON invalida do modelo: {e}. Resposta: {raw_clean[:500]}")
+        parsed_content: object = json.loads(raw_clean)
+    except json.JSONDecodeError as exc:
+        logger.warning("Content generation returned invalid JSON")
+        raise HTTPException(
+            502,
+            "O serviço de IA retornou um formato inválido. Tente novamente mais tarde.",
+        ) from exc
+
+    if not isinstance(parsed_content, dict):
+        logger.warning("Content generation returned a non-object JSON payload")
+        raise HTTPException(
+            502,
+            "O serviço de IA retornou um formato inválido. Tente novamente mais tarde.",
+        )
 
     return ContentResponse(
         format=req.format,
         topic=req.topic,
-        content=content,
+        content={str(key): value for key, value in parsed_content.items()},
         model=openrouter_client._default_model,
         generated_tokens=len(raw_clean.split()),
     )

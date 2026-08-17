@@ -20,7 +20,7 @@ import {
 import { billingService } from './billing.service.js';
 import { abacatepay } from './providers/abacatepay.js';
 import { stripe } from './providers/stripe.js';
-import { resolveClinicId } from '../auth/auth.helpers.js';
+import { requireClinicAdministration, resolveClinicId } from '../auth/auth.helpers.js';
 
 // Zod schemas for webhook payload validation
 const AbacatePayWebhookSchema = z.object({
@@ -77,7 +77,7 @@ export const billingRoutes: FastifyPluginAsync = async (app) => {
       },
     },
   }, async (req) => {
-    const clinicId = await resolveClinicId(req.user.id);
+    const clinicId = await requireClinicAdministration(req.user.id);
     return billingService.createCheckout({
       clinicId,
       planSlug: req.body.planSlug,
@@ -96,7 +96,7 @@ export const billingRoutes: FastifyPluginAsync = async (app) => {
       response: { 200: z.object({ ok: z.boolean() }), 404: ErrorResponseSchema },
     },
   }, async (req) => {
-    const clinicId = await resolveClinicId(req.user.id);
+    const clinicId = await requireClinicAdministration(req.user.id);
     return billingService.cancelSubscription(clinicId);
   });
 
@@ -138,10 +138,23 @@ export const billingWebhookRoutes: FastifyPluginAsync = async (app) => {
       req.log.warn({ err: parseErr }, 'webhook abacatepay payload inválido');
       return reply.code(400).send({ error: 'invalid payload' });
     }
+    const nestedEvent = typeof evt.event === 'object' && evt.event !== null
+      ? evt.event as Record<string, unknown>
+      : undefined;
+    const externalId = typeof evt.id === 'string'
+      ? evt.id
+      : typeof nestedEvent?.id === 'string' ? nestedEvent.id : undefined;
+    const eventType = typeof evt.event === 'string'
+      ? evt.event
+      : typeof evt.type === 'string' ? evt.type : undefined;
+    if (!externalId || !eventType) {
+      req.log.warn('webhook abacatepay sem id ou tipo');
+      return reply.code(400).send({ error: 'invalid payload' });
+    }
     return billingService.processWebhook({
       provider: 'abacatepay',
-      externalId: evt.id ?? (evt.event as Record<string, unknown>)?.id as string,
-      type: evt.event as string ?? evt.type as string,
+      externalId,
+      type: eventType,
       payload: evt,
     });
   });

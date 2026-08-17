@@ -56,14 +56,21 @@ const treatmentPlansRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['treatment-plans'],
         body: CreateTreatmentPlanSchema,
-        response: { 201: TreatmentPlanSchema },
+        response: { 201: TreatmentPlanSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
       const r = await treatmentPlansService.create(
         await resolveClinicId(req.user.id),
+        req.user.id,
         req.body,
       );
+      if (!r) {
+        return rep.code(404).send({
+          error: 'NotFound',
+          message: 'Patient or therapist not found in this clinic',
+        });
+      }
       return rep.code(201).send(r);
     },
   );
@@ -81,6 +88,7 @@ const treatmentPlansRoutes: FastifyPluginAsync = async (app) => {
     async (req, rep) => {
       const r = await treatmentPlansService.update(
         await resolveClinicId(req.user.id),
+        req.user.id,
         req.params.id,
         req.body,
       );
@@ -100,6 +108,7 @@ const treatmentPlansRoutes: FastifyPluginAsync = async (app) => {
     async (req, rep) => {
       const ok = await treatmentPlansService.remove(
         await resolveClinicId(req.user.id),
+        req.user.id,
         req.params.id,
       );
       if (!ok) return rep.code(404).send(notFound);
@@ -138,6 +147,7 @@ const treatmentPlansRoutes: FastifyPluginAsync = async (app) => {
     async (req, rep) => {
       const r = await treatmentPlansService.registerSession(
         await resolveClinicId(req.user.id),
+        req.user.id,
         req.params.id,
         req.body,
       );

@@ -11,6 +11,7 @@ Estratégia atual:
 A geração usa HuggingFace chat completion (provider hf-inference) com prompt
 de sistema fortemente instrucional para citar fontes quando houver.
 """
+
 from __future__ import annotations
 
 import logging
@@ -24,8 +25,8 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from ..config import get_settings
-from ..deps import get_user_id, verify_internal_token
-from ..hf_client import HuggingFaceError, HuggingFaceModelLoading, hf_client
+from ..deps import get_clinic_id, get_user_id, verify_internal_token
+from ..hf_client import HuggingFaceError, HuggingFaceModelLoadingError, hf_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/library", tags=["library-rag"])
@@ -35,7 +36,9 @@ router = APIRouter(prefix="/library", tags=["library-rag"])
 
 
 class ChatMessage(BaseModel):
-    role: str = Field(pattern="^(user|assistant|system)$")
+    # System messages are composed by the server after authorization and
+    # retrieval. Accepting them from history would permit prompt injection.
+    role: str = Field(pattern="^(user|assistant)$")
     content: str
 
 
@@ -75,13 +78,13 @@ SYSTEM_PROMPT = (
 # ── Retrieval ──────────────────────────────────────────────────────────
 
 
-async def _retrieve(query: str, *, top_k: int = 4) -> list[dict[str, Any]]:
+async def _retrieve(query: str, clinic_id: str, *, top_k: int = 4) -> list[dict[str, Any]]:
     """Top-k chunks via pgvector. Retorna lista vazia se a tabela não existir."""
     settings = get_settings()
     try:
         embeddings = await hf_client.embed([f"query: {query}"])
-    except (HuggingFaceError, httpx.HTTPError) as e:
-        logger.warning("RAG retrieval skipped (embedding failed): %s", e)
+    except (HuggingFaceError, httpx.HTTPError):
+        logger.warning("RAG retrieval skipped because embedding is unavailable")
         return []
 
     if not embeddings or not embeddings[0]:
@@ -92,18 +95,19 @@ async def _retrieve(query: str, *, top_k: int = 4) -> list[dict[str, Any]]:
     # psycopg é síncrono/bloqueante: executa em threadpool para não travar o
     # event loop async do FastAPI.
     return await run_in_threadpool(
-        _retrieve_sync, settings.database_url, vec_literal, top_k
+        _retrieve_sync, settings.database_url, vec_literal, clinic_id, top_k
     )
 
 
 def _retrieve_sync(
-    database_url: str, vec_literal: str, top_k: int
+    database_url: str, vec_literal: str, clinic_id: str, top_k: int
 ) -> list[dict[str, Any]]:
     """Query pgvector síncrona (rodar via run_in_threadpool)."""
     sql = """
         SELECT id, source, title, source_url, page, snippet,
                1 - (embedding <=> %s::vector) AS similarity
         FROM library_chunks
+        WHERE clinic_id = %s
         ORDER BY embedding <=> %s::vector
         LIMIT %s
     """
@@ -111,14 +115,14 @@ def _retrieve_sync(
     try:
         with psycopg.connect(database_url, connect_timeout=5) as conn:
             with conn.cursor() as cur:
-                cur.execute(sql, (vec_literal, vec_literal, top_k))
+                cur.execute(sql, (vec_literal, clinic_id, vec_literal, top_k))
                 cols = [c.name for c in cur.description or []]
                 return [dict(zip(cols, row, strict=False)) for row in cur.fetchall()]
     except psycopg.errors.UndefinedTable:
         logger.info("library_chunks table not yet created — retrieval skipped")
         return []
-    except psycopg.Error as e:
-        logger.warning("library retrieval failed: %s", e)
+    except psycopg.Error:
+        logger.warning("Library retrieval failed")
         return []
 
 
@@ -145,11 +149,12 @@ def _format_context(chunks: list[dict[str, Any]]) -> str:
 async def chat_with_library(
     req: ChatRequest,
     user_id: str = Depends(get_user_id),
+    clinic_id: str = Depends(get_clinic_id),
 ) -> ChatResponse:
-    _ = user_id  # poderia ser usado para auditar uso por terapeuta
+    _ = user_id  # reservado para audit por terapeuta
 
     started = time.perf_counter()
-    chunks = await _retrieve(req.question)
+    chunks = await _retrieve(req.question, clinic_id)
     context = _format_context(chunks)
 
     messages: list[dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -175,11 +180,11 @@ async def chat_with_library(
 
     try:
         answer = await hf_client.chat(messages, max_tokens=900, temperature=0.2)
-    except HuggingFaceModelLoading as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-    except HuggingFaceError as e:
-        logger.error("HF chat failed: %s", e)
-        raise HTTPException(status_code=502, detail=f"AI provider error: {e}") from e
+    except HuggingFaceModelLoadingError as exc:
+        raise HTTPException(status_code=503, detail="Modelo de IA indisponível") from exc
+    except HuggingFaceError as exc:
+        logger.error("HF chat failed")
+        raise HTTPException(status_code=502, detail="Falha no provedor de IA") from exc
 
     citations = [
         ChatCitation(

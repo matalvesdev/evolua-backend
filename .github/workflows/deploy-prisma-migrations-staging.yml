@@ -1,0 +1,55 @@
+name: Deploy Prisma migrations to staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Digite "STAGING" para confirmar a migration no ambiente de staging'
+        required: true
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prisma-migrations-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: prisma migrate deploy (staging)
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - name: Validate branch and confirmation
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "develop" ]; then
+            echo "::error::Migrations de staging só podem ser disparadas a partir de develop."
+            exit 1
+          fi
+          if [ "${{ github.event.inputs.confirm }}" != "STAGING" ]; then
+            echo "::error::Confirmação inválida. Digite exatamente 'STAGING'."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Show pending migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate status --schema=prisma/schema.prisma
+      - name: Apply pending migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate deploy --schema=prisma/schema.prisma
+      - name: Confirm final status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate status --schema=prisma/schema.prisma

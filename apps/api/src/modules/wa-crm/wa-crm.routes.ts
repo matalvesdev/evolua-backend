@@ -17,7 +17,7 @@ import {
 import { resolveClinicId } from '../auth/auth.helpers.js';
 import { waCrmService, WaCrmError } from './wa-crm.service.js';
 import { waCrmMapper } from './wa-crm.mapper.js';
-import { env } from '../../config/env.js';
+import { env, isProductionLike } from '../../config/env.js';
 
 /**
  * Verifica HMAC-SHA256 da assinatura enviada no header `x-evolution-signature`
@@ -27,13 +27,13 @@ import { env } from '../../config/env.js';
  * Em desenvolvimento, se EVOLUTION_WEBHOOK_SECRET não estiver definido,
  * a verificação é pulada (apenas o `x-internal-token` é exigido).
  */
-function verifyWebhookSignature(
+export function verifyWebhookSignature(
   rawBody: string,
   signatureHeader: string | undefined,
 ): boolean {
   const secret = env.EVOLUTION_WEBHOOK_SECRET;
   if (!secret) {
-    if (env.NODE_ENV === 'production') {
+    if (isProductionLike) {
       // Em prod sem secret é falha de configuração — rejeitar.
       return false;
     }
@@ -52,8 +52,34 @@ function verifyWebhookSignature(
   return timingSafeEqual(Buffer.from(provided, 'hex'), Buffer.from(expected, 'hex'));
 }
 
+function hasValidInternalToken(provided: string | undefined): boolean {
+  if (!provided || !env.INTERNAL_SERVICE_TOKEN) return false;
+  const actual = Buffer.from(provided);
+  const expected = Buffer.from(env.INTERNAL_SERVICE_TOKEN);
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
 const waCrmRoutes: FastifyPluginAsync = async (app) => {
   const route = app.withTypeProvider<ZodTypeProvider>();
+
+  // O HMAC do gateway Go é calculado sobre bytes. Mantemos o body cru apenas
+  // para o webhook e fazemos parse/validação após autenticar a assinatura.
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'string' },
+    (req, body, done) => {
+      if (req.url.endsWith('/webhook/inbound')) {
+        done(null, body);
+        return;
+      }
+      try {
+        const json = Buffer.isBuffer(body) ? body.toString('utf8') : body;
+        done(null, JSON.parse(json));
+      } catch (error) {
+        done(error instanceof Error ? error : new Error('Invalid JSON'));
+      }
+    },
+  );
 
   // ── Webhook interno chamado pelo Go (ANTES do authenticate) ─────────
   route.post(
@@ -63,13 +89,13 @@ const waCrmRoutes: FastifyPluginAsync = async (app) => {
       config: { rateLimit: { max: 600, timeWindow: '1 minute' } },
       schema: {
         tags: ['wa-crm'],
-        body: WaInboundWebhookSchema,
         headers: z.object({
           'x-internal-token': z.string(),
           'x-evolution-signature': z.string().optional(),
         }),
         response: {
           204: z.null(),
+          400: ErrorResponseSchema,
           401: ErrorResponseSchema,
           500: ErrorResponseSchema,
         },
@@ -77,7 +103,7 @@ const waCrmRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const token = req.headers['x-internal-token'];
-      if (token !== env.INTERNAL_SERVICE_TOKEN) {
+      if (!hasValidInternalToken(token)) {
         req.log.warn({ remoteIp: req.ip }, 'wa-crm webhook: invalid internal token');
         return rep.code(401).send({
           error: 'Unauthorized',
@@ -86,8 +112,13 @@ const waCrmRoutes: FastifyPluginAsync = async (app) => {
       }
 
       const signature = req.headers['x-evolution-signature'] as string | undefined;
-      const rawBody =
-        typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      if (typeof req.body !== 'string' && !Buffer.isBuffer(req.body)) {
+        return rep.code(400).send({
+          error: 'ValidationError',
+          message: 'Invalid webhook payload',
+        });
+      }
+      const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : req.body;
       if (!verifyWebhookSignature(rawBody, signature)) {
         req.log.warn(
           { remoteIp: req.ip, hasSignature: Boolean(signature) },
@@ -99,8 +130,18 @@ const waCrmRoutes: FastifyPluginAsync = async (app) => {
         });
       }
 
+      let payload: z.infer<typeof WaInboundWebhookSchema>;
       try {
-        await waCrmService.handleInbound(req.body);
+        payload = WaInboundWebhookSchema.parse(JSON.parse(rawBody));
+      } catch {
+        return rep.code(400).send({
+          error: 'ValidationError',
+          message: 'Invalid webhook payload',
+        });
+      }
+
+      try {
+        await waCrmService.handleInbound(payload);
         return rep.code(204).send(null);
       } catch (e) {
         // Erro real de processamento — devolvemos 500 para que o Go
@@ -108,8 +149,7 @@ const waCrmRoutes: FastifyPluginAsync = async (app) => {
         req.log.error(
           {
             err: e,
-            senderPhone: req.body.senderPhone,
-            messageId: req.body.messageId,
+            messageId: payload.messageId,
           },
           'wa-crm: inbound handler failed',
         );

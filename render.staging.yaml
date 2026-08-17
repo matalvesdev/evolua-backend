@@ -1,0 +1,84 @@
+# Blueprint separado para infraestrutura de staging. Ele nunca gerencia os
+# serviços de produção definidos em render.yaml.
+services:
+  - type: web
+    name: evolua-api-staging
+    runtime: docker
+    region: virginia
+    plan: free
+    branch: develop
+    autoDeployTrigger: 'off'
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: INTERNAL_SERVICE_TOKEN
+        fromService:
+          type: web
+          name: evolua-ai-staging
+          envVarKey: INTERNAL_SERVICE_TOKEN
+      - key: AI_SERVICE_URL
+        fromService:
+          type: web
+          name: evolua-ai-staging
+          envVarKey: RENDER_EXTERNAL_URL
+      # Deve ser o domínio permanente do frontend de staging, não produção.
+      - key: CORS_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: LANDING_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        value: naoresponder@useevolua.com.br
+      - key: HUGGINGFACE_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: staging
+
+  - type: web
+    name: evolua-ai-staging
+    runtime: docker
+    region: virginia
+    plan: free
+    branch: develop
+    autoDeployTrigger: 'off'
+    rootDir: ./apps/ai
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      - key: ENVIRONMENT
+        value: staging
+      - key: DATABASE_URL
+        sync: false
+      - key: INTERNAL_SERVICE_TOKEN
+        generateValue: true
+      - key: HUGGINGFACE_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_SITE_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: staging

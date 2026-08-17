@@ -4,14 +4,21 @@ export interface Settings {
   clinicName: string;
   clinicPhone: string;
   clinicEmail: string;
+  clinicAddress: string;
   workingHours: Record<string, { start: string; end: string }>;
   appointmentDuration: number;
+  sessionDuration: number;
   allowTeleconsulta: boolean;
   notificationEmail: boolean;
   notificationWhatsApp: boolean;
   autoSendReminders: boolean;
   reminder24h: boolean;
   reminder1h: boolean;
+  notifSessao: boolean;
+  notifReport: boolean;
+  notifPagamento: boolean;
+  notifWhatsapp: boolean;
+  notifEmail: boolean;
 }
 
 export class SettingsService {
@@ -29,14 +36,21 @@ export class SettingsService {
       clinicName: clinic?.name ?? '',
       clinicPhone: clinic?.phone ?? '',
       clinicEmail: clinic?.email ?? '',
+      clinicAddress: (settings.clinicAddress as string) ?? '',
       notificationEmail: pref?.emailEnabled ?? true,
       notificationWhatsApp: pref?.appointmentRemindersEnabled ?? true,
       workingHours: (settings.workingHours ?? {}) as Record<string, { start: string; end: string }>,
       appointmentDuration: (settings.appointmentDuration as number) ?? 50,
+      sessionDuration: (settings.sessionDuration as number) ?? (settings.appointmentDuration as number) ?? 50,
       allowTeleconsulta: (settings.allowTeleconsulta as boolean) ?? false,
       autoSendReminders: (settings.autoSendReminders as boolean) ?? false,
       reminder24h: (settings.reminder24h as boolean) ?? true,
       reminder1h: (settings.reminder1h as boolean) ?? false,
+      notifSessao: (settings.notifSessao as boolean) ?? true,
+      notifReport: (settings.notifReport as boolean) ?? true,
+      notifPagamento: (settings.notifPagamento as boolean) ?? false,
+      notifWhatsapp: pref?.appointmentRemindersEnabled ?? true,
+      notifEmail: pref?.emailEnabled ?? true,
     };
   }
 
@@ -57,6 +71,11 @@ export class SettingsService {
       'autoSendReminders',
       'reminder24h',
       'reminder1h',
+      'clinicAddress',
+      'sessionDuration',
+      'notifSessao',
+      'notifReport',
+      'notifPagamento',
     ] as const;
     const settingsUpdate: Record<string, unknown> = {};
     for (const key of settingsFields) {
@@ -85,9 +104,11 @@ export class SettingsService {
 
     const prefUpdate: Record<string, unknown> = {};
     if (input.notificationEmail !== undefined) prefUpdate.emailEnabled = input.notificationEmail;
+    if (input.notifEmail !== undefined) prefUpdate.emailEnabled = input.notifEmail;
     if (input.notificationWhatsApp !== undefined) {
       prefUpdate.appointmentRemindersEnabled = input.notificationWhatsApp;
     }
+    if (input.notifWhatsapp !== undefined) prefUpdate.appointmentRemindersEnabled = input.notifWhatsapp;
     if (Object.keys(prefUpdate).length > 0) {
       await prisma.notificationPreference.upsert({
         where: { userId_clinicId: { userId, clinicId } },

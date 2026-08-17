@@ -39,6 +39,19 @@ function verifySignature(rawBody: string, signature: string): boolean {
   }
 }
 
+function resolvePasswordResetRedirect(candidate?: string): string {
+  const fallback = new URL('/nova-senha', env.FRONTEND_URL).toString();
+  if (!candidate) return fallback;
+
+  try {
+    const configuredOrigin = new URL(env.FRONTEND_URL).origin;
+    const requestedUrl = new URL(candidate);
+    return requestedUrl.origin === configuredOrigin ? requestedUrl.toString() : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export class AuthHooksService {
   verifySignature(rawBody: string, signature: string): boolean {
     return verifySignature(rawBody, signature);
@@ -49,18 +62,21 @@ export class AuthHooksService {
 
     switch (event) {
       case 'user.signup': {
-        logger.info({ userId: user.id, email: user.email }, 'Auth hook: signup');
+        logger.info('Auth hook: signup');
 
-        // Envia email de boas-vindas via Notifica
-        const name =
-          (user.user_metadata?.full_name as string) ??
-          (user.user_metadata?.fullName as string) ??
-          user.email;
+        // Envia email de boas-vindas pelo provedor configurado
+        const fullName = user.user_metadata?.full_name;
+        const legacyFullName = user.user_metadata?.fullName;
+        const name = typeof fullName === 'string'
+          ? fullName
+          : typeof legacyFullName === 'string'
+            ? legacyFullName
+            : user.email;
 
         if (emailService.isEnabled()) {
           emailService
             .sendWelcome(user.email, name)
-            .catch((err) => logger.error({ err }, 'Auth hook welcome email failed'));
+            .catch(() => logger.error('Auth hook welcome email failed'));
         }
 
         return {
@@ -70,14 +86,14 @@ export class AuthHooksService {
       }
 
       case 'user.password_reset': {
-        logger.info({ userId: user.id, email: user.email }, 'Auth hook: password reset');
+        logger.info('Auth hook: password reset');
 
-        const redirectTo = payload.redirect_to ?? `${env.FRONTEND_URL}/nova-senha`;
+        const redirectTo = resolvePasswordResetRedirect(payload.redirect_to);
 
         if (emailService.isEnabled()) {
           emailService
             .sendPasswordReset(user.email, redirectTo)
-            .catch((err) => logger.error({ err }, 'Auth hook password reset email failed'));
+            .catch(() => logger.error('Auth hook password reset email failed'));
         }
 
         return {

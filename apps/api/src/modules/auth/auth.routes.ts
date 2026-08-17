@@ -69,7 +69,7 @@ const authRoutes: FastifyPluginAsync = async (app) => {
       config: { rateLimit: { max: 3, timeWindow: '1 minute' } },
       schema: {
         tags: ['auth'],
-        summary: 'Solicitar redefinição de senha (via Notifica)',
+        summary: 'Solicitar redefinição de senha por e-mail',
         body: z.object({ email: z.string().email() }),
         response: { 200: z.object({ success: z.boolean() }) },
       },
@@ -127,7 +127,7 @@ const authRoutes: FastifyPluginAsync = async (app) => {
     async (req, rep) => {
       const auth = req.headers.authorization ?? '';
       const token = auth.replace(/^Bearer\s+/i, '');
-      await authService.changePassword(token, req.body.newPassword);
+      await authService.changePassword(token, req.body.newPassword, req.user.id);
       return rep.code(204).send(null);
     },
   );

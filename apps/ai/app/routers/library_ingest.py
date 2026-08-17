@@ -10,11 +10,14 @@ Fluxo:
 A migration `20260601000001_add_library_rag_tables` precisa estar aplicada.
 Quando a tabela não existe, retornamos 503 com instrução clara.
 """
+
 from __future__ import annotations
 
 import io
+import ipaddress
 import logging
 import re
+import socket
 import time
 from typing import Any
 from uuid import UUID
@@ -31,11 +34,11 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from ..config import get_settings
 from ..deps import get_user_id, verify_internal_token
-from ..hf_client import HuggingFaceError, HuggingFaceModelLoading, hf_client
+from ..hf_client import HuggingFaceError, HuggingFaceModelLoadingError, hf_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/library", tags=["library-ingest"])
@@ -82,8 +85,8 @@ def _extract_text_from_pdf(blob: bytes) -> list[tuple[int, str]]:
     for i, page in enumerate(reader.pages, 1):
         try:
             text = page.extract_text() or ""
-        except Exception as e:  # noqa: BLE001
-            logger.warning("PDF page %d extract failed: %s", i, e)
+        except Exception:  # noqa: BLE001
+            logger.warning("PDF page %d extraction failed", i)
             text = ""
         pages.append((i, text))
     return pages
@@ -174,9 +177,7 @@ def _insert_document_and_chunks(
                     raise HTTPException(500, "Falha ao inserir library_document")
                 doc_id = str(row[0])
 
-                for idx, ((page, snippet), emb) in enumerate(
-                    zip(chunks, embeddings, strict=True)
-                ):
+                for idx, ((page, snippet), emb) in enumerate(zip(chunks, embeddings, strict=True)):
                     cur.execute(
                         sql_chunk,
                         (
@@ -204,6 +205,23 @@ def _insert_document_and_chunks(
 # ── Security helpers ───────────────────────────────────────────────────────
 
 
+def _resolve_public_addresses(hostname: str) -> set[str]:
+    """Resolve hostname e rejeita destinos que não sejam IPs públicos."""
+    try:
+        addresses = {
+            str(item[4][0])
+            for item in socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)
+        }
+    except socket.gaierror as exc:
+        raise HTTPException(400, "source_url não pôde ser resolvida") from exc
+
+    if not addresses:
+        raise HTTPException(400, "source_url não pôde ser resolvida")
+    if any(not ipaddress.ip_address(address).is_global for address in addresses):
+        raise HTTPException(400, "source_url não permitida (rede não pública)")
+    return addresses
+
+
 def _validate_source_url(url: str) -> None:
     """Valida URL de fonte para evitar SSRF.
 
@@ -219,24 +237,100 @@ def _validate_source_url(url: str) -> None:
     hostname = (parsed.hostname or "").lower()
 
     # Bloqueia IPs de metadata de cloud providers
-    BLOCKED_HOSTS = (
+    blocked_hosts = (
         "169.254.169.254",
         "metadata.google.internal",
         "metadata.instance.google.internal",
         "100.100.100.200",
         "fd00:ec2::254",
     )
-    if hostname in BLOCKED_HOSTS:
+    if hostname in blocked_hosts:
         raise HTTPException(400, "source_url não permitida (host bloqueado)")
 
-    # Bloqueia endereços privados (localhost, LAN)
-    import ipaddress
+    # Bloqueia endereços privados (localhost, LAN) e redes não roteáveis.
     try:
         ip = ipaddress.ip_address(hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local:
-            raise HTTPException(400, "source_url não permitida (rede interna)")
+        if not ip.is_global:
+            raise HTTPException(400, "source_url não permitida (rede não pública)")
     except ValueError:
-        pass  # hostname, não IP — permitido
+        _resolve_public_addresses(hostname)
+
+
+def _parse_allowed_hosts(raw_hosts: str) -> tuple[str, ...]:
+    return tuple(host.strip().lower() for host in raw_hosts.split(",") if host.strip())
+
+
+def _is_allowed_remote_host(hostname: str, allowed_hosts: tuple[str, ...]) -> bool:
+    """Aceita somente host exato ou um subdomínio de sufixo explicitamente confiado."""
+    for allowed_host in allowed_hosts:
+        if allowed_host.startswith("."):
+            suffix = allowed_host[1:]
+            if hostname == suffix or hostname.endswith(allowed_host):
+                return True
+        elif hostname == allowed_host:
+            return True
+    return False
+
+
+def _require_trusted_remote_host(url: str) -> None:
+    """Em ambientes não locais, URL remota requer domínio confiável configurado.
+
+    A resolução DNS feita como defesa contra SSRF não consegue garantir que uma
+    segunda resolução pelo cliente HTTP apontará para o mesmo IP. Em produção,
+    restringimos a origem a domínios sob controle conhecido e falhamos fechados
+    até que a operação configure a allowlist.
+    """
+    settings = get_settings()
+    if settings.environment in {"development", "test"}:
+        return
+
+    from urllib.parse import urlparse
+
+    hostname = (urlparse(url).hostname or "").lower()
+    allowed_hosts = _parse_allowed_hosts(settings.library_ingest_allowed_hosts)
+    if not allowed_hosts or not _is_allowed_remote_host(hostname, allowed_hosts):
+        raise HTTPException(
+            403,
+            "source_url não está em um host confiável para este ambiente",
+        )
+
+
+async def _download_remote_document(source_url: str) -> tuple[bytes, str]:
+    """Baixa documento remoto em streaming, impondo o limite antes de alocar.
+
+    Redirects são desabilitados e a origem já passou por validação de HTTPS,
+    rede pública e allowlist de produção.
+    """
+    timeout = httpx.Timeout(connect=5.0, read=20.0, write=5.0, pool=5.0)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+        async with client.stream("GET", source_url) as response:
+            if response.status_code >= 400:
+                raise HTTPException(400, f"Falha ao baixar source_url: {response.status_code}")
+
+            blob = await _read_limited_response(response)
+            return blob, (response.headers.get("content-type") or "").lower()
+
+
+async def _read_limited_response(response: httpx.Response) -> bytes:
+    """Consome uma resposta HTTP sem permitir que ela exceda o limite aceito."""
+    raw_content_length = response.headers.get("content-length")
+    if raw_content_length:
+        try:
+            content_length = int(raw_content_length)
+        except ValueError:
+            content_length = None
+        if content_length is not None and content_length > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "Documento remoto excede 25MB")
+
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in response.aiter_bytes():
+        total += len(chunk)
+        if total > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "Documento remoto excede 25MB")
+        chunks.append(chunk)
+
+    return b"".join(chunks)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────
@@ -280,15 +374,9 @@ async def ingest_document(
         source = filename
     elif source_url:
         _validate_source_url(source_url)
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
-            r = await client.get(source_url)
-        if r.status_code >= 400:
-            raise HTTPException(400, f"Falha ao baixar source_url: {r.status_code}")
-        blob = r.content
-        if len(blob) > MAX_UPLOAD_BYTES:
-            raise HTTPException(413, "Documento remoto excede 25MB")
+        _require_trusted_remote_host(source_url)
+        blob, content_type = await _download_remote_document(source_url)
         filename = source_url.rsplit("/", 1)[-1].split("?", 1)[0] or "remote"
-        content_type = r.headers.get("content-type", "").lower()
         source = filename
     else:
         raise HTTPException(400, "Envie 'file' (multipart) ou 'source_url' (form)")
@@ -308,11 +396,11 @@ async def ingest_document(
     snippets = [c[1] for c in chunks]
     try:
         embeddings = await _embed_in_batches(snippets, batch=16)
-    except HuggingFaceModelLoading as e:
-        raise HTTPException(503, str(e)) from e
-    except HuggingFaceError as e:
-        logger.error("HF embed failed: %s", e)
-        raise HTTPException(502, f"AI provider error: {e}") from e
+    except HuggingFaceModelLoadingError as exc:
+        raise HTTPException(503, "Modelo de IA indisponível") from exc
+    except HuggingFaceError as exc:
+        logger.error("HF embed failed")
+        raise HTTPException(502, "Falha no provedor de IA") from exc
 
     if len(embeddings) != len(chunks):
         raise HTTPException(500, "Mismatch entre embeddings e chunks")
@@ -339,9 +427,7 @@ async def ingest_document(
     )
 
 
-async def _embed_in_batches(
-    texts: list[str], *, batch: int = 16
-) -> list[list[float]]:
+async def _embed_in_batches(texts: list[str], *, batch: int = 16) -> list[list[float]]:
     out: list[list[float]] = []
     for i in range(0, len(texts), batch):
         sub = [f"passage: {t}" for t in texts[i : i + batch]]
@@ -379,7 +465,7 @@ async def list_documents(
         SELECT id, title, source, source_url, author, specialty, language,
                chunk_count, created_at
         FROM library_documents
-        WHERE {' AND '.join(where)}
+        WHERE {" AND ".join(where)}
         ORDER BY created_at DESC
         LIMIT %s OFFSET %s
     """

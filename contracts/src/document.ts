@@ -20,8 +20,6 @@ export const CreateDocumentSchema = z.object({
   type: z.enum(['referral', 'prescription', 'document']),
   title: z.string().min(1).max(300),
   content: z.string().optional(),
-  therapistName: z.string().optional(),
-  therapistCrfa: z.string().optional(),
 });
 export type CreateDocumentInput = z.infer<typeof CreateDocumentSchema>;
 

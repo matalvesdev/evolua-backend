@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -19,7 +20,7 @@ import (
 )
 
 type SendMessageRequest struct {
-	To        string  `json:"to"`   // E.164 ou número BR — Evolution normaliza
+	To        string  `json:"to"` // E.164 ou número BR — Evolution normaliza
 	Body      string  `json:"body"`
 	PatientID *string `json:"patientId,omitempty"`
 }
@@ -36,7 +37,11 @@ type Handler struct {
 	internalTok   string
 	verifyToken   string
 	webhookSecret string
+	webhookCIDRs  []*net.IPNet
 }
+
+const maxWebhookBodyBytes = 1 << 20
+const maxSendBodyBytes = 64 << 10
 
 type Options struct {
 	Evolution            *evolution.Client
@@ -47,6 +52,9 @@ type Options struct {
 	// para assinar o body de cada forward. Se vazio, nenhum header é enviado
 	// (o gateway exige em produção).
 	WebhookSecret string
+	// WebhookAllowedCIDRs limita o endpoint público ao ingress/provider.
+	// A configuração de produção deve ser validada em config.Load.
+	WebhookAllowedCIDRs []*net.IPNet
 }
 
 func NewHandler(logger zerolog.Logger, opts Options) *Handler {
@@ -57,6 +65,7 @@ func NewHandler(logger zerolog.Logger, opts Options) *Handler {
 		internalTok:   opts.InternalServiceToken,
 		verifyToken:   opts.WhatsAppVerifyToken,
 		webhookSecret: opts.WebhookSecret,
+		webhookCIDRs:  opts.WebhookAllowedCIDRs,
 	}
 }
 
@@ -75,7 +84,6 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 			respondJSON(w, http.StatusServiceUnavailable, map[string]string{
 				"status": "degraded",
 				"state":  state,
-				"error":  err.Error(),
 			})
 			return
 		}
@@ -94,6 +102,7 @@ func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
 // SendMessage: envia mensagem WhatsApp via Evolution API.
 func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	var req SendMessageRequest
+	r.Body = http.MaxBytesReader(w, r.Body, maxSendBodyBytes)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, "InvalidPayload", err.Error())
 		return
@@ -121,9 +130,11 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.evolution.SendText(ctx, req.To, req.Body)
 	if err != nil {
-		h.logger.Error().Err(err).Str("userId", userID).Str("to", masked).
-			Msg("send message failed")
-		respondError(w, http.StatusBadGateway, "ProviderError", err.Error())
+		// Provider errors can contain response payloads. Do not expose or persist
+		// them in the API response/log without a redaction policy.
+		h.logger.Error().Str("userId", userID).Str("to", masked).
+			Msg("send message failed at WhatsApp provider")
+		respondError(w, http.StatusBadGateway, "ProviderError", "WhatsApp provider unavailable")
 		return
 	}
 
@@ -159,7 +170,13 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !h.isAllowedWebhookSource(r.RemoteAddr) {
+		h.logger.Warn().Msg("webhook request rejected from untrusted source")
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBodyBytes)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "InvalidPayload", err.Error())
@@ -184,9 +201,35 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 
 	if err := h.forwardToGateway(r.Context(), canonical); err != nil {
 		h.logger.Error().Err(err).Msg("failed to forward inbound message to gateway")
-		// Ainda retornamos 200 para evitar reentregas em loop pelo Evolution
+		// Falhas transitórias devem receber retry do provider. A deduplicação
+		// persistente no gateway evita duplicar mensagens em uma nova entrega.
+		respondError(w, http.StatusBadGateway, "GatewayUnavailable", "Unable to process webhook")
+		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) isAllowedWebhookSource(remoteAddr string) bool {
+	// Development may intentionally omit the allowlist. Staging/production are
+	// prevented from doing so by config.Load before the server starts.
+	if len(h.webhookCIDRs) == 0 {
+		return true
+	}
+
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, network := range h.webhookCIDRs {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 // ── Tipos do webhook Evolution API ──────────────────────────────────────────
@@ -196,14 +239,14 @@ type evolutionWebhookPayload struct {
 	Instance string `json:"instance"`
 	Data     struct {
 		Key struct {
-			ID         string `json:"id"`
-			RemoteJid  string `json:"remoteJid"`
-			FromMe     bool   `json:"fromMe"`
+			ID          string `json:"id"`
+			RemoteJid   string `json:"remoteJid"`
+			FromMe      bool   `json:"fromMe"`
 			Participant string `json:"participant,omitempty"`
 		} `json:"key"`
 		PushName string `json:"pushName"`
 		Message  struct {
-			Conversation       string `json:"conversation"`
+			Conversation        string `json:"conversation"`
 			ExtendedTextMessage struct {
 				Text string `json:"text"`
 			} `json:"extendedTextMessage"`
@@ -213,11 +256,12 @@ type evolutionWebhookPayload struct {
 }
 
 type canonicalInbound struct {
-	MessageID   string `json:"messageId"`
-	From        string `json:"senderPhone"`
-	PushName    string `json:"pushName"`
-	Text        string `json:"text"`
-	Timestamp   int64  `json:"timestamp"`
+	Instance  string `json:"instance"`
+	MessageID string `json:"messageId"`
+	From      string `json:"senderPhone"`
+	PushName  string `json:"pushName"`
+	Text      string `json:"text"`
+	Timestamp int64  `json:"timestamp"`
 }
 
 func (p evolutionWebhookPayload) toCanonical() (canonicalInbound, bool) {
@@ -241,6 +285,7 @@ func (p evolutionWebhookPayload) toCanonical() (canonicalInbound, bool) {
 	}
 
 	return canonicalInbound{
+		Instance:  p.Instance,
 		MessageID: p.Data.Key.ID,
 		From:      from,
 		PushName:  p.Data.PushName,
@@ -251,7 +296,7 @@ func (p evolutionWebhookPayload) toCanonical() (canonicalInbound, bool) {
 
 func (h *Handler) forwardToGateway(ctx context.Context, msg canonicalInbound) error {
 	if h.gatewayURL == "" {
-		return nil
+		return &gatewayError{code: http.StatusServiceUnavailable}
 	}
 	body, _ := json.Marshal(msg)
 	url := h.gatewayURL + "/api/wa-crm/webhook/inbound"

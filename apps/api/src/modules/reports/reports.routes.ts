@@ -13,7 +13,11 @@ import {
   UuidSchema,
 } from '@evolua/contracts';
 import { reportsService } from './reports.service.js';
-import { resolveClinicId } from '../auth/auth.helpers.js';
+import {
+  requireClinicAdministration,
+  requireResourceOwnerOrClinicAdmin,
+  resolveClinicId,
+} from '../auth/auth.helpers.js';
 import { auditAsync } from '../../lib/audit.js';
 import { prisma } from '../../lib/prisma.js';
 import { reportToDTO } from './reports.mapper.js';
@@ -42,7 +46,7 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['reports'],
         params: z.object({ id: UuidSchema }),
-        response: { 200: ReportSchema, 404: ErrorResponseSchema },
+        response: { 200: ReportSchema, 404: ErrorResponseSchema, 409: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
@@ -57,7 +61,7 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['reports'],
         body: CreateReportSchema,
-        response: { 201: ReportSchema },
+        response: { 201: ReportSchema, 403: ErrorResponseSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
@@ -79,16 +83,24 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
         tags: ['reports'],
         params: z.object({ id: UuidSchema }),
         body: UpdateReportSchema,
-        response: { 200: ReportSchema, 404: ErrorResponseSchema },
+        response: { 200: ReportSchema, 404: ErrorResponseSchema, 409: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
-      const r = await reportsService.update(
-        await resolveClinicId(req.user.id),
-        req.params.id,
-        req.body,
-      );
-      return r ?? rep.code(404).send(notFound);
+      try {
+        const r = await reportsService.update(
+          await resolveClinicId(req.user.id),
+          req.user.id,
+          req.params.id,
+          req.body,
+        );
+        return r ?? rep.code(404).send(notFound);
+      } catch (error) {
+        if (error instanceof Error && 'statusCode' in error && error.statusCode === 409) {
+          return rep.code(409).send({ error: 'Conflict', message: error.message });
+        }
+        throw error;
+      }
     },
   );
 
@@ -98,12 +110,13 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['reports'],
         params: z.object({ id: UuidSchema }),
-        response: { 200: ReportSchema, 404: ErrorResponseSchema },
+        response: { 200: ReportSchema, 404: ErrorResponseSchema, 409: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
       const r = await reportsService.submitForReview(
         await resolveClinicId(req.user.id),
+        req.user.id,
         req.params.id,
       );
       return r ?? rep.code(404).send(notFound);
@@ -117,7 +130,7 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
         tags: ['reports'],
         params: z.object({ id: UuidSchema }),
         body: ReviewReportSchema,
-        response: { 200: ReportSchema, 404: ErrorResponseSchema },
+        response: { 200: ReportSchema, 404: ErrorResponseSchema, 409: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
@@ -141,7 +154,7 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async (req, rep) => {
-      const clinicId = await resolveClinicId(req.user.id);
+      const clinicId = await requireClinicAdministration(req.user.id);
       const r = await reportsService.approve(clinicId, req.params.id, req.user.id);
       if (r) auditAsync({
         clinicId, userId: req.user.id, action: 'SIGN', resource: 'Report',
@@ -158,18 +171,20 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
         tags: ['reports'],
         params: z.object({ id: UuidSchema }),
         body: SendReportSchema,
-        response: { 200: ReportSchema, 404: ErrorResponseSchema },
+        response: { 200: ReportSchema, 404: ErrorResponseSchema, 501: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
-      const clinicId = await resolveClinicId(req.user.id);
-      const r = await reportsService.send(clinicId, req.params.id, req.body);
-      if (r) auditAsync({
-        clinicId, userId: req.user.id, action: 'EXPORT', resource: 'Report',
-        resourceId: r.id, ipAddress: req.ip, userAgent: req.headers['user-agent'] ?? null,
-        metadata: { channel: 'email', recipientsCount: req.body.recipients.length },
-      });
-      return r ?? rep.code(404).send(notFound);
+      try {
+        const clinicId = await resolveClinicId(req.user.id);
+        const r = await reportsService.send(clinicId, req.params.id, req.body);
+        return r ?? rep.code(404).send(notFound);
+      } catch (error) {
+        if (error instanceof Error && 'statusCode' in error && error.statusCode === 501) {
+          return rep.code(501).send({ error: 'NotImplemented', message: error.message });
+        }
+        throw error;
+      }
     },
   );
 
@@ -179,12 +194,20 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['reports'],
         params: z.object({ id: UuidSchema }),
-        response: { 204: z.null(), 404: ErrorResponseSchema },
+        response: { 204: z.null(), 404: ErrorResponseSchema, 409: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
-      const r = await reportsService.remove(clinicId, req.params.id);
+      let r;
+      try {
+        r = await reportsService.remove(clinicId, req.user.id, req.params.id);
+      } catch (error) {
+        if (error instanceof Error && 'statusCode' in error && error.statusCode === 409) {
+          return rep.code(409).send({ error: 'Conflict', message: error.message });
+        }
+        throw error;
+      }
       if (!r) return rep.code(404).send(notFound);
       auditAsync({
         clinicId, userId: req.user.id, action: 'DELETE', resource: 'Report',
@@ -222,14 +245,11 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
         tags: ['reports'],
         body: z.object({
           patientId: UuidSchema,
-          patientName: z.string().min(1).max(200),
-          therapistName: z.string().min(1).max(200),
-          therapistCrfa: z.string().max(50),
           type: z.string().min(1),
           title: z.string().min(1).max(300),
           content: z.string().default(''),
         }),
-        response: { 201: ReportSchema },
+        response: { 201: ReportSchema, 403: ErrorResponseSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
@@ -254,16 +274,23 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
           title: z.string().min(1).max(300).optional(),
           content: z.string().optional(),
         }),
-        response: { 200: ReportSchema, 404: ErrorResponseSchema },
+        response: { 200: ReportSchema, 404: ErrorResponseSchema, 409: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
       const existing = await prisma.report.findFirst({
-        where: { id: req.params.id, clinicId, deletedAt: null },
-        select: { id: true },
+        where: { id: req.params.id, clinicId, deletedAt: null, type: { in: ['laudo', 'atestado', 'declaracao', 'relatorio'] } },
+        select: { id: true, status: true, therapistId: true },
       });
       if (!existing) return rep.code(404).send(notFound);
+      await requireResourceOwnerOrClinicAdmin(req.user.id, existing.therapistId);
+      if (['approved', 'sent', 'signed'].includes(existing.status)) {
+        return rep.code(409).send({
+          error: 'Conflict',
+          message: 'Finalized clinical records cannot be changed',
+        });
+      }
       const updated = await prisma.report.update({
         where: { id: req.params.id },
         data: {
@@ -286,8 +313,13 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
-      const r = await reportsService.remove(clinicId, req.params.id);
-      if (!r) return rep.code(404).send(notFound);
+      const existing = await prisma.report.findFirst({
+        where: { id: req.params.id, clinicId, deletedAt: null, type: { in: ['laudo', 'atestado', 'declaracao', 'relatorio'] } },
+        select: { id: true, therapistId: true },
+      });
+      if (!existing) return rep.code(404).send(notFound);
+      await requireResourceOwnerOrClinicAdmin(req.user.id, existing.therapistId);
+      await reportsService.remove(clinicId, req.user.id, req.params.id);
       auditAsync({
         clinicId, userId: req.user.id, action: 'DELETE', resource: 'Report',
         resourceId: req.params.id, ipAddress: req.ip, userAgent: req.headers['user-agent'] ?? null,

@@ -2,8 +2,8 @@ services:
   # Backend API (Fastify/Node.js)
   - type: web
     name: evolua-api
-    env: docker
-    region: sao-paulo
+    runtime: docker
+    region: virginia
     plan: free
     dockerfilePath: ./Dockerfile
     rootDir: .
@@ -22,21 +22,25 @@ services:
       - key: SUPABASE_JWT_SECRET
         sync: false
       - key: INTERNAL_SERVICE_TOKEN
-        generateValue: true
+        fromService:
+          type: web
+          name: evolua-ai
+          envVarKey: INTERNAL_SERVICE_TOKEN
       - key: CORS_ORIGINS
         value: https://app.useevolua.com.br
       - key: FRONTEND_URL
         value: https://app.useevolua.com.br
       - key: AI_SERVICE_URL
-        sync: false
+        fromService:
+          type: web
+          name: evolua-ai
+          envVarKey: RENDER_EXTERNAL_URL
       - key: HUGGINGFACE_API_KEY
         sync: false
-      - key: NOTIFICA_API_URL
-        value: https://app.usenotifica.com.br/v1
-      - key: NOTIFICA_API_KEY
+      - key: RESEND_API_KEY
         sync: false
-      - key: NOTIFICA_FROM_EMAIL
-        value: noreply@useevolua.com
+      - key: RESEND_FROM_EMAIL
+        value: naoresponder@useevolua.com.br
       - key: PIX_KEY
         sync: false
       - key: PIX_MERCHANT_NAME
@@ -46,21 +50,25 @@ services:
       - key: SENTRY_DSN
         sync: false
       - key: SENTRY_TRACES_SAMPLE_RATE
-        value: "0.1"
+        value: '0.1'
       - key: SENTRY_ENVIRONMENT
         value: production
 
   # AI Service (Python/FastAPI)
   - type: web
     name: evolua-ai
-    env: docker
-    region: sao-paulo
+    runtime: docker
+    region: virginia
     plan: free
-    dockerfilePath: ./apps/ai/Dockerfile
+    dockerfilePath: ./Dockerfile
     rootDir: ./apps/ai
     healthCheckPath: /healthz
     envVars:
       - key: HUGGINGFACE_API_KEY
         sync: false
       - key: INTERNAL_SERVICE_TOKEN
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENROUTER_API_KEY
         sync: false

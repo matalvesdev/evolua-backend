@@ -1,11 +1,16 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 import type {
   CreatePatientInput,
   UpdatePatientInput,
   ListPatientsQuery,
   Patient,
+  CreateMedicalRecordInput,
+  UpdateMedicalRecordInput,
+  ListMedicalRecordsQuery,
 } from '@evolua/contracts';
+import { ClinicalAreaSchema, MedicalRecordScalesSchema } from '@evolua/contracts';
 import { patientToDTO } from './patients.mapper.js';
 
 export class PatientsService {
@@ -120,25 +125,53 @@ export class PatientsService {
     return patientToDTO(row);
   }
 
-  async listRecords(clinicId: string, q: { page: number; pageSize: number; patientId?: string }) {
-    const where: Prisma.ReportWhereInput = {
+  async listRecords(clinicId: string, q: ListMedicalRecordsQuery) {
+    const where: Prisma.MedicalRecordWhereInput = {
       clinicId,
-      deletedAt: null,
-      type: 'evolution',
       ...(q.patientId && { patientId: q.patientId }),
     };
     const [rows, total] = await prisma.$transaction([
-      prisma.report.findMany({
+      prisma.medicalRecord.findMany({
         where,
         skip: (q.page - 1) * q.pageSize,
         take: q.pageSize,
-        orderBy: { createdAt: 'desc' },
-        include: { patient: { select: { id: true, name: true, phone: true } } },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          patient: {
+            select: {
+              name: true,
+              birthDate: true,
+              appointments: {
+                where: { deletedAt: null, status: 'completed' },
+                orderBy: { dateTime: 'desc' },
+                take: 1,
+                select: { dateTime: true },
+              },
+              _count: { select: { appointments: { where: { deletedAt: null, status: 'completed' } } } },
+            },
+          },
+        },
       }),
-      prisma.report.count({ where }),
+      prisma.medicalRecord.count({ where }),
     ]);
     return {
-      data: rows,
+      data: rows.map((row) => ({
+        id: row.id,
+        clinicId: row.clinicId,
+        patientId: row.patientId,
+        patientName: row.patient.name,
+        birthDate: row.patient.birthDate?.toISOString().slice(0, 10) ?? null,
+        clinicalArea: ClinicalAreaSchema.parse(row.clinicalArea),
+        diagnosis: row.diagnosis,
+        anamnesis: row.anamnesis,
+        scales: MedicalRecordScalesSchema.parse(row.scales),
+        objectives: row.objectives,
+        latestEvolution: row.latestEvolution,
+        sessionCount: row.patient._count.appointments,
+        lastSessionAt: row.patient.appointments[0]?.dateTime.toISOString() ?? null,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      })),
       pagination: {
         page: q.page,
         pageSize: q.pageSize,
@@ -148,40 +181,55 @@ export class PatientsService {
     };
   }
 
-  async createRecord(clinicId: string, therapistId: string, input: {
-    patientId: string; patientName: string; therapistName: string;
-    therapistCrfa: string; title: string; content: string;
-  }) {
-    const row = await prisma.report.create({
+  async createRecord(clinicId: string, therapistId: string, input: CreateMedicalRecordInput) {
+    const patient = await prisma.patient.findFirst({
+      where: { id: input.patientId, clinicId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!patient) return null;
+    const existing = await prisma.medicalRecord.findFirst({
+      where: { patientId: input.patientId, clinicId },
+      select: { id: true, createdBy: true },
+    });
+    if (existing) {
+      await requireResourceOwnerOrClinicAdmin(therapistId, existing.createdBy);
+      return prisma.medicalRecord.update({
+        where: { id: existing.id },
+        data: { clinicalArea: input.clinicalArea, diagnosis: input.diagnosis },
+      });
+    }
+    return prisma.medicalRecord.create({
       data: {
         clinicId,
         patientId: input.patientId,
-        patientName: input.patientName,
-        therapistId,
-        therapistName: input.therapistName,
-        therapistCrfa: input.therapistCrfa,
-        type: 'evolution',
-        title: input.title,
-        content: input.content,
-        sections: Prisma.JsonNull,
+        createdBy: therapistId,
+        clinicalArea: input.clinicalArea,
+        diagnosis: input.diagnosis,
       },
     });
-    return row;
   }
 
-  async updateRecord(clinicId: string, id: string, input: {
-    title?: string; content?: string;
-  }) {
-    const exists = await prisma.report.findFirst({
-      where: { id, clinicId, deletedAt: null },
-      select: { id: true },
+  async updateRecord(
+    clinicId: string,
+    actorId: string,
+    id: string,
+    input: UpdateMedicalRecordInput,
+  ) {
+    const exists = await prisma.medicalRecord.findFirst({
+      where: { id, clinicId },
+      select: { id: true, createdBy: true },
     });
     if (!exists) return null;
-    return prisma.report.update({
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.createdBy);
+    return prisma.medicalRecord.update({
       where: { id },
       data: {
-        ...(input.title !== undefined && { title: input.title }),
-        ...(input.content !== undefined && { content: input.content }),
+        ...(input.clinicalArea !== undefined && { clinicalArea: input.clinicalArea }),
+        ...(input.diagnosis !== undefined && { diagnosis: input.diagnosis }),
+        ...(input.anamnesis !== undefined && { anamnesis: input.anamnesis }),
+        ...(input.scales !== undefined && { scales: input.scales }),
+        ...(input.objectives !== undefined && { objectives: input.objectives }),
+        ...(input.latestEvolution !== undefined && { latestEvolution: input.latestEvolution }),
       },
     });
   }

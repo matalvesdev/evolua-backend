@@ -12,6 +12,7 @@ import type {
   Appointment,
 } from '@evolua/contracts';
 import { appointmentToDTO } from './appointments.mapper.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 
 /**
  * Cliente HTTP para sincronização com provedor de calendário.
@@ -90,14 +91,38 @@ export class AppointmentsService {
     return row ? appointmentToDTO(row) : null;
   }
 
-  async create(clinicId: string, input: CreateAppointmentInput): Promise<Appointment> {
+  async assertMutationPermission(clinicId: string, actorId: string, id: string): Promise<boolean> {
+    const appointment = await prisma.appointment.findFirst({
+      where: { id, clinicId, deletedAt: null },
+      select: { therapistId: true },
+    });
+    if (!appointment) return false;
+    await requireResourceOwnerOrClinicAdmin(actorId, appointment.therapistId);
+    return true;
+  }
+
+  async create(
+    clinicId: string,
+    actorId: string,
+    input: CreateAppointmentInput,
+  ): Promise<Appointment> {
+    const patient = await this.assertPatientBelongsToClinic(clinicId, input.patientId);
+    const assignedTherapistId = input.therapistId ?? actorId;
+    const therapist = await prisma.user.findFirst({
+      where: { id: assignedTherapistId, clinicId },
+      select: { id: true, fullName: true },
+    });
+    if (!therapist) {
+      throw Object.assign(new Error('Professional not found in this clinic'), { statusCode: 404 });
+    }
+    await requireResourceOwnerOrClinicAdmin(actorId, therapist.id);
     const row = await prisma.appointment.create({
       data: {
         clinicId,
         patientId: input.patientId,
-        patientName: input.patientName,
-        therapistId: input.therapistId ?? null,
-        therapistName: input.therapistName,
+        patientName: patient.name,
+        therapistId: therapist.id,
+        therapistName: therapist.fullName,
         dateTime: new Date(input.dateTime),
         duration: input.duration,
         type: input.type,
@@ -152,10 +177,7 @@ export class AppointmentsService {
   }
 
   async confirm(clinicId: string, id: string): Promise<Appointment | null> {
-    const appt = await this.findById(clinicId, id);
-    if (!appt) return null;
-
-    const updated = await this.transition(clinicId, id, {
+    const updated = await this.transition(clinicId, id, ['scheduled'], {
       status: 'confirmed',
       confirmedAt: new Date(),
     });
@@ -191,7 +213,7 @@ export class AppointmentsService {
                   data: { reminder24hSentAt: new Date() },
                 }).catch(() => {}),
               )
-              .catch((err) => logger.warn({ err }, '24h reminder email failed'));
+              .catch(() => logger.warn('24h reminder email failed'));
           }
 
           if (send1h) {
@@ -203,7 +225,7 @@ export class AppointmentsService {
                   data: { reminder1hSentAt: new Date() },
                 }).catch(() => {}),
               )
-              .catch((err) => logger.warn({ err }, '1h reminder email failed'));
+              .catch(() => logger.warn('1h reminder email failed'));
           }
         }
       }
@@ -213,7 +235,7 @@ export class AppointmentsService {
   }
 
   async start(clinicId: string, id: string): Promise<Appointment | null> {
-    return this.transition(clinicId, id, {
+    return this.transition(clinicId, id, ['scheduled', 'confirmed'], {
       status: 'in_progress',
       startedAt: new Date(),
     });
@@ -232,7 +254,7 @@ export class AppointmentsService {
     const appt = await prisma.appointment.findFirst({
       where: { id, clinicId, deletedAt: null },
     });
-    if (!appt) return null;
+    if (!appt || appt.status !== 'in_progress') return null;
 
     const updated = await prisma.appointment.update({
       where: { id },
@@ -258,7 +280,11 @@ export class AppointmentsService {
         year: 'numeric',
       });
 
-      await prisma.report.create({
+      const existingEvolution = await prisma.report.findFirst({
+        where: { clinicId, appointmentId: id, type: 'evolution', deletedAt: null },
+        select: { id: true },
+      });
+      if (!existingEvolution) await prisma.report.create({
         data: {
           clinicId,
           patientId: appt.patientId,
@@ -288,7 +314,7 @@ export class AppointmentsService {
     const appt = await prisma.appointment.findFirst({
       where: { id, clinicId, deletedAt: null },
     });
-    if (!appt) return null;
+    if (!appt || appt.status === 'completed' || appt.status === 'cancelled') return null;
 
     const updated = await prisma.appointment.update({
       where: { id },
@@ -296,7 +322,9 @@ export class AppointmentsService {
         status: 'cancelled',
         cancellationReason: input.reason,
         cancellationNotes: input.notes ?? null,
-        cancelledBy: input.cancelledBy,
+      // This authenticated endpoint represents a professional-initiated action.
+      // Never accept cancellation authority from a client-controlled payload.
+      cancelledBy: 'therapist',
         cancelledAt: new Date(),
       },
     });
@@ -334,16 +362,32 @@ export class AppointmentsService {
   private async transition(
     clinicId: string,
     id: string,
+    allowedStatuses: string[],
     data: Prisma.AppointmentUpdateInput,
   ): Promise<Appointment | null> {
     const exists = await prisma.appointment.findFirst({
-      where: { id, clinicId, deletedAt: null },
+      where: { id, clinicId, deletedAt: null, status: { in: allowedStatuses } },
       select: { id: true },
     });
     if (!exists) return null;
 
     const row = await prisma.appointment.update({ where: { id }, data });
     return appointmentToDTO(row);
+  }
+
+  private async assertPatientBelongsToClinic(
+    clinicId: string,
+    patientId: string,
+  ): Promise<{ id: string; name: string }> {
+    const patient = await prisma.patient.findFirst({
+      where: { id: patientId, clinicId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (patient) return patient;
+
+    const err = new Error('Patient not found');
+    (err as Error & { statusCode: number }).statusCode = 404;
+    throw err;
   }
 }
 

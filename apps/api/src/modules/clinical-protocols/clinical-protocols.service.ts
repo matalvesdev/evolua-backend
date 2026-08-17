@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 import type {
   ClinicalProtocolTemplate as PrismaTemplate,
   ClinicalProtocolEntry as PrismaEntry,
@@ -71,6 +72,46 @@ export class ClinicalProtocolsService {
     therapistId: string,
     input: CreateProtocolEntryInput,
   ) {
+    // These references are independent foreign keys in PostgreSQL. Validate
+    // their shared tenant and patient scope explicitly before creating a
+    // sensitive clinical entry.
+    const [patient, template, treatmentPlan, appointment] = await Promise.all([
+      prisma.patient.findFirst({
+        where: { id: input.patientId, clinicId, deletedAt: null },
+        select: { id: true },
+      }),
+      prisma.clinicalProtocolTemplate.findUnique({
+        where: { id: input.templateId },
+        select: { id: true },
+      }),
+      input.treatmentPlanId
+        ? prisma.treatmentPlan.findFirst({
+          where: {
+            id: input.treatmentPlanId,
+            clinicId,
+            patientId: input.patientId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        })
+        : Promise.resolve(null),
+      input.appointmentId
+        ? prisma.appointment.findFirst({
+          where: {
+            id: input.appointmentId,
+            clinicId,
+            patientId: input.patientId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        })
+        : Promise.resolve(null),
+    ]);
+
+    if (!patient || !template || (input.treatmentPlanId && !treatmentPlan) || (input.appointmentId && !appointment)) {
+      return null;
+    }
+
     const row = await prisma.clinicalProtocolEntry.create({
       data: {
         clinicId,
@@ -88,12 +129,13 @@ export class ClinicalProtocolsService {
     return entryToDTO(row);
   }
 
-  async deleteEntry(clinicId: string, id: string): Promise<boolean> {
+  async deleteEntry(clinicId: string, actorId: string, id: string): Promise<boolean> {
     const exists = await prisma.clinicalProtocolEntry.findFirst({
       where: { id, clinicId },
-      select: { id: true },
+      select: { id: true, therapistId: true },
     });
     if (!exists) return false;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.therapistId);
     await prisma.clinicalProtocolEntry.delete({ where: { id } });
     return true;
   }

@@ -1,8 +1,9 @@
-import type { Prisma, Message } from '@prisma/client';
+import { Prisma, type Message } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
-import { notificaClient } from '../../lib/notifica.js';
+import { emailClient } from '../../lib/email-client.js';
 import { logger } from '../../lib/logger.js';
+import { recordDeliveryAttempt } from '../../plugins/metrics.js';
 import type { CreateMessageInput, ListMessagesQuery } from '@evolua/contracts';
 
 export interface PaginatedMessages {
@@ -11,15 +12,53 @@ export interface PaginatedMessages {
 }
 
 export class MessagesService {
+  async processPendingDeliveries(limit = 50): Promise<void> {
+    const safeLimit = Math.max(1, Math.min(limit, 100));
+    const pending = await prisma.message.findMany({
+      where: { deliveryStatus: 'pending' },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+      take: safeLimit,
+    });
+    for (const message of pending) {
+      await this.dispatchPersistedMessage(message.id);
+    }
+
+    // Email has a provider idempotency key (the message ID), so a stale claim
+    // can be resumed safely. WhatsApp does not expose a verified equivalent in
+    // this integration: do not resend it automatically after an unknown result.
+    const staleBefore = new Date(Date.now() - 10 * 60 * 1000);
+    await prisma.message.updateMany({
+      where: {
+        deliveryStatus: 'processing',
+        channel: 'email',
+        deliveryAttemptedAt: { lt: staleBefore },
+      },
+      data: { deliveryStatus: 'pending' },
+    });
+    await prisma.message.updateMany({
+      where: {
+        deliveryStatus: 'processing',
+        channel: 'whatsapp',
+        deliveryAttemptedAt: { lt: staleBefore },
+      },
+      data: {
+        deliveryStatus: 'failed',
+        deliveryError: 'delivery outcome unknown; manual review required',
+      },
+    });
+  }
+
   async create(
     clinicId: string,
     therapistId: string,
     input: CreateMessageInput,
+    idempotencyKey?: string,
   ): Promise<Message> {
     // Confirma que o paciente pertence à clínica
     const patient = await prisma.patient.findFirst({
       where: { id: input.patientId, clinicId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, name: true, phone: true, guardianPhone: true, email: true },
     });
     if (!patient) {
       const err = new Error('Patient not found in this clinic');
@@ -27,88 +66,142 @@ export class MessagesService {
       throw err;
     }
 
-    // Recipient address: telefone (whatsapp/sms) ou email (email).
-    // O schema Message.recipientPhone armazena o identificador do destinatário.
-    const recipient =
-      input.channel === 'email'
-        ? input.recipientEmail!
-        : input.recipientPhone!;
-
-    const message = await prisma.message.create({
-      data: {
-        clinicId,
-        therapistId,
-        patientId: input.patientId,
-        content: input.content,
-        templateType: input.templateType,
-        recipientPhone: recipient,
-        recipientName: input.recipientName,
-        channel: input.channel,
-      },
-    });
-
-    // Dispatch best-effort por canal.
-    if (input.channel === 'whatsapp') {
-      void this.dispatchWhatsApp(input, therapistId).catch((err) => {
-        logger.warn(
-          { err, patientId: input.patientId, channel: 'whatsapp' },
-          'messages: whatsapp dispatch error',
-        );
-      });
-    } else if (input.channel === 'email') {
-      void this.dispatchEmail(input, message.id).catch((err) => {
-        logger.warn(
-          { err, patientId: input.patientId, channel: 'email' },
-          'messages: email dispatch error',
-        );
-      });
+    if (input.channel === 'sms') {
+      const err = new Error('SMS delivery is not supported');
+      Object.assign(err, { statusCode: 400 });
+      throw err;
     }
+
+    // Destinatário clínico é derivado do paciente/responsável autorizado no
+    // servidor. Dados enviados pelo navegador não são autoridade.
+    const recipient = input.channel === 'email'
+      ? patient.email
+      : patient.guardianPhone ?? patient.phone;
+    if (!recipient) {
+      const err = new Error(input.channel === 'email'
+        ? 'Patient has no email address'
+        : 'Patient has no phone number');
+      Object.assign(err, { statusCode: 400 });
+      throw err;
+    }
+    const normalizedInput = {
+      ...input,
+      recipientName: patient.name,
+      recipientPhone: input.channel === 'whatsapp' ? recipient : undefined,
+      recipientEmail: input.channel === 'email' ? recipient : undefined,
+      subject: input.channel === 'email' ? input.subject ?? 'Mensagem da clínica' : undefined,
+    };
+
+    let message: Message;
+    try {
+      message = await prisma.message.create({
+        data: {
+          clinicId,
+          therapistId,
+          patientId: patient.id,
+          content: normalizedInput.content,
+          templateType: normalizedInput.templateType,
+          recipientPhone: recipient,
+          recipientName: patient.name,
+          channel: normalizedInput.channel,
+          deliveryStatus: 'pending',
+          idempotencyKey,
+        },
+      });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002' || !idempotencyKey) {
+        throw error;
+      }
+      const existing = await prisma.message.findFirst({
+        where: { clinicId, idempotencyKey },
+      });
+      if (!existing) throw error;
+      const isSameOperation = existing.patientId === patient.id
+        && existing.content === normalizedInput.content
+        && existing.templateType === normalizedInput.templateType
+        && existing.channel === normalizedInput.channel;
+      if (!isSameOperation) {
+        throw Object.assign(
+          new Error('Idempotency key was already used for a different message'),
+          { statusCode: 409 },
+        );
+      }
+      return existing;
+    }
+
+    // A resposta representa aceitação persistida, não entrega. O estado muda
+    // somente após o provider confirmar ou falhar.
+    void this.dispatchPersistedMessage(message.id).catch(() => undefined);
 
     return message;
   }
 
-  private async dispatchWhatsApp(
-    input: CreateMessageInput,
-    therapistId: string,
-  ): Promise<void> {
+  private async dispatchPersistedMessage(messageId: string): Promise<void> {
+    const claimed = await prisma.message.updateMany({
+      where: { id: messageId, deliveryStatus: 'pending' },
+      data: { deliveryStatus: 'processing', deliveryAttempts: { increment: 1 }, deliveryAttemptedAt: new Date() },
+    });
+    if (claimed.count === 0) return;
+
+    const message = await prisma.message.findUnique({ where: { id: messageId } });
+    if (!message) return;
+    try {
+      if (message.channel === 'whatsapp') {
+        await this.dispatchWhatsApp(message);
+      } else if (message.channel === 'email') {
+        await this.dispatchEmail(message);
+      } else {
+        throw new Error('Unsupported delivery channel');
+      }
+      await prisma.message.update({
+        where: { id: message.id },
+        data: { deliveryStatus: 'sent', deliveryError: null, deliveredAt: new Date() },
+      });
+      if (message.channel === 'email' || message.channel === 'whatsapp') {
+        recordDeliveryAttempt(message.channel, 'sent');
+      }
+    } catch {
+      await prisma.message.update({
+        where: { id: message.id },
+        data: { deliveryStatus: 'failed', deliveryError: 'provider unavailable' },
+      });
+      if (message.channel === 'email' || message.channel === 'whatsapp') {
+        recordDeliveryAttempt(message.channel, 'failed');
+      }
+      logger.warn({ messageId: message.id, channel: message.channel }, 'messages: delivery failed');
+    }
+  }
+
+  private async dispatchWhatsApp(message: Message): Promise<void> {
     const res = await fetch(`${env.WHATSAPP_SERVICE_URL}/messages/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-internal-token': env.INTERNAL_SERVICE_TOKEN,
-        'x-user-id': therapistId,
+        'x-user-id': message.therapistId,
       },
       body: JSON.stringify({
-        to: input.recipientPhone,
-        body: input.content,
-        patientId: input.patientId,
+        to: message.recipientPhone,
+        body: message.content,
+        patientId: message.patientId,
       }),
       signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) {
-      logger.warn(
-        { status: res.status, patientId: input.patientId },
-        'messages: whatsapp service returned non-2xx',
-      );
+      throw new Error(`WhatsApp provider returned ${res.status}`);
     }
   }
 
-  private async dispatchEmail(
-    input: CreateMessageInput,
-    messageId: string,
-  ): Promise<void> {
-    const result = await notificaClient.sendEmail({
-      to: input.recipientEmail!,
-      subject: input.subject!,
-      html: input.htmlBody ?? `<p>${escapeHtml(input.content)}</p>`,
-      text: input.content,
-      idempotencyKey: messageId,
+  private async dispatchEmail(message: Message): Promise<void> {
+    const result = await emailClient.sendEmail({
+      to: message.recipientPhone,
+      subject: 'Mensagem da clínica',
+      html: `<p>${escapeHtml(message.content)}</p>`,
+      text: message.content,
+      idempotencyKey: message.id,
     });
     if (!result.success) {
-      logger.warn(
-        { error: result.error, messageId, patientId: input.patientId },
-        'messages: notifica email dispatch failed',
-      );
+      throw new Error('Email provider unavailable');
     }
   }
 

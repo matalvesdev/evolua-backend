@@ -32,7 +32,9 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(chimw.RequestID)
-	r.Use(chimw.RealIP)
+	// Não confiar em X-Forwarded-For neste serviço público: a allowlist do
+	// webhook deve avaliar a origem TCP entregue pelo ingress/provedor, não um
+	// header que um cliente externo possa forjar.
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.Timeout(30 * time.Second))
 	// CORS — em produção apenas o gateway Fastify chama este serviço.
@@ -60,6 +62,7 @@ func main() {
 		InternalServiceToken: cfg.InternalServiceToken,
 		WhatsAppVerifyToken:  cfg.WhatsAppVerifyToken,
 		WebhookSecret:        cfg.WebhookSecret,
+		WebhookAllowedCIDRs:  cfg.WebhookAllowedCIDRs,
 	})
 
 	if cfg.WebhookSecret == "" {

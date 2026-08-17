@@ -13,7 +13,7 @@ import {
   jsonSchemaTransform,
 } from 'fastify-type-provider-zod';
 
-import { env } from './config/env.js';
+import { env, isProductionLike } from './config/env.js';
 import authPlugin from './plugins/auth.js';
 import errorHandler from './plugins/error-handler.js';
 import requestIdPlugin from './plugins/request-id.js';
@@ -68,7 +68,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Helmet — CSP relaxado em dev (Swagger UI usa inline scripts/styles).
   // Em produção, mantemos CSP padrão do helmet (sem inline) e ajustamos directives.
   await app.register(helmet, {
-    contentSecurityPolicy: env.NODE_ENV === 'production'
+    contentSecurityPolicy: isProductionLike
       ? {
           directives: {
             defaultSrc: ["'self'"],
@@ -86,7 +86,7 @@ export async function buildApp(): Promise<FastifyInstance> {
         }
       : false,
     crossOriginEmbedderPolicy: false, // permite Swagger UI carregar fontes externas
-    hsts: env.NODE_ENV === 'production'
+    hsts: isProductionLike
       ? { maxAge: 31536000, includeSubDomains: true, preload: true }
       : false,
   });
@@ -117,7 +117,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
     transform: jsonSchemaTransform,
   });
-  if (env.NODE_ENV !== 'production') {
+  if (!isProductionLike) {
     await app.register(swaggerUi, { routePrefix: '/docs' });
   }
 
@@ -145,10 +145,10 @@ export async function buildApp(): Promise<FastifyInstance> {
     await instance.register(billingWebhookRoutes);
   }, { prefix: '/hooks' });
 
-  // Non-critical modules — lazy-loaded after startup via dynamic imports
-  // This reduces cold start time by deferring ~30 route modules
-  app.addHook('onReady', async () => {
-    const lazyModules = [
+  // Módulos não críticos usam imports dinâmicos, mas precisam ser registrados
+  // antes de o Fastify concluir o boot. Registrar plugins em onReady causa
+  // FST_ERR_ROOT_PLG_BOOTED e impede o servidor de iniciar.
+  const dynamicModules = [
       { import: () => import('./modules/reports/reports.routes.js'), prefix: '/api/reports' },
       { import: () => import('./modules/tasks/tasks.routes.js'), prefix: '/api/tasks' },
       { import: () => import('./modules/finances/finances.routes.js'), prefix: '/api/finances' },
@@ -179,12 +179,11 @@ export async function buildApp(): Promise<FastifyInstance> {
       { import: () => import('./modules/document-templates/document-templates.routes.js'), prefix: '/api/document-templates' },
       { import: () => import('./modules/clinical-scales/clinical-scales.routes.js'), prefix: '/api/clinical-scales' },
       { import: () => import('./modules/teleconsulta/teleconsulta.routes.js'), prefix: '/api/teleconsulta' },
-    ];
-    for (const mod of lazyModules) {
-      const m = await mod.import();
-      await app.register(m.default, { prefix: mod.prefix });
-    }
-  });
+  ];
+  for (const mod of dynamicModules) {
+    const loadedModule = await mod.import();
+    await app.register(loadedModule.default, { prefix: mod.prefix });
+  }
 
   return app;
 }

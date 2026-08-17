@@ -1,0 +1,91 @@
+name: Deploy backend staging
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend-staging
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Validate staging deployment configuration
+        env:
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          RENDER_DEPLOY_HOOK_API: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+          RENDER_DEPLOY_HOOK_AI: ${{ secrets.RENDER_DEPLOY_HOOK_AI }}
+          API_URL: ${{ secrets.API_URL }}
+          AI_URL: ${{ secrets.AI_URL }}
+        run: |
+          missing=0
+          for name in DIRECT_URL RENDER_DEPLOY_HOOK_API RENDER_DEPLOY_HOOK_AI API_URL AI_URL; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing staging secret: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+  migrate:
+    needs: preflight
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Apply Prisma migrations to staging
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate deploy --schema=prisma/schema.prisma
+
+  deploy:
+    needs: migrate
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Trigger API deploy
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
+        run: curl --fail --silent --show-error --request POST "$DEPLOY_HOOK"
+      - name: Trigger AI deploy
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_AI }}
+        run: curl --fail --silent --show-error --request POST "$DEPLOY_HOOK"
+      - name: Wait for API readiness
+        env:
+          HEALTH_URL: ${{ secrets.API_URL }}/readyz
+        run: |
+          for _ in {1..30}; do
+            if curl --fail --silent --show-error "$HEALTH_URL"; then exit 0; fi
+            sleep 10
+          done
+          exit 1
+      - name: Wait for AI readiness
+        env:
+          HEALTH_URL: ${{ secrets.AI_URL }}/readyz
+        run: |
+          for _ in {1..30}; do
+            if curl --fail --silent --show-error "$HEALTH_URL"; then exit 0; fi
+            sleep 10
+          done
+          exit 1

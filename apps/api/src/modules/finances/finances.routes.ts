@@ -14,7 +14,7 @@ import {
   UuidSchema,
 } from '@evolua/contracts';
 import { financesService } from './finances.service.js';
-import { resolveClinicId } from '../auth/auth.helpers.js';
+import { requireClinicAdministration, resolveClinicId } from '../auth/auth.helpers.js';
 
 const notFound = { error: 'NotFound', message: 'Transaction not found' };
 
@@ -73,7 +73,7 @@ const financesRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const r = await financesService.createCategory(
-        await resolveClinicId(req.user.id),
+        await requireClinicAdministration(req.user.id),
         req.body,
       );
       return rep.code(201).send(r);
@@ -91,7 +91,7 @@ const financesRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const ok = await financesService.deleteCategory(
-        await resolveClinicId(req.user.id),
+        await requireClinicAdministration(req.user.id),
         req.params.id,
       );
       if (!ok) return rep.code(404).send({ error: 'NotFound', message: 'Category not found' });

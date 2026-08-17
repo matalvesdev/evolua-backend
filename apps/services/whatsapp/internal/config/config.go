@@ -3,8 +3,10 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -16,8 +18,8 @@ type Config struct {
 	InternalServiceToken string
 
 	// Evolution API (WhatsApp provider)
-	EvolutionAPIURL  string
-	EvolutionAPIKey  string
+	EvolutionAPIURL   string
+	EvolutionAPIKey   string
 	EvolutionInstance string
 
 	// Legacy / Meta (mantido p/ compatibilidade — não usado quando Evolution está ativo)
@@ -32,6 +34,10 @@ type Config struct {
 	// HMAC para assinar webhooks enviados ao Fastify gateway. Em produção
 	// deve ser igual a EVOLUTION_WEBHOOK_SECRET do gateway.
 	WebhookSecret string
+	// CIDRs de origem do provider/ingress que pode chamar o webhook público.
+	// Obrigatório em staging/produção enquanto a Evolution não disponibilizar
+	// uma assinatura verificável de payload.
+	WebhookAllowedCIDRs []*net.IPNet
 }
 
 func Load() (*Config, error) {
@@ -40,6 +46,11 @@ func Load() (*Config, error) {
 	port, err := strconv.Atoi(getEnv("PORT", "8010"))
 	if err != nil {
 		return nil, fmt.Errorf("invalid PORT: %w", err)
+	}
+
+	allowedCIDRs, err := parseCIDRs(os.Getenv("EVOLUTION_WEBHOOK_ALLOWED_CIDRS"))
+	if err != nil {
+		return nil, err
 	}
 
 	cfg := &Config{
@@ -60,9 +71,35 @@ func Load() (*Config, error) {
 
 		GatewayURL: getEnv("GATEWAY_URL", "http://localhost:3000"),
 
-		WebhookSecret: os.Getenv("EVOLUTION_WEBHOOK_SECRET"),
+		WebhookSecret:       os.Getenv("EVOLUTION_WEBHOOK_SECRET"),
+		WebhookAllowedCIDRs: allowedCIDRs,
+	}
+	if (cfg.Environment == "production" || cfg.Environment == "staging") && cfg.WebhookSecret == "" {
+		return nil, fmt.Errorf("missing EVOLUTION_WEBHOOK_SECRET in %s", cfg.Environment)
+	}
+	if (cfg.Environment == "production" || cfg.Environment == "staging") && os.Getenv("GATEWAY_URL") == "" {
+		return nil, fmt.Errorf("missing GATEWAY_URL in %s", cfg.Environment)
+	}
+	if (cfg.Environment == "production" || cfg.Environment == "staging") && len(cfg.WebhookAllowedCIDRs) == 0 {
+		return nil, fmt.Errorf("missing EVOLUTION_WEBHOOK_ALLOWED_CIDRS in %s", cfg.Environment)
 	}
 	return cfg, nil
+}
+
+func parseCIDRs(raw string) ([]*net.IPNet, error) {
+	var networks []*net.IPNet
+	for _, value := range strings.Split(raw, ",") {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		_, network, err := net.ParseCIDR(value)
+		if err != nil {
+			return nil, fmt.Errorf("invalid EVOLUTION_WEBHOOK_ALLOWED_CIDRS entry %q: %w", value, err)
+		}
+		networks = append(networks, network)
+	}
+	return networks, nil
 }
 
 func getEnv(key, fallback string) string {

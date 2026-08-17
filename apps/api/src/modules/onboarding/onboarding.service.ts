@@ -10,31 +10,26 @@ export class OnboardingService {
     };
   }
 
-  async completeStep(userId: string, stepId: string, _data?: Record<string, unknown>): Promise<{ success: boolean }> {
+  async completeStep(
+    userId: string,
+    stepId: string,
+    data?: Record<string, unknown>,
+    completed = false,
+  ): Promise<{ success: boolean }> {
     try {
-      const res = await fetch(`${env.SUPABASE_URL}/rest/v1/onboarding_progress?user_id=eq.${userId}`, {
-        method: 'PATCH',
+      const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/advance_onboarding_progress`, {
+        method: 'POST',
         headers: this.headers,
         body: JSON.stringify({
-          current_step: stepId,
-          completed_steps: null,
-          data: _data ?? null,
+          p_user_id: userId,
+          p_step_id: stepId,
+          p_data: data ?? {},
+          p_completed: completed,
         }),
       });
-      if (res.status === 404 || res.status === 0) {
-        await fetch(`${env.SUPABASE_URL}/rest/v1/onboarding_progress`, {
-          method: 'POST',
-          headers: { ...this.headers, Prefer: 'resolution=merge-duplicates' },
-          body: JSON.stringify({
-            user_id: userId,
-            current_step: stepId,
-            completed_steps: [],
-            data: _data ?? {},
-            completed: false,
-          }),
-        });
-      } else if (!res.ok) {
+      if (!res.ok) {
         logger.warn({ status: res.status, stepId }, 'onboarding: patch step failed');
+        return { success: false };
       }
       return { success: true };
     } catch (err) {
@@ -44,17 +39,7 @@ export class OnboardingService {
   }
 
   async complete(userId: string): Promise<{ success: boolean }> {
-    try {
-      await fetch(`${env.SUPABASE_URL}/rest/v1/onboarding_progress?user_id=eq.${userId}`, {
-        method: 'PATCH',
-        headers: this.headers,
-        body: JSON.stringify({ current_step: 'completed', completed: true }),
-      });
-      return { success: true };
-    } catch (err) {
-      logger.warn({ err, userId }, 'onboarding: exception on complete');
-      return { success: false };
-    }
+    return this.completeStep(userId, 'completed', undefined, true);
   }
 }
 

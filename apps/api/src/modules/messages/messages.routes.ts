@@ -25,13 +25,36 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['messages'],
         body: CreateMessageSchema,
-        response: { 201: MessageSchema, 404: ErrorResponseSchema },
+        response: {
+          201: MessageSchema,
+          400: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+          409: ErrorResponseSchema,
+        },
       },
     },
     async (req, rep) => {
-      const clinicId = await resolveClinicId(req.user.id);
-      const m = await messagesService.create(clinicId, req.user.id, req.body);
-      return rep.code(201).send(messageMapper.toDto(m));
+      try {
+        const clinicId = await resolveClinicId(req.user.id);
+        const m = await messagesService.create(
+          clinicId,
+          req.user.id,
+          req.body,
+          parseIdempotencyKey(req.headers['idempotency-key']),
+        );
+        return rep.code(201).send(messageMapper.toDto(m));
+      } catch (error) {
+        if (error instanceof Error && 'statusCode' in error && error.statusCode === 404) {
+          return rep.code(404).send({ error: 'NotFound', message: 'Patient not found' });
+        }
+        if (error instanceof Error && 'statusCode' in error && error.statusCode === 400) {
+          return rep.code(400).send({ error: 'BadRequest', message: error.message });
+        }
+        if (error instanceof Error && 'statusCode' in error && error.statusCode === 409) {
+          return rep.code(409).send({ error: 'Conflict', message: error.message });
+        }
+        throw error;
+      }
     },
   );
 
@@ -63,7 +86,17 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
           text: z.string().min(1).max(10000),
           type: z.enum(['whatsapp', 'sms', 'email']).default('whatsapp'),
         }),
-        response: { 201: z.object({ success: z.boolean(), messageId: z.string().optional() }), 404: ErrorResponseSchema, 500: ErrorResponseSchema },
+        response: {
+          202: z.object({
+            success: z.literal(true),
+            messageId: z.string(),
+            deliveryStatus: z.enum(['pending', 'processing', 'sent', 'failed']),
+          }),
+          400: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+          409: ErrorResponseSchema,
+          500: ErrorResponseSchema,
+        },
       },
     },
     async (req, rep) => {
@@ -83,10 +116,22 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
           recipientName: patient.name,
           channel: req.body.type,
           recipientPhone: patient.phone ?? undefined,
+        }, parseIdempotencyKey(req.headers['idempotency-key']));
+        logger.info({ messageId: message.id, channel: req.body.type }, 'messages: delivery accepted');
+        return rep.code(202).send({
+          success: true,
+          messageId: message.id,
+          // A criação sempre persiste o estado pending; o dispatcher pode
+          // avançar depois da resposta, mas nunca antes da aceitação.
+          deliveryStatus: 'pending',
         });
-        logger.info({ messageId: message.id, channel: req.body.type }, 'messages: sent');
-        return rep.code(201).send({ success: true, messageId: message.id });
       } catch (e) {
+        if (e instanceof Error && 'statusCode' in e && e.statusCode === 400) {
+          return rep.code(400).send({ error: 'BadRequest', message: e.message });
+        }
+        if (e instanceof Error && 'statusCode' in e && e.statusCode === 409) {
+          return rep.code(409).send({ error: 'Conflict', message: e.message });
+        }
         logger.error({ err: e }, 'messages: send error');
         return rep.code(500).send({ error: 'InternalError', message: 'Falha ao enviar mensagem' });
       }
@@ -124,7 +169,12 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req) => {
       const clinicId = await resolveClinicId(req.user.id);
-      return messagesService.listAutomations(clinicId) as unknown as Promise<z.infer<typeof WaAutomationSchema>[]>;
+      const automations = await messagesService.listAutomations(clinicId);
+      return automations.map((automation) => ({
+        ...automation,
+        createdAt: automation.createdAt.toISOString(),
+        updatedAt: automation.updatedAt.toISOString(),
+      }));
     },
   );
 
@@ -147,9 +197,25 @@ const messagesRoutes: FastifyPluginAsync = async (app) => {
       if (!updated) {
         return rep.code(404).send({ error: 'NotFound', message: 'Automation not found' });
       }
-      return updated as unknown as z.infer<typeof WaAutomationSchema>;
+      return {
+        ...updated,
+        createdAt: updated.createdAt.toISOString(),
+        updatedAt: updated.updatedAt.toISOString(),
+      };
     },
   );
 };
 
 export default messagesRoutes;
+
+function parseIdempotencyKey(value: string | string[] | undefined): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const key = value.trim();
+  if (!key) return undefined;
+  if (key.length < 8 || key.length > 128) {
+    const error = new Error('Idempotency-Key must contain 8 to 128 characters');
+    Object.assign(error, { statusCode: 400 });
+    throw error;
+  }
+  return key;
+}

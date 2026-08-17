@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 import type {
   TreatmentPlan as PrismaPlan,
   TreatmentSession as PrismaSession,
@@ -65,7 +66,19 @@ export class TreatmentPlansService {
     return row ? planToDTO(row) : null;
   }
 
-  async create(clinicId: string, input: CreateTreatmentPlanInput) {
+  async create(clinicId: string, actorId: string, input: CreateTreatmentPlanInput) {
+    const [patient, therapist] = await Promise.all([
+      prisma.patient.findFirst({
+        where: { id: input.patientId, clinicId, deletedAt: null },
+        select: { id: true },
+      }),
+      prisma.user.findFirst({
+        where: { id: input.therapistId, clinicId },
+        select: { id: true },
+      }),
+    ]);
+    if (!patient || !therapist) return null;
+    await requireResourceOwnerOrClinicAdmin(actorId, therapist.id);
     const row = await prisma.treatmentPlan.create({
       data: {
         clinicId,
@@ -88,12 +101,13 @@ export class TreatmentPlansService {
     return planToDTO(row);
   }
 
-  async update(clinicId: string, id: string, input: UpdateTreatmentPlanInput) {
+  async update(clinicId: string, actorId: string, id: string, input: UpdateTreatmentPlanInput) {
     const exists = await prisma.treatmentPlan.findFirst({
       where: { id, clinicId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, therapistId: true },
     });
     if (!exists) return null;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.therapistId);
     const row = await prisma.treatmentPlan.update({
       where: { id },
       data: {
@@ -122,12 +136,13 @@ export class TreatmentPlansService {
     return planToDTO(row);
   }
 
-  async remove(clinicId: string, id: string): Promise<boolean> {
+  async remove(clinicId: string, actorId: string, id: string): Promise<boolean> {
     const exists = await prisma.treatmentPlan.findFirst({
       where: { id, clinicId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, therapistId: true },
     });
     if (!exists) return false;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.therapistId);
     await prisma.treatmentPlan.update({
       where: { id },
       data: { deletedAt: new Date() },
@@ -151,16 +166,35 @@ export class TreatmentPlansService {
 
   async registerSession(
     clinicId: string,
+    actorId: string,
     planId: string,
     input: RegisterSessionInput,
   ): Promise<TreatmentSession | null> {
     return prisma.$transaction(async (tx) => {
       const plan = await tx.treatmentPlan.findFirst({
-        where: { id: planId, clinicId, deletedAt: null },
+        where: { id: planId, clinicId, deletedAt: null, status: 'active' },
       });
       if (!plan) return null;
+      await requireResourceOwnerOrClinicAdmin(actorId, plan.therapistId);
 
-      const sessionNumber = plan.usedSessions + 1;
+      if (input.appointmentId) {
+        const appointment = await tx.appointment.findFirst({
+          where: {
+            id: input.appointmentId,
+            clinicId,
+            patientId: plan.patientId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        if (!appointment) return null;
+      }
+
+      if (plan.usedSessions >= plan.totalSessions) return null;
+
+      const sessionNumber = await tx.treatmentSession.count({
+        where: { treatmentPlanId: planId },
+      }) + 1;
 
       const session = await tx.treatmentSession.create({
         data: {
@@ -176,7 +210,7 @@ export class TreatmentPlansService {
       await tx.treatmentPlan.update({
         where: { id: planId },
         data: {
-          usedSessions: sessionNumber,
+          usedSessions: { increment: 1 },
           ...(sessionNumber >= plan.totalSessions && {
             status: 'completed',
             completedAt: new Date(),
@@ -185,7 +219,7 @@ export class TreatmentPlansService {
       });
 
       return sessionToDTO(session);
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 }
 

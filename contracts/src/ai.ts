@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-export const ChatRoleEnum = z.enum(['user', 'assistant', 'system']);
+// System instructions are server-owned. Client history can only represent a
+// prior user/assistant exchange and must not override RAG policy.
+export const ChatRoleEnum = z.enum(['user', 'assistant']);
 
 export const ChatMessageSchema = z.object({
   role: ChatRoleEnum,
@@ -44,9 +46,9 @@ export const ReportTemplateEnum = z.enum([
 export type ReportTemplate = z.infer<typeof ReportTemplateEnum>;
 
 export const GenerateReportRequestSchema = z.object({
+  patientId: z.string().uuid(),
   transcription: z.string().min(10).max(50000),
   template: ReportTemplateEnum,
-  patientName: z.string().max(200).optional(),
 });
 export type GenerateReportRequest = z.infer<typeof GenerateReportRequestSchema>;
 

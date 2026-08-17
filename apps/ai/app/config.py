@@ -1,4 +1,5 @@
 """Configuração do serviço AI."""
+
 from functools import lru_cache
 from typing import Literal
 
@@ -8,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    environment: Literal["development", "production", "test"] = "development"
+    environment: Literal["development", "staging", "production", "test"] = "development"
     port: int = 8001
     log_level: str = "info"
 
@@ -28,6 +29,11 @@ class Settings(BaseSettings):
     huggingface_whisper_model: str = "openai/whisper-large-v3"
 
     database_url: str
+
+    # URLs remotas para ingestão RAG só são aceitas em staging/produção quando
+    # o host está explicitamente autorizado. Separar por vírgulas; use nomes
+    # exatos ou sufixos iniciados por ponto (ex.: ".supabase.co").
+    library_ingest_allowed_hosts: str = ""
 
     # OpenRouter (AI content generation — ebooks, infográficos, materiais)
     openrouter_api_key: str = ""

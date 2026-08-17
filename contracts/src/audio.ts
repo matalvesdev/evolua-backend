@@ -48,6 +48,20 @@ export const CreateAudioSessionSchema = z.object({
 });
 export type CreateAudioSessionInput = z.infer<typeof CreateAudioSessionSchema>;
 
+export const CreateAudioUploadSchema = z.object({
+  patientId: UuidSchema,
+  contentType: z.enum([
+    'audio/webm', 'audio/ogg', 'audio/mpeg', 'audio/mp3', 'audio/wav',
+    'audio/mp4', 'audio/m4a', 'audio/x-m4a', 'audio/aac',
+  ]),
+});
+export type CreateAudioUploadInput = z.infer<typeof CreateAudioUploadSchema>;
+
+export const AudioUploadTargetSchema = z.object({
+  path: AudioPathSchema,
+  token: z.string().min(1),
+});
+
 export const TranscribeAudioSchema = z.object({
   audioSessionId: UuidSchema,
   language: z.string().max(10).optional(),

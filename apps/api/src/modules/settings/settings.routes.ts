@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { settingsService } from './settings.service.js';
-import { resolveClinicId } from '../auth/auth.helpers.js';
+import { requireClinicAdministration, resolveClinicId } from '../auth/auth.helpers.js';
 
 const WorkingHoursSchema = z.record(
   z.string(),
@@ -13,14 +13,21 @@ const SettingsSchema = z.object({
   clinicName: z.string(),
   clinicPhone: z.string(),
   clinicEmail: z.string(),
+  clinicAddress: z.string(),
   workingHours: WorkingHoursSchema,
   appointmentDuration: z.number(),
+  sessionDuration: z.number(),
   allowTeleconsulta: z.boolean(),
   notificationEmail: z.boolean(),
   notificationWhatsApp: z.boolean(),
   autoSendReminders: z.boolean(),
   reminder24h: z.boolean(),
   reminder1h: z.boolean(),
+  notifSessao: z.boolean(),
+  notifReport: z.boolean(),
+  notifPagamento: z.boolean(),
+  notifWhatsapp: z.boolean(),
+  notifEmail: z.boolean(),
 });
 
 const UpdateSettingsSchema = SettingsSchema.partial();
@@ -53,7 +60,7 @@ const settingsRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async (req) => {
-      const clinicId = await resolveClinicId(req.user.id);
+      const clinicId = await requireClinicAdministration(req.user.id);
       return settingsService.update(clinicId, req.user.id, req.body);
     },
   );

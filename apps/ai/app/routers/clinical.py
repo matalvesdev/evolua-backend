@@ -1,4 +1,5 @@
 """Geração clínica: evolução pós-sessão, materiais, transcrição e relatórios."""
+
 from __future__ import annotations
 
 import json
@@ -11,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..deps import get_user_id, verify_internal_token
-from ..hf_client import HuggingFaceError, HuggingFaceModelLoading, hf_client
+from ..hf_client import HuggingFaceError, HuggingFaceModelLoadingError, hf_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/clinical", tags=["clinical-ai"])
@@ -75,16 +76,27 @@ async def generate_evolution(
 
     try:
         raw = await hf_client.chat(messages, max_tokens=900, temperature=0.2)
-    except HuggingFaceModelLoading as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-    except HuggingFaceError as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except HuggingFaceModelLoadingError as exc:
+        logger.warning("Clinical evolution model is loading")
+        raise HTTPException(
+            status_code=503,
+            detail="O serviço de IA está sendo preparado. Tente novamente em alguns instantes.",
+        ) from exc
+    except HuggingFaceError as exc:
+        logger.warning("Clinical evolution provider unavailable")
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível gerar a evolução agora. Tente novamente mais tarde.",
+        ) from exc
 
     parsed = _safe_json(raw)
     if not parsed:
         raise HTTPException(status_code=502, detail="LLM não retornou JSON válido")
 
-    soap = parsed.get("soap") or {}
+    soap_value = parsed.get("soap")
+    soap = soap_value if isinstance(soap_value, dict) else {}
+    suggestions_value = parsed.get("next_session_suggestions")
+    suggestions = suggestions_value if isinstance(suggestions_value, list) else []
     return GeneratedEvolution(
         soap={
             "subjective": str(soap.get("subjective", "")),
@@ -93,7 +105,7 @@ async def generate_evolution(
             "plan": str(soap.get("plan", "")),
         },
         summary=str(parsed.get("summary", "")),
-        next_session_suggestions=[str(s) for s in (parsed.get("next_session_suggestions") or [])][:5],
+        next_session_suggestions=[str(s) for s in suggestions][:5],
     )
 
 
@@ -101,8 +113,15 @@ async def generate_evolution(
 
 
 TherapyArea = Literal[
-    "linguagem", "fala", "fluencia", "voz",
-    "degluticao", "fonologia", "mof", "tea", "caa",
+    "linguagem",
+    "fala",
+    "fluencia",
+    "voz",
+    "degluticao",
+    "fonologia",
+    "mof",
+    "tea",
+    "caa",
 ]
 MaterialFormat = Literal["atividade", "brincadeira", "jogo", "historia", "exercicio", "roteiro"]
 AgeGroup = Literal["bebe", "infantil", "escolar", "adolescente", "adulto"]
@@ -178,7 +197,7 @@ def _coerce_str_list(value: object, limit: int = 8) -> list[str]:
 
 def _coerce_int(value: object) -> int | None:
     try:
-        if value is None or value == "":
+        if value is None or value == "" or not isinstance(value, (str, int, float)):
             return None
         n = int(float(value))  # tolera "20" ou 20.0
         return max(1, min(180, n))
@@ -209,15 +228,22 @@ async def generate_material(
 
     try:
         raw = await hf_client.chat(messages, max_tokens=1100, temperature=0.5)
-    except HuggingFaceModelLoading as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-    except HuggingFaceError as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except HuggingFaceModelLoadingError as exc:
+        logger.warning("Clinical material model is loading")
+        raise HTTPException(
+            status_code=503,
+            detail="O serviço de IA está sendo preparado. Tente novamente em alguns instantes.",
+        ) from exc
+    except HuggingFaceError as exc:
+        logger.warning("Clinical material provider unavailable")
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível gerar o material agora. Tente novamente mais tarde.",
+        ) from exc
 
     parsed = _safe_json(raw) or {}
     title = str(parsed.get("title") or "").strip() or (
-        f"{FORMAT_LABELS.get(req.format, req.format)} de "
-        f"{AREA_LABELS.get(req.area, req.area)}"
+        f"{FORMAT_LABELS.get(req.format, req.format)} de {AREA_LABELS.get(req.area, req.area)}"
     )
     return GeneratedMaterial(
         title=title[:120],
@@ -320,8 +346,12 @@ async def generate_report(
         f"TRANSCRIÇÃO:\n{req.transcription}"
     )
 
-    logger.info("Generating report: template=%s, patient=%s, transcription_len=%d",
-                req.template, req.patient_name or 'unknown', len(req.transcription))
+    logger.info(
+        "Generating report: template=%s, patient=%s, transcription_len=%d",
+        req.template,
+        req.patient_name or "unknown",
+        len(req.transcription),
+    )
 
     try:
         raw = await hf_client.chat(
@@ -329,7 +359,7 @@ async def generate_report(
             max_tokens=2000,
             temperature=0.2,
         )
-    except HuggingFaceModelLoading as e:
+    except HuggingFaceModelLoadingError as e:
         return GenerateReportResponse(success=False, error=str(e))
     except HuggingFaceError as e:
         return GenerateReportResponse(success=False, error=str(e))
@@ -363,6 +393,11 @@ class TranscribeResponse(BaseModel):
 
 
 _ALLOWED_AUDIO_HOSTS = ("supabase.co", "amazonaws.com")
+_ALLOWED_AUDIO_CONTENT_TYPES = {
+    "audio/webm", "audio/ogg", "audio/mpeg", "audio/mp3", "audio/wav",
+    "audio/mp4", "audio/m4a", "audio/x-m4a", "audio/aac",
+}
+_MAX_AUDIO_BYTES = 50 * 1024 * 1024
 
 
 def _is_allowed_audio_url(url: str) -> bool:
@@ -370,7 +405,8 @@ def _is_allowed_audio_url(url: str) -> bool:
         parsed = urlparse(url)
         if parsed.scheme != "https" or not parsed.hostname:
             return False
-        return any(parsed.hostname.endswith(h) for h in _ALLOWED_AUDIO_HOSTS)
+        hostname = parsed.hostname.lower()
+        return any(hostname == host or hostname.endswith(f".{host}") for host in _ALLOWED_AUDIO_HOSTS)
     except ValueError:
         return False
 
@@ -389,30 +425,46 @@ async def transcribe_audio(
     if not _is_allowed_audio_url(req.audio_url):
         raise HTTPException(status_code=400, detail="audio_url não permitida")
 
-    # 1. Baixa o áudio (Supabase Storage público).
+    # 1. Baixa o áudio por URL temporária assinada gerada pelo serviço API.
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            audio_resp = await client.get(req.audio_url)
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Falha baixando áudio: {e}") from e
+        timeout = httpx.Timeout(connect=10.0, read=60.0, write=10.0, pool=10.0)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+            async with client.stream("GET", req.audio_url) as audio_resp:
+                if audio_resp.status_code >= 400:
+                    raise HTTPException(status_code=502, detail="Falha baixando áudio")
 
-    if audio_resp.status_code >= 400:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Falha baixando áudio: HTTP {audio_resp.status_code}",
-        )
+                content_length = audio_resp.headers.get("content-length")
+                if content_length:
+                    try:
+                        declared_size = int(content_length)
+                    except ValueError as exc:
+                        raise HTTPException(status_code=502, detail="Resposta de áudio inválida") from exc
+                    if declared_size > _MAX_AUDIO_BYTES:
+                        raise HTTPException(status_code=413, detail="Áudio excede o limite permitido")
 
-    audio_bytes = audio_resp.content
-    content_type = audio_resp.headers.get("content-type", "audio/webm")
-    logger.info("Transcribing %d bytes (%s) for session %s", len(audio_bytes), content_type, req.audio_session_id)
+                content_type = audio_resp.headers.get("content-type", "").split(";", 1)[0].lower()
+                if content_type not in _ALLOWED_AUDIO_CONTENT_TYPES:
+                    raise HTTPException(status_code=415, detail="Formato de áudio não suportado")
+
+                chunks: list[bytes] = []
+                size = 0
+                async for chunk in audio_resp.aiter_bytes():
+                    size += len(chunk)
+                    if size > _MAX_AUDIO_BYTES:
+                        raise HTTPException(status_code=413, detail="Áudio excede o limite permitido")
+                    chunks.append(chunk)
+                audio_bytes = b"".join(chunks)
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Falha baixando áudio") from exc
+    logger.info("Transcribing audio session %s (%d bytes)", req.audio_session_id, len(audio_bytes))
 
     # 2. Envia ao Whisper.
     try:
         text = await hf_client.transcribe(audio_bytes, content_type=content_type)
-    except HuggingFaceModelLoading as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-    except HuggingFaceError as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except HuggingFaceModelLoadingError as exc:
+        raise HTTPException(status_code=503, detail="Modelo de transcrição indisponível") from exc
+    except HuggingFaceError as exc:
+        raise HTTPException(status_code=502, detail="Falha no provedor de transcrição") from exc
 
     return TranscribeResponse(transcription=text)
 
@@ -420,7 +472,17 @@ async def transcribe_audio(
 # ── helpers ────────────────────────────────────────────────────────────
 
 
-def _safe_json(raw: str) -> dict | None:
+def _decode_json_object(candidate: str) -> dict[str, object] | None:
+    try:
+        value: object = json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(value, dict):
+        return None
+    return {str(key): item for key, item in value.items()}
+
+
+def _safe_json(raw: str) -> dict[str, object] | None:
     """Tenta decodificar JSON, lidando com possíveis cercas markdown do LLM."""
     if not raw or not raw.strip():
         return None
@@ -443,16 +505,15 @@ def _safe_json(raw: str) -> dict | None:
     if start >= 0 and end > start:
         candidate = candidate[start : end + 1]
 
-    try:
-        return json.loads(candidate)
-    except json.JSONDecodeError:
-        pass
+    decoded = _decode_json_object(candidate)
+    if decoded is not None:
+        return decoded
 
     # Fallback: tenta limpar caracteres problemáticos
-    try:
-        import re
-        cleaned = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F]', ' ', candidate)
-        return json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        logger.warning("JSON parse failed after cleanup: %s | raw=%s", e, raw[:200])
-        return None
+    import re
+
+    cleaned = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", " ", candidate)
+    decoded = _decode_json_object(cleaned)
+    if decoded is None:
+        logger.warning("JSON parse failed after cleanup")
+    return decoded

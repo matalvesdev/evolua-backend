@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from 'fastify';
+import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { leadsService } from './leads.service.js';
 
@@ -13,7 +14,7 @@ const bodySchema = z.object({
 });
 
 const leadsRoutes: FastifyPluginAsync = async (app) => {
-  const route = app.withTypeProvider<any>();
+  const route = app.withTypeProvider<ZodTypeProvider>();
 
   route.post(
     '/',

@@ -17,6 +17,7 @@ import {
 } from '@evolua/contracts';
 import { aiService } from './ai.service.js';
 import { resolveClinicId } from '../auth/auth.helpers.js';
+import { prisma } from '../../lib/prisma.js';
 
 const aiRoutes: FastifyPluginAsync = async (app) => {
   const route = app.withTypeProvider<ZodTypeProvider>();
@@ -32,7 +33,7 @@ const aiRoutes: FastifyPluginAsync = async (app) => {
         response: { 200: AiChatResponseSchema },
       },
     },
-    async (req) => aiService.chat(req.body, req.user.id),
+    async (req) => aiService.chat(req.body, req.user.id, await resolveClinicId(req.user.id)),
   );
 
   route.post(
@@ -42,10 +43,18 @@ const aiRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['ai'],
         body: GenerateReportRequestSchema,
-        response: { 200: GenerateReportResponseSchema },
+        response: { 200: GenerateReportResponseSchema, 404: ErrorResponseSchema },
       },
     },
-    async (req) => aiService.generateReport(req.body, req.user.id),
+    async (req, reply) => {
+      const clinicId = await resolveClinicId(req.user.id);
+      const patient = await prisma.patient.findFirst({
+        where: { id: req.body.patientId, clinicId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!patient) return reply.code(404).send({ error: 'NotFound', message: 'Patient not found' });
+      return aiService.generateReport(req.body, req.user.id, clinicId);
+    },
   );
 
   route.post(
@@ -57,17 +66,24 @@ const aiRoutes: FastifyPluginAsync = async (app) => {
         body: GenerateEvolutionRequestSchema,
         response: {
           200: GeneratedEvolutionSchema,
+          404: ErrorResponseSchema,
           502: ErrorResponseSchema,
         },
       },
     },
     async (req, reply) => {
       try {
-        return await aiService.generateEvolution(req.body, req.user.id);
-      } catch (e) {
+        const clinicId = await resolveClinicId(req.user.id);
+        const patient = await prisma.patient.findFirst({
+          where: { id: req.body.patientId, clinicId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!patient) return reply.code(404).send({ error: 'NotFound', message: 'Patient not found' });
+        return await aiService.generateEvolution(req.body, req.user.id, clinicId);
+      } catch {
         return reply.code(502).send({
           error: 'AiServiceError',
-          message: e instanceof Error ? e.message : 'Falha ao gerar evolução',
+          message: 'Falha ao gerar evolução. Tente novamente mais tarde.',
         });
       }
     },
@@ -107,10 +123,10 @@ const aiRoutes: FastifyPluginAsync = async (app) => {
       const clinicId = await resolveClinicId(req.user.id);
       try {
         return await aiService.ingestLibraryUrl(req.body, clinicId, req.user.id);
-      } catch (e) {
+      } catch {
         return reply.code(502).send({
           error: 'AiServiceError',
-          message: e instanceof Error ? e.message : 'Falha ao ingerir documento',
+          message: 'Falha ao ingerir documento. Tente novamente mais tarde.',
         });
       }
     },
@@ -167,10 +183,10 @@ const aiRoutes: FastifyPluginAsync = async (app) => {
           clinicId,
           req.user.id,
         );
-      } catch (e) {
+      } catch {
         return reply.code(502).send({
           error: 'AiServiceError',
-          message: e instanceof Error ? e.message : 'Falha ao ingerir arquivo',
+          message: 'Falha ao ingerir arquivo. Tente novamente mais tarde.',
         });
       }
     },
@@ -193,10 +209,10 @@ const aiRoutes: FastifyPluginAsync = async (app) => {
       try {
         await aiService.deleteLibraryDocument(req.params.id, clinicId, req.user.id);
         return reply.code(204).send(null);
-      } catch (e) {
+      } catch {
         return reply.code(502).send({
           error: 'AiServiceError',
-          message: e instanceof Error ? e.message : 'Falha ao deletar documento',
+          message: 'Falha ao deletar documento. Tente novamente mais tarde.',
         });
       }
     },

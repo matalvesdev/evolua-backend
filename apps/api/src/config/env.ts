@@ -2,7 +2,7 @@ import { z } from 'zod';
 import 'dotenv/config';
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   CORS_ORIGINS: z.string().transform((s) => s.split(',').map((o) => o.trim()).filter(Boolean)),
@@ -35,14 +35,9 @@ const envSchema = z.object({
   // Resend (https://resend.com) — email transacional primário
   RESEND_API_KEY: z.string().min(1).optional(),
   RESEND_FROM_EMAIL: z.string().email().default('naoresponder@useevolua.com.br'),
+  RESEND_FROM_NAME: z.string().default('Evolua'),
 
-  // Notifica (https://docs.usenotifica.com.br) — email transacional fallback
-  NOTIFICA_API_URL: z.string().url().default('https://app.usenotifica.com.br/v1'),
-  NOTIFICA_API_KEY: z.string().min(1).optional(),
-  NOTIFICA_FROM_EMAIL: z.string().email().optional(),
-  NOTIFICA_FROM_NAME: z.string().default('Evolua'),
-
-  // SMTP fallback — usado quando Notifica falha
+  // SMTP fallback — usado quando Resend falha
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.coerce.number().int().positive().default(587),
   SMTP_SECURE: z.coerce.boolean().default(false),
@@ -86,10 +81,12 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error('❌ Invalid environment variables:');
-  console.error(parsed.error.flatten().fieldErrors);
-  process.exit(1);
+  throw new Error(`Invalid environment variables: ${JSON.stringify(parsed.error.flatten().fieldErrors)}`);
 }
 
 export const env = parsed.data;
 export type Env = typeof env;
+
+// Staging recebe os mesmos controles de exposição e transporte de produção.
+// A diferença é a infraestrutura isolada, nunca controles de segurança menores.
+export const isProductionLike = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging';

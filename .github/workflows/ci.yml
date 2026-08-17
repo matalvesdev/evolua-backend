@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate
+      - run: npm run build:contracts
+      - run: npm run build:api
+      - run: npm run lint --workspace=@evolua/api
+      - run: npm test --workspace=@evolua/api
+
+  ai:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install -e './apps/ai[dev]'
+      - run: python -m ruff check apps/ai
+      - run: python -m pytest apps/ai/tests
+
+  whatsapp:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/services/whatsapp
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.23'
+          cache-dependency-path: apps/services/whatsapp/go.sum
+      - run: go test ./...
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build API image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+      - name: Build AI image
+        uses: docker/build-push-action@v7
+        with:
+          context: ./apps/ai
+          file: ./apps/ai/Dockerfile
+          push: false
+
+  secret-scanning:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  blueprints:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install Blueprint validators
+        run: python -m pip install 'jsonschema==4.25.1' 'PyYAML==6.0.3'
+      - name: Validate Render Blueprints
+        run: python scripts/validate-render-blueprints.py
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+
+  ci-gate:
+    if: always()
+    needs: [api, ai, whatsapp, docker, secret-scanning, blueprints, dependency-review]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evaluate gate
+        env:
+          API_RESULT: ${{ needs.api.result }}
+          AI_RESULT: ${{ needs.ai.result }}
+          WHATSAPP_RESULT: ${{ needs.whatsapp.result }}
+          DOCKER_RESULT: ${{ needs.docker.result }}
+          SECRETS_RESULT: ${{ needs.secret-scanning.result }}
+          BLUEPRINTS_RESULT: ${{ needs.blueprints.result }}
+          DEPENDENCY_RESULT: ${{ needs.dependency-review.result }}
+        run: |
+          for result in "$API_RESULT" "$AI_RESULT" "$WHATSAPP_RESULT" "$DOCKER_RESULT" "$SECRETS_RESULT" "$BLUEPRINTS_RESULT" "$DEPENDENCY_RESULT"; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "::error::CI gate failed: $result"
+              exit 1
+            fi
+          done
+          echo "CI gate passed"
