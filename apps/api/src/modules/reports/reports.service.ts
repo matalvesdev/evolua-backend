@@ -50,11 +50,12 @@ export class ReportsService {
     therapistId: string,
     input: CreateReportInput,
   ): Promise<Report> {
+    const patient = await this.assertPatientBelongsToClinic(clinicId, input.patientId);
     const row = await prisma.report.create({
       data: {
         clinicId,
         patientId: input.patientId,
-        patientName: input.patientName,
+        patientName: patient.name,
         therapistId,
         therapistName: input.therapistName,
         therapistCrfa: input.therapistCrfa,
@@ -177,11 +178,12 @@ export class ReportsService {
     therapistId: string,
     input: { patientId: string; patientName: string; therapistName: string; therapistCrfa: string; type: string; title: string; content: string },
   ): Promise<Report> {
+    const patient = await this.assertPatientBelongsToClinic(clinicId, input.patientId);
     const row = await prisma.report.create({
       data: {
         clinicId,
         patientId: input.patientId,
-        patientName: input.patientName,
+        patientName: patient.name,
         therapistId,
         therapistName: input.therapistName,
         therapistCrfa: input.therapistCrfa,
@@ -219,6 +221,21 @@ export class ReportsService {
     if (!exists) return null;
     const row = await prisma.report.update({ where: { id }, data });
     return reportToDTO(row);
+  }
+
+  private async assertPatientBelongsToClinic(
+    clinicId: string,
+    patientId: string,
+  ): Promise<{ id: string; name: string }> {
+    const patient = await prisma.patient.findFirst({
+      where: { id: patientId, clinicId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (patient) return patient;
+
+    const err = new Error('Patient not found');
+    (err as Error & { statusCode: number }).statusCode = 404;
+    throw err;
   }
 }
 

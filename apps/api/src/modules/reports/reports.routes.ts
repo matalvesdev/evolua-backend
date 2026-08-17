@@ -57,7 +57,7 @@ const reportsRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['reports'],
         body: CreateReportSchema,
-        response: { 201: ReportSchema },
+        response: { 201: ReportSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {

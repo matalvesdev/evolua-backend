@@ -14,8 +14,10 @@ Quando a tabela não existe, retornamos 503 com instrução clara.
 from __future__ import annotations
 
 import io
+import ipaddress
 import logging
 import re
+import socket
 import time
 from typing import Any
 from uuid import UUID
@@ -83,8 +85,8 @@ def _extract_text_from_pdf(blob: bytes) -> list[tuple[int, str]]:
     for i, page in enumerate(reader.pages, 1):
         try:
             text = page.extract_text() or ""
-        except Exception as e:  # noqa: BLE001
-            logger.warning("PDF page %d extract failed: %s", i, e)
+        except Exception:  # noqa: BLE001
+            logger.warning("PDF page %d extraction failed", i)
             text = ""
         pages.append((i, text))
     return pages
@@ -203,6 +205,23 @@ def _insert_document_and_chunks(
 # ── Security helpers ───────────────────────────────────────────────────────
 
 
+def _resolve_public_addresses(hostname: str) -> set[str]:
+    """Resolve hostname e rejeita destinos que não sejam IPs públicos."""
+    try:
+        addresses = {
+            item[4][0]
+            for item in socket.getaddrinfo(hostname, 443, type=socket.SOCK_STREAM)
+        }
+    except socket.gaierror as exc:
+        raise HTTPException(400, "source_url não pôde ser resolvida") from exc
+
+    if not addresses:
+        raise HTTPException(400, "source_url não pôde ser resolvida")
+    if any(not ipaddress.ip_address(address).is_global for address in addresses):
+        raise HTTPException(400, "source_url não permitida (rede não pública)")
+    return addresses
+
+
 def _validate_source_url(url: str) -> None:
     """Valida URL de fonte para evitar SSRF.
 
@@ -228,15 +247,13 @@ def _validate_source_url(url: str) -> None:
     if hostname in blocked_hosts:
         raise HTTPException(400, "source_url não permitida (host bloqueado)")
 
-    # Bloqueia endereços privados (localhost, LAN)
-    import ipaddress
-
+    # Bloqueia endereços privados (localhost, LAN) e redes não roteáveis.
     try:
         ip = ipaddress.ip_address(hostname)
-        if ip.is_private or ip.is_loopback or ip.is_link_local:
-            raise HTTPException(400, "source_url não permitida (rede interna)")
+        if not ip.is_global:
+            raise HTTPException(400, "source_url não permitida (rede não pública)")
     except ValueError:
-        pass  # hostname, não IP — permitido
+        _resolve_public_addresses(hostname)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────
@@ -308,11 +325,11 @@ async def ingest_document(
     snippets = [c[1] for c in chunks]
     try:
         embeddings = await _embed_in_batches(snippets, batch=16)
-    except HuggingFaceModelLoadingError as e:
-        raise HTTPException(503, str(e)) from e
-    except HuggingFaceError as e:
-        logger.error("HF embed failed: %s", e)
-        raise HTTPException(502, f"AI provider error: {e}") from e
+    except HuggingFaceModelLoadingError as exc:
+        raise HTTPException(503, "Modelo de IA indisponível") from exc
+    except HuggingFaceError as exc:
+        logger.error("HF embed failed")
+        raise HTTPException(502, "Falha no provedor de IA") from exc
 
     if len(embeddings) != len(chunks):
         raise HTTPException(500, "Mismatch entre embeddings e chunks")

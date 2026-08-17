@@ -129,8 +129,12 @@ Responda APENAS com o JSON, sem markdown, sem comentarios."""
             max_tokens=8192,
             temperature=0.7,
         )
-    except Exception as e:
-        raise HTTPException(502, f"OpenRouter falhou: {e}") from e
+    except Exception as exc:
+        logger.warning("Content generation provider unavailable")
+        raise HTTPException(
+            502,
+            "Não foi possível gerar o conteúdo agora. Tente novamente mais tarde.",
+        ) from exc
 
     raw_clean = raw.strip()
     if raw_clean.startswith("```"):
@@ -141,10 +145,12 @@ Responda APENAS com o JSON, sem markdown, sem comentarios."""
 
     try:
         content = json.loads(raw_clean)
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError as exc:
+        logger.warning("Content generation returned invalid JSON")
         raise HTTPException(
-            502, f"Resposta JSON invalida do modelo: {e}. Resposta: {raw_clean[:500]}"
-        ) from e
+            502,
+            "O serviço de IA retornou um formato inválido. Tente novamente mais tarde.",
+        ) from exc
 
     return ContentResponse(
         format=req.format,

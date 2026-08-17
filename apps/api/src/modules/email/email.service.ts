@@ -21,13 +21,13 @@ export class EmailService {
 
   async sendWelcome(to: string, name: string): Promise<{ success: boolean; error?: string }> {
     const { subject, html } = welcomeEmail(name);
-    logger.info({ to, template: 'welcome' }, 'Sending welcome email');
+    logger.info({ template: 'welcome' }, 'Sending welcome email');
     return this.client.sendEmail({ to, subject, html });
   }
 
   async sendPasswordReset(to: string, resetLink: string): Promise<{ success: boolean; error?: string }> {
     const { subject, html } = passwordResetEmail(resetLink);
-    logger.info({ to, template: 'passwordReset' }, 'Sending password reset email');
+    logger.info({ template: 'passwordReset' }, 'Sending password reset email');
     return this.client.sendEmail({ to, subject, html });
   }
 
@@ -51,7 +51,7 @@ export class EmailService {
 
   async sendReportReady(to: string, patientName: string, reportType: string, reportLink: string): Promise<{ success: boolean; error?: string }> {
     const { subject, html } = reportReady(patientName, reportType, reportLink);
-    logger.info({ to, template: 'reportReady' }, 'Sending report ready email');
+    logger.info({ template: 'reportReady' }, 'Sending report ready email');
     return this.client.sendEmail({ to, subject, html });
   }
 

@@ -19,7 +19,7 @@ export class AiService {
   /**
    * Proxy para o serviço Python AI: RAG na biblioteca clínica.
    */
-  async chat(req: AiChatRequest, userId: string): Promise<AiChatResponse> {
+  async chat(req: AiChatRequest, userId: string, clinicId: string): Promise<AiChatResponse> {
     try {
       const res = await fetch(`${env.AI_SERVICE_URL}/library/chat`, {
         method: 'POST',
@@ -27,6 +27,7 @@ export class AiService {
           'Content-Type': 'application/json',
           'x-internal-token': env.INTERNAL_SERVICE_TOKEN,
           'x-user-id': userId,
+          'x-clinic-id': clinicId,
         },
         body: JSON.stringify({
           question: req.question,
@@ -37,8 +38,8 @@ export class AiService {
       });
 
       if (!res.ok) {
-        const body = await res.text();
-        return this.fallback(`AI service ${res.status}: ${body.slice(0, 200)}`);
+        await res.text();
+        return this.fallback();
       }
 
       const data = (await res.json()) as Partial<AiChatResponse> & {
@@ -50,8 +51,8 @@ export class AiService {
         latency_ms: data.latency_ms,
         model: data.model,
       };
-    } catch (e) {
-      return this.fallback(e instanceof Error ? e.message : String(e));
+    } catch {
+      return this.fallback();
     }
   }
 
@@ -79,8 +80,9 @@ export class AiService {
       signal: AbortSignal.timeout(90_000),
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`AI evolution ${res.status}: ${body.slice(0, 300)}`);
+      await res.text().catch(() => '');
+      logger.warn({ statusCode: res.status }, 'ai: evolution provider unavailable');
+      throw new Error('Serviço de geração de evolução indisponível.');
     }
     const data = (await res.json()) as {
       soap: { subjective: string; objective: string; assessment: string; plan: string };
@@ -118,8 +120,9 @@ export class AiService {
       signal: AbortSignal.timeout(90_000),
     });
     if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`AI material ${res.status}: ${body.slice(0, 300)}`);
+      await res.text().catch(() => '');
+      logger.warn({ statusCode: res.status }, 'ai: material provider unavailable');
+      throw new Error('Serviço de geração de material indisponível.');
     }
     const data = (await res.json()) as {
       title: string;
@@ -163,16 +166,16 @@ export class AiService {
       });
 
       if (!res.ok) {
-        const body = await res.text();
-        return { success: false, error: `AI service ${res.status}: ${body.slice(0, 200)}` };
+        await res.text();
+        return { success: false, error: 'Serviço de IA indisponível. Tente novamente mais tarde.' };
       }
 
       const data = (await res.json()) as GenerateReportResponse;
       return data;
-    } catch (e) {
+    } catch {
       return {
         success: false,
-        error: e instanceof Error ? e.message : 'Erro ao gerar relatório',
+        error: 'Serviço de IA indisponível. Tente novamente mais tarde.',
       };
     }
   }
@@ -199,7 +202,9 @@ export class AiService {
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) {
-      throw new Error(`AI service ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      await res.text().catch(() => '');
+      logger.warn({ statusCode: res.status }, 'ai: library provider unavailable');
+      throw new Error('Biblioteca com IA indisponível.');
     }
     return (await res.json()) as LibraryDocumentListResponse;
   }
@@ -231,7 +236,9 @@ export class AiService {
       signal: AbortSignal.timeout(120_000),
     });
     if (!res.ok) {
-      throw new Error(`AI ingest ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      await res.text().catch(() => '');
+      logger.warn({ statusCode: res.status }, 'ai: library URL ingestion unavailable');
+      throw new Error('Ingestão da biblioteca indisponível.');
     }
     const data = (await res.json()) as {
       document_id: string;
@@ -283,7 +290,9 @@ export class AiService {
       signal: AbortSignal.timeout(180_000),
     });
     if (!res.ok) {
-      throw new Error(`AI ingest ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      await res.text().catch(() => '');
+      logger.warn({ statusCode: res.status }, 'ai: library file ingestion unavailable');
+      throw new Error('Ingestão da biblioteca indisponível.');
     }
     const data = (await res.json()) as {
       document_id: string;
@@ -315,12 +324,14 @@ export class AiService {
       },
     );
     if (!res.ok) {
-      throw new Error(`AI delete ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      await res.text().catch(() => '');
+      logger.warn({ statusCode: res.status }, 'ai: library document deletion unavailable');
+      throw new Error('Exclusão da biblioteca indisponível.');
     }
   }
 
-  private fallback(reason: string): AiChatResponse {
-    logger.warn({ reason }, 'ai: chat fallback triggered');
+  private fallback(): AiChatResponse {
+    logger.warn('ai: chat fallback triggered');
     return {
       answer:
         'A base de conhecimento científica está indisponível no momento. Tente novamente em alguns instantes.',

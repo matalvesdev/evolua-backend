@@ -45,8 +45,8 @@ export class LeadsService {
 
       // Auto-disparar email de entrega se for lead magnet
       if (data.magnetId && data.email) {
-        this.sendMagnetEmail(data.email, data.nome, data.magnetId).catch((err) =>
-          logger.warn({ err, email: data.email, magnetId: data.magnetId }, 'Failed to send magnet email'),
+        this.sendMagnetEmail(data.email, data.nome, data.magnetId).catch(() =>
+          logger.warn({ magnetId: data.magnetId }, 'Failed to send magnet email'),
         );
       }
 
@@ -66,7 +66,7 @@ export class LeadsService {
     });
 
     if (!res.ok) {
-      logger.warn({ email, magnetId, status: res.status }, 'sendMagnetEmail: internal request failed');
+      logger.warn({ magnetId, status: res.status }, 'sendMagnetEmail: internal request failed');
     }
   }
 }

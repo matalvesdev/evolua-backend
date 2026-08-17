@@ -77,7 +77,7 @@ export class AuthService {
     if (emailService.isEnabled()) {
       emailService
         .sendWelcome(input.email, input.fullName)
-        .catch((err) => logger.error({ err }, 'Welcome email failed'));
+        .catch(() => logger.error('Welcome email failed'));
     }
 
     return {
@@ -102,7 +102,7 @@ export class AuthService {
       options: { redirectTo: `${env.FRONTEND_URL}/nova-senha` },
     });
     if (error || !data.properties?.action_link) {
-      logger.warn({ err: error, email }, 'Failed to generate reset link');
+      logger.warn('Failed to generate reset link');
       return null;
     }
     return data.properties.action_link;

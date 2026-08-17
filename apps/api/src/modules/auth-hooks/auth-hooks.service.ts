@@ -49,7 +49,7 @@ export class AuthHooksService {
 
     switch (event) {
       case 'user.signup': {
-        logger.info({ userId: user.id, email: user.email }, 'Auth hook: signup');
+        logger.info('Auth hook: signup');
 
         // Envia email de boas-vindas pelo provedor configurado
         const name =
@@ -60,7 +60,7 @@ export class AuthHooksService {
         if (emailService.isEnabled()) {
           emailService
             .sendWelcome(user.email, name)
-            .catch((err) => logger.error({ err }, 'Auth hook welcome email failed'));
+            .catch(() => logger.error('Auth hook welcome email failed'));
         }
 
         return {
@@ -70,14 +70,14 @@ export class AuthHooksService {
       }
 
       case 'user.password_reset': {
-        logger.info({ userId: user.id, email: user.email }, 'Auth hook: password reset');
+        logger.info('Auth hook: password reset');
 
         const redirectTo = payload.redirect_to ?? `${env.FRONTEND_URL}/nova-senha`;
 
         if (emailService.isEnabled()) {
           emailService
             .sendPasswordReset(user.email, redirectTo)
-            .catch((err) => logger.error({ err }, 'Auth hook password reset email failed'));
+            .catch(() => logger.error('Auth hook password reset email failed'));
         }
 
         return {

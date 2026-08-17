@@ -162,11 +162,8 @@ export class AudioService {
       data: { transcriptionStatus: 'processing', transcriptionError: null },
     });
 
-    void this.dispatchTranscription(updated, therapistId, input.language).catch((err) => {
-      logger.warn(
-        { err, sessionId: updated.id, patientId: updated.patientId },
-        'audio: transcription dispatch failed',
-      );
+    void this.dispatchTranscription(updated, therapistId, input.language).catch(() => {
+      logger.warn('audio: transcription dispatch failed');
     });
 
     return updated;
@@ -191,7 +188,7 @@ export class AudioService {
 
       // Fallback: Hugging Face Inference API direto (serverless, sem cold start)
       logger.info(
-        { sessionId: session.id, fallback: 'huggingface' },
+        { fallback: 'huggingface' },
         'audio: AI service unavailable, falling back to Hugging Face Inference API',
       );
 
@@ -206,15 +203,15 @@ export class AudioService {
         where: { id: session.id },
         data: {
           transcriptionStatus: 'failed',
-          transcriptionError: `AI service: ${aiResult.error} | HF fallback: ${hfResult.error}`,
+          transcriptionError: 'Transcrição indisponível. Tente novamente mais tarde.',
         },
       });
-    } catch (e) {
+    } catch {
       await prisma.audioSession.update({
         where: { id: session.id },
         data: {
           transcriptionStatus: 'failed',
-          transcriptionError: e instanceof Error ? e.message : String(e),
+          transcriptionError: 'Transcrição indisponível. Tente novamente mais tarde.',
         },
       });
     }
@@ -235,7 +232,7 @@ export class AudioService {
       if (attempt > 0) {
         const delay = delays[attempt - 1] ?? 20_000;
         logger.info(
-          { sessionId, attempt, delayMs: delay },
+          { attempt, delayMs: delay },
           'audio: retrying AI service after cold start',
         );
         await new Promise(r => setTimeout(r, delay));
@@ -269,8 +266,8 @@ export class AudioService {
         if (res.status !== 502 && res.status !== 503) {
           return { success: false, error: lastError };
         }
-      } catch (e) {
-        lastError = e instanceof Error ? e.message : 'unknown';
+      } catch {
+        lastError = 'network_or_timeout';
         // Timeout ou network error — pode ser cold start
         if (attempt < maxRetries) continue;
         return { success: false, error: lastError };
@@ -311,8 +308,7 @@ export class AudioService {
       );
 
       if (!hfRes.ok) {
-        const body = await hfRes.text().catch(() => '');
-        return { success: false, error: `HF API ${hfRes.status}: ${body.slice(0, 200)}` };
+        return { success: false, error: `HF API ${hfRes.status}` };
       }
 
       const data = (await hfRes.json()) as { text?: string };
@@ -321,8 +317,8 @@ export class AudioService {
       }
 
       return { success: true, transcription: data.text };
-    } catch (e) {
-      return { success: false, error: e instanceof Error ? e.message : 'unknown' };
+    } catch {
+      return { success: false, error: 'network_or_timeout' };
     }
   }
 

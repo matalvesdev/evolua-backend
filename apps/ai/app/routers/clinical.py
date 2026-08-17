@@ -76,10 +76,18 @@ async def generate_evolution(
 
     try:
         raw = await hf_client.chat(messages, max_tokens=900, temperature=0.2)
-    except HuggingFaceModelLoadingError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-    except HuggingFaceError as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except HuggingFaceModelLoadingError as exc:
+        logger.warning("Clinical evolution model is loading")
+        raise HTTPException(
+            status_code=503,
+            detail="O serviço de IA está sendo preparado. Tente novamente em alguns instantes.",
+        ) from exc
+    except HuggingFaceError as exc:
+        logger.warning("Clinical evolution provider unavailable")
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível gerar a evolução agora. Tente novamente mais tarde.",
+        ) from exc
 
     parsed = _safe_json(raw)
     if not parsed:
@@ -219,10 +227,18 @@ async def generate_material(
 
     try:
         raw = await hf_client.chat(messages, max_tokens=1100, temperature=0.5)
-    except HuggingFaceModelLoadingError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-    except HuggingFaceError as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except HuggingFaceModelLoadingError as exc:
+        logger.warning("Clinical material model is loading")
+        raise HTTPException(
+            status_code=503,
+            detail="O serviço de IA está sendo preparado. Tente novamente em alguns instantes.",
+        ) from exc
+    except HuggingFaceError as exc:
+        logger.warning("Clinical material provider unavailable")
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível gerar o material agora. Tente novamente mais tarde.",
+        ) from exc
 
     parsed = _safe_json(raw) or {}
     title = str(parsed.get("title") or "").strip() or (
@@ -403,12 +419,12 @@ async def transcribe_audio(
     if not _is_allowed_audio_url(req.audio_url):
         raise HTTPException(status_code=400, detail="audio_url não permitida")
 
-    # 1. Baixa o áudio (Supabase Storage público).
+    # 1. Baixa o áudio por URL temporária assinada gerada pelo serviço API.
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             audio_resp = await client.get(req.audio_url)
-    except httpx.HTTPError as e:
-        raise HTTPException(status_code=502, detail=f"Falha baixando áudio: {e}") from e
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Falha baixando áudio") from exc
 
     if audio_resp.status_code >= 400:
         raise HTTPException(
@@ -418,20 +434,15 @@ async def transcribe_audio(
 
     audio_bytes = audio_resp.content
     content_type = audio_resp.headers.get("content-type", "audio/webm")
-    logger.info(
-        "Transcribing %d bytes (%s) for session %s",
-        len(audio_bytes),
-        content_type,
-        req.audio_session_id,
-    )
+    logger.info("Transcribing %d bytes (%s)", len(audio_bytes), content_type)
 
     # 2. Envia ao Whisper.
     try:
         text = await hf_client.transcribe(audio_bytes, content_type=content_type)
-    except HuggingFaceModelLoadingError as e:
-        raise HTTPException(status_code=503, detail=str(e)) from e
-    except HuggingFaceError as e:
-        raise HTTPException(status_code=502, detail=str(e)) from e
+    except HuggingFaceModelLoadingError as exc:
+        raise HTTPException(status_code=503, detail="Modelo de transcrição indisponível") from exc
+    except HuggingFaceError as exc:
+        raise HTTPException(status_code=502, detail="Falha no provedor de transcrição") from exc
 
     return TranscribeResponse(transcription=text)
 
@@ -473,6 +484,6 @@ def _safe_json(raw: str) -> dict | None:
 
         cleaned = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F]", " ", candidate)
         return json.loads(cleaned)
-    except json.JSONDecodeError as e:
-        logger.warning("JSON parse failed after cleanup: %s | raw=%s", e, raw[:200])
+    except json.JSONDecodeError:
+        logger.warning("JSON parse failed after cleanup")
         return None

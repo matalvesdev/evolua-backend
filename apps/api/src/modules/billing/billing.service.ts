@@ -226,7 +226,7 @@ class BillingService {
               const today = new Date().toLocaleDateString('pt-BR');
               emailService
                 .sendBillingReceipt(clinic.email, clinic.name, amount, today, 'PIX/Cartão')
-                .catch((err) => logger.warn({ err, clinicId }, 'Billing receipt email failed'));
+                .catch(() => logger.warn('Billing receipt email failed'));
             }
           }
         }
@@ -306,7 +306,7 @@ class BillingService {
             const today = new Date().toLocaleDateString('pt-BR');
             emailService
               .sendBillingReceipt(clinic.email, clinic.name, amount, today, 'Cartão (Stripe)')
-              .catch((err) => logger.warn({ err, clinicId: sub.clinicId }, 'Billing receipt email failed'));
+              .catch(() => logger.warn('Billing receipt email failed'));
           }
         }
         return;

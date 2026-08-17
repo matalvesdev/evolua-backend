@@ -34,7 +34,7 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
     },
   }, async (req, rep) => {
     const { email, magnetId, nome } = req.body;
-    req.log.info({ email, magnetId }, 'lead magnet download requested');
+    req.log.info({ magnetId }, 'lead magnet download requested');
 
     const magnet = LEAD_MAGNETS[magnetId];
     const title = magnet?.title ?? magnetId;

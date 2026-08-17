@@ -1,10 +1,9 @@
 import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
+import { randomBytes } from 'node:crypto';
 
 function generateLink(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-  const code = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  return `https://meet.evolua.app/fono/${code}`;
+  return `https://meet.evolua.app/fono/${randomBytes(24).toString('base64url')}`;
 }
 
 export class TeleconsultaService {
@@ -28,12 +27,22 @@ export class TeleconsultaService {
   }
 
   async create(clinicId: string, input: { patientId: string; patient: string; date: string; time: string; sendWA: boolean }) {
+    const patient = await prisma.patient.findFirst({
+      where: { id: input.patientId, clinicId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (!patient) {
+      const err = new Error('Patient not found');
+      (err as Error & { statusCode: number }).statusCode = 404;
+      throw err;
+    }
+
     const link = generateLink();
     const row = await prisma.teleSession.create({
       data: {
         clinicId,
         patientId: input.patientId,
-        patientName: input.patient,
+        patientName: patient.name,
         date: input.date,
         time: input.time,
         link,
@@ -41,7 +50,7 @@ export class TeleconsultaService {
         sentViaWhatsApp: input.sendWA,
       },
     });
-    logger.info({ id: row.id, patient: input.patient }, 'teleconsulta: session created');
+    logger.info('teleconsulta: session created');
     return {
       id: row.id,
       patient: row.patientName,

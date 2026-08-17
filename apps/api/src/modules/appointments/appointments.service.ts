@@ -91,11 +91,12 @@ export class AppointmentsService {
   }
 
   async create(clinicId: string, input: CreateAppointmentInput): Promise<Appointment> {
+    const patient = await this.assertPatientBelongsToClinic(clinicId, input.patientId);
     const row = await prisma.appointment.create({
       data: {
         clinicId,
         patientId: input.patientId,
-        patientName: input.patientName,
+        patientName: patient.name,
         therapistId: input.therapistId ?? null,
         therapistName: input.therapistName,
         dateTime: new Date(input.dateTime),
@@ -191,7 +192,7 @@ export class AppointmentsService {
                   data: { reminder24hSentAt: new Date() },
                 }).catch(() => {}),
               )
-              .catch((err) => logger.warn({ err }, '24h reminder email failed'));
+              .catch(() => logger.warn('24h reminder email failed'));
           }
 
           if (send1h) {
@@ -203,7 +204,7 @@ export class AppointmentsService {
                   data: { reminder1hSentAt: new Date() },
                 }).catch(() => {}),
               )
-              .catch((err) => logger.warn({ err }, '1h reminder email failed'));
+              .catch(() => logger.warn('1h reminder email failed'));
           }
         }
       }
@@ -344,6 +345,21 @@ export class AppointmentsService {
 
     const row = await prisma.appointment.update({ where: { id }, data });
     return appointmentToDTO(row);
+  }
+
+  private async assertPatientBelongsToClinic(
+    clinicId: string,
+    patientId: string,
+  ): Promise<{ id: string; name: string }> {
+    const patient = await prisma.patient.findFirst({
+      where: { id: patientId, clinicId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    if (patient) return patient;
+
+    const err = new Error('Patient not found');
+    (err as Error & { statusCode: number }).statusCode = 404;
+    throw err;
   }
 }
 

@@ -233,8 +233,8 @@ const patientsRoutes: FastifyPluginAsync = async (app) => {
       try {
         const clinicId = await resolveClinicId(req.user.id);
         return patientsService.getTimeline(clinicId, req.params.patientId);
-      } catch (e) {
-        logger.error({ err: e, patientId: req.params.patientId }, 'patients: timeline error');
+      } catch {
+        logger.error('patients: timeline error');
         return rep.code(500).send({ error: 'InternalError', message: 'Falha ao carregar timeline' });
       }
     },

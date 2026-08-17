@@ -1,5 +1,7 @@
 """Dependências FastAPI: autenticação interna entre serviços."""
 
+from uuid import UUID
+
 from fastapi import Header, HTTPException, status
 
 from .config import get_settings
@@ -23,3 +25,14 @@ async def get_user_id(x_user_id: str = Header(...)) -> str:
             detail="Missing x-user-id header",
         )
     return x_user_id
+
+
+async def get_clinic_id(x_clinic_id: str = Header(...)) -> str:
+    """Recebe clinic.id resolvido e autorizado pelo gateway Fastify."""
+    try:
+        return str(UUID(x_clinic_id))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid clinic scope",
+        ) from exc

@@ -91,7 +91,7 @@ const appointmentsRoutes: FastifyPluginAsync = async (app) => {
         tags: ['appointments'],
         summary: 'Cria agendamento',
         body: CreateAppointmentSchema,
-        response: { 201: AppointmentSchema },
+        response: { 201: AppointmentSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
