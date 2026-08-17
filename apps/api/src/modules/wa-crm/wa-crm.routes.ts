@@ -17,7 +17,7 @@ import {
 import { resolveClinicId } from '../auth/auth.helpers.js';
 import { waCrmService, WaCrmError } from './wa-crm.service.js';
 import { waCrmMapper } from './wa-crm.mapper.js';
-import { env } from '../../config/env.js';
+import { env, isProductionLike } from '../../config/env.js';
 
 /**
  * Verifica HMAC-SHA256 da assinatura enviada no header `x-evolution-signature`
@@ -33,7 +33,7 @@ function verifyWebhookSignature(
 ): boolean {
   const secret = env.EVOLUTION_WEBHOOK_SECRET;
   if (!secret) {
-    if (env.NODE_ENV === 'production') {
+    if (isProductionLike) {
       // Em prod sem secret é falha de configuração — rejeitar.
       return false;
     }

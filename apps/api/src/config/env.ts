@@ -2,7 +2,7 @@ import { z } from 'zod';
 import 'dotenv/config';
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   CORS_ORIGINS: z.string().transform((s) => s.split(',').map((o) => o.trim()).filter(Boolean)),
@@ -86,3 +86,7 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 export type Env = typeof env;
+
+// Staging recebe os mesmos controles de exposição e transporte de produção.
+// A diferença é a infraestrutura isolada, nunca controles de segurança menores.
+export const isProductionLike = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging';

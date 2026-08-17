@@ -1,3 +1,5 @@
+# Blueprint separado para infraestrutura de staging. Ele nunca gerencia os
+# serviços de produção definidos em render.yaml.
 services:
   - type: web
     name: evolua-api-staging
@@ -11,7 +13,7 @@ services:
     healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
-        value: production
+        value: staging
       - key: LOG_LEVEL
         value: info
       - key: DATABASE_URL
@@ -34,6 +36,7 @@ services:
           type: web
           name: evolua-ai-staging
           envVarKey: RENDER_EXTERNAL_URL
+      # Deve ser o domínio permanente do frontend de staging, não produção.
       - key: CORS_ORIGINS
         sync: false
       - key: FRONTEND_URL
@@ -64,7 +67,7 @@ services:
     healthCheckPath: /healthz
     envVars:
       - key: ENVIRONMENT
-        value: production
+        value: staging
       - key: DATABASE_URL
         sync: false
       - key: INTERNAL_SERVICE_TOKEN

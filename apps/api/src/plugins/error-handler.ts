@@ -3,7 +3,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { ZodError } from 'zod';
 import { Prisma } from '@prisma/client';
 import { Sentry } from '../lib/sentry.js';
-import { env } from '../config/env.js';
+import { isProductionLike } from '../config/env.js';
 
 type AnyError = Error & {
   statusCode?: number;
@@ -61,7 +61,7 @@ const errorHandlerPlugin: FastifyPluginAsync = async (app) => {
     });
     return rep.code(500).send({
       error: 'InternalServerError',
-      message: env.NODE_ENV === 'production' ? 'Something went wrong' : e.message,
+      message: isProductionLike ? 'Something went wrong' : e.message,
     });
   });
 };

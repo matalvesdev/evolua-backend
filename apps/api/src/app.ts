@@ -13,7 +13,7 @@ import {
   jsonSchemaTransform,
 } from 'fastify-type-provider-zod';
 
-import { env } from './config/env.js';
+import { env, isProductionLike } from './config/env.js';
 import authPlugin from './plugins/auth.js';
 import errorHandler from './plugins/error-handler.js';
 import requestIdPlugin from './plugins/request-id.js';
@@ -68,7 +68,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Helmet — CSP relaxado em dev (Swagger UI usa inline scripts/styles).
   // Em produção, mantemos CSP padrão do helmet (sem inline) e ajustamos directives.
   await app.register(helmet, {
-    contentSecurityPolicy: env.NODE_ENV === 'production'
+    contentSecurityPolicy: isProductionLike
       ? {
           directives: {
             defaultSrc: ["'self'"],
@@ -86,7 +86,7 @@ export async function buildApp(): Promise<FastifyInstance> {
         }
       : false,
     crossOriginEmbedderPolicy: false, // permite Swagger UI carregar fontes externas
-    hsts: env.NODE_ENV === 'production'
+    hsts: isProductionLike
       ? { maxAge: 31536000, includeSubDomains: true, preload: true }
       : false,
   });
@@ -117,7 +117,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     },
     transform: jsonSchemaTransform,
   });
-  if (env.NODE_ENV !== 'production') {
+  if (!isProductionLike) {
     await app.register(swaggerUi, { routePrefix: '/docs' });
   }
 
