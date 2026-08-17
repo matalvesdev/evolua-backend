@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Digite "STAGING" para confirmar a migration no ambiente de staging'
+        description: 'Digite "STAGING" para aplicar migrations ou "RECOVER_STAGING" para reconciliar o timezone em staging'
         required: true
         default: ''
 
@@ -28,8 +28,8 @@ jobs:
             echo "::error::Migrations de staging só podem ser disparadas a partir de develop."
             exit 1
           fi
-          if [ "${{ github.event.inputs.confirm }}" != "STAGING" ]; then
-            echo "::error::Confirmação inválida. Digite exatamente 'STAGING'."
+          if [ "${{ github.event.inputs.confirm }}" != "STAGING" ] && [ "${{ github.event.inputs.confirm }}" != "RECOVER_STAGING" ]; then
+            echo "::error::Confirmação inválida. Digite exatamente 'STAGING' ou 'RECOVER_STAGING'."
             exit 1
           fi
       - uses: actions/checkout@v7
@@ -38,6 +38,15 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Reconcile only the known failed timezone migration
+        if: ${{ github.event.inputs.confirm == 'RECOVER_STAGING' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: >-
+          npx prisma migrate resolve --rolled-back
+          20260817000200_add_clinic_timezone
+          --schema=prisma/schema.prisma
       - name: Apply pending migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
