@@ -38,11 +38,6 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Show pending migrations
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL }}
-        run: npx prisma migrate status --schema=prisma/schema.prisma
       - name: Apply pending migrations
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
