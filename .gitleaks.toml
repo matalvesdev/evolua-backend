@@ -1,0 +1,4 @@
+[allowlist]
+description = "Synthetic UUID fixture removed from the newsletter test"
+paths = ["apps/api/src/modules/newsletter/newsletter.service.test.ts"]
+regexes = ["00000000-0000-4000-8000-000000000000"]
