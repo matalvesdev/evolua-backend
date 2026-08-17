@@ -57,9 +57,7 @@ export type Appointment = z.infer<typeof AppointmentSchema>;
 
 export const CreateAppointmentSchema = z.object({
   patientId: UuidSchema,
-  patientName: z.string().min(1).max(200),
   therapistId: UuidSchema.optional().nullable(),
-  therapistName: z.string().min(1).max(200),
   dateTime: z.string().datetime(),
   duration: z.number().int().min(5).max(480).default(60),
   type: AppointmentTypeSchema,
@@ -81,7 +79,6 @@ export type UpdateAppointmentInput = z.infer<typeof UpdateAppointmentSchema>;
 export const CancelAppointmentSchema = z.object({
   reason: CancellationReasonSchema,
   notes: z.string().max(1000).optional().nullable(),
-  cancelledBy: z.enum(['therapist', 'patient', 'system']).default('therapist'),
 });
 export type CancelAppointmentInput = z.infer<typeof CancelAppointmentSchema>;
 

@@ -22,6 +22,7 @@ model Clinic {
   zipCode   String?  @map("zip_code")
   phone     String?
   email     String?
+  timeZone  String   @default("America/Sao_Paulo") @map("time_zone")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
   settings  Json?     @default("{}")
@@ -369,6 +370,12 @@ model Message {
   recipientName  String   @map("recipient_name")
   channel        String   @default("whatsapp")
   sentAt         DateTime @default(now()) @map("sent_at") @db.Timestamptz
+  deliveryStatus String   @default("sent") @map("delivery_status")
+  deliveryAttempts Int    @default(0) @map("delivery_attempts")
+  deliveryError  String?  @map("delivery_error")
+  deliveryAttemptedAt DateTime? @map("delivery_attempted_at") @db.Timestamptz
+  deliveredAt    DateTime? @map("delivered_at") @db.Timestamptz
+  idempotencyKey String?  @map("idempotency_key")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   clinic    Clinic  @relation(fields: [clinicId], references: [id], onDelete: Cascade)
@@ -378,6 +385,7 @@ model Message {
   @@index([clinicId, sentAt])
   @@index([patientId, sentAt])
   @@index([therapistId, sentAt])
+  @@unique([clinicId, idempotencyKey])
   @@map("messages")
 }
 

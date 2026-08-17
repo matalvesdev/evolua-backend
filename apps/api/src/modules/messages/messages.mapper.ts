@@ -13,6 +13,9 @@ export const messageMapper = {
       recipientPhone: m.recipientPhone,
       recipientName: m.recipientName,
       channel: m.channel,
+      deliveryStatus: m.deliveryStatus as Message['deliveryStatus'],
+      deliveryAttempts: m.deliveryAttempts,
+      deliveredAt: m.deliveredAt?.toISOString() ?? null,
       sentAt: m.sentAt.toISOString(),
       createdAt: m.createdAt.toISOString(),
     };

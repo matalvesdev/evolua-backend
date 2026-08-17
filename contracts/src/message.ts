@@ -6,6 +6,7 @@ export type MessageTemplateType = z.infer<typeof MessageTemplateTypeEnum>;
 
 export const MessageChannelEnum = z.enum(['whatsapp', 'sms', 'email']);
 export type MessageChannel = z.infer<typeof MessageChannelEnum>;
+export const MessageDeliveryStatusEnum = z.enum(['pending', 'processing', 'sent', 'failed']);
 
 export const MessageSchema = z.object({
   id: UuidSchema,
@@ -17,6 +18,9 @@ export const MessageSchema = z.object({
   recipientPhone: z.string(),
   recipientName: z.string(),
   channel: z.string(),
+  deliveryStatus: MessageDeliveryStatusEnum,
+  deliveryAttempts: z.number().int().nonnegative(),
+  deliveredAt: z.string().datetime().nullable(),
   sentAt: z.string().datetime(),
   createdAt: z.string().datetime(),
 });

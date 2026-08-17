@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { settingsService } from './settings.service.js';
-import { resolveClinicId } from '../auth/auth.helpers.js';
+import { requireClinicAdministration, resolveClinicId } from '../auth/auth.helpers.js';
 
 const WorkingHoursSchema = z.record(
   z.string(),
@@ -60,7 +60,7 @@ const settingsRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async (req) => {
-      const clinicId = await resolveClinicId(req.user.id);
+      const clinicId = await requireClinicAdministration(req.user.id);
       return settingsService.update(clinicId, req.user.id, req.body);
     },
   );

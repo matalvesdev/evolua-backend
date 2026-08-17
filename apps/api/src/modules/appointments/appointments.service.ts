@@ -12,6 +12,7 @@ import type {
   Appointment,
 } from '@evolua/contracts';
 import { appointmentToDTO } from './appointments.mapper.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 
 /**
  * Cliente HTTP para sincronização com provedor de calendário.
@@ -90,15 +91,38 @@ export class AppointmentsService {
     return row ? appointmentToDTO(row) : null;
   }
 
-  async create(clinicId: string, input: CreateAppointmentInput): Promise<Appointment> {
+  async assertMutationPermission(clinicId: string, actorId: string, id: string): Promise<boolean> {
+    const appointment = await prisma.appointment.findFirst({
+      where: { id, clinicId, deletedAt: null },
+      select: { therapistId: true },
+    });
+    if (!appointment) return false;
+    await requireResourceOwnerOrClinicAdmin(actorId, appointment.therapistId);
+    return true;
+  }
+
+  async create(
+    clinicId: string,
+    actorId: string,
+    input: CreateAppointmentInput,
+  ): Promise<Appointment> {
     const patient = await this.assertPatientBelongsToClinic(clinicId, input.patientId);
+    const assignedTherapistId = input.therapistId ?? actorId;
+    const therapist = await prisma.user.findFirst({
+      where: { id: assignedTherapistId, clinicId },
+      select: { id: true, fullName: true },
+    });
+    if (!therapist) {
+      throw Object.assign(new Error('Professional not found in this clinic'), { statusCode: 404 });
+    }
+    await requireResourceOwnerOrClinicAdmin(actorId, therapist.id);
     const row = await prisma.appointment.create({
       data: {
         clinicId,
         patientId: input.patientId,
         patientName: patient.name,
-        therapistId: input.therapistId ?? null,
-        therapistName: input.therapistName,
+        therapistId: therapist.id,
+        therapistName: therapist.fullName,
         dateTime: new Date(input.dateTime),
         duration: input.duration,
         type: input.type,
@@ -298,7 +322,9 @@ export class AppointmentsService {
         status: 'cancelled',
         cancellationReason: input.reason,
         cancellationNotes: input.notes ?? null,
-        cancelledBy: input.cancelledBy,
+      // This authenticated endpoint represents a professional-initiated action.
+      // Never accept cancellation authority from a client-controlled payload.
+      cancelledBy: 'therapist',
         cancelledAt: new Date(),
       },
     });

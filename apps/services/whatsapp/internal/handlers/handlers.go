@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -36,6 +37,7 @@ type Handler struct {
 	internalTok   string
 	verifyToken   string
 	webhookSecret string
+	webhookCIDRs  []*net.IPNet
 }
 
 const maxWebhookBodyBytes = 1 << 20
@@ -50,6 +52,9 @@ type Options struct {
 	// para assinar o body de cada forward. Se vazio, nenhum header é enviado
 	// (o gateway exige em produção).
 	WebhookSecret string
+	// WebhookAllowedCIDRs limita o endpoint público ao ingress/provider.
+	// A configuração de produção deve ser validada em config.Load.
+	WebhookAllowedCIDRs []*net.IPNet
 }
 
 func NewHandler(logger zerolog.Logger, opts Options) *Handler {
@@ -60,6 +65,7 @@ func NewHandler(logger zerolog.Logger, opts Options) *Handler {
 		internalTok:   opts.InternalServiceToken,
 		verifyToken:   opts.WhatsAppVerifyToken,
 		webhookSecret: opts.WebhookSecret,
+		webhookCIDRs:  opts.WebhookAllowedCIDRs,
 	}
 }
 
@@ -124,9 +130,11 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.evolution.SendText(ctx, req.To, req.Body)
 	if err != nil {
-		h.logger.Error().Err(err).Str("userId", userID).Str("to", masked).
-			Msg("send message failed")
-		respondError(w, http.StatusBadGateway, "ProviderError", err.Error())
+		// Provider errors can contain response payloads. Do not expose or persist
+		// them in the API response/log without a redaction policy.
+		h.logger.Error().Str("userId", userID).Str("to", masked).
+			Msg("send message failed at WhatsApp provider")
+		respondError(w, http.StatusBadGateway, "ProviderError", "WhatsApp provider unavailable")
 		return
 	}
 
@@ -162,6 +170,11 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	if !h.isAllowedWebhookSource(r.RemoteAddr) {
+		h.logger.Warn().Msg("webhook request rejected from untrusted source")
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBodyBytes)
 	body, err := io.ReadAll(r.Body)
@@ -194,6 +207,29 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) isAllowedWebhookSource(remoteAddr string) bool {
+	// Development may intentionally omit the allowlist. Staging/production are
+	// prevented from doing so by config.Load before the server starts.
+	if len(h.webhookCIDRs) == 0 {
+		return true
+	}
+
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, network := range h.webhookCIDRs {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
 }
 
 // ── Tipos do webhook Evolution API ──────────────────────────────────────────

@@ -20,7 +20,7 @@ import {
 import { billingService } from './billing.service.js';
 import { abacatepay } from './providers/abacatepay.js';
 import { stripe } from './providers/stripe.js';
-import { resolveClinicId } from '../auth/auth.helpers.js';
+import { requireClinicAdministration, resolveClinicId } from '../auth/auth.helpers.js';
 
 // Zod schemas for webhook payload validation
 const AbacatePayWebhookSchema = z.object({
@@ -77,7 +77,7 @@ export const billingRoutes: FastifyPluginAsync = async (app) => {
       },
     },
   }, async (req) => {
-    const clinicId = await resolveClinicId(req.user.id);
+    const clinicId = await requireClinicAdministration(req.user.id);
     return billingService.createCheckout({
       clinicId,
       planSlug: req.body.planSlug,
@@ -96,7 +96,7 @@ export const billingRoutes: FastifyPluginAsync = async (app) => {
       response: { 200: z.object({ ok: z.boolean() }), 404: ErrorResponseSchema },
     },
   }, async (req) => {
-    const clinicId = await resolveClinicId(req.user.id);
+    const clinicId = await requireClinicAdministration(req.user.id);
     return billingService.cancelSubscription(clinicId);
   });
 

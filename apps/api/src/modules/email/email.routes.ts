@@ -29,6 +29,7 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
       }),
       response: {
         200: z.object({ success: z.literal(true) }),
+        400: z.object({ error: z.string(), message: z.string() }),
         500: z.object({ error: z.string(), message: z.string() }),
       },
     },
@@ -37,7 +38,10 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
     req.log.info({ magnetId }, 'lead magnet download requested');
 
     const magnet = LEAD_MAGNETS[magnetId];
-    const title = magnet?.title ?? magnetId;
+    if (!magnet) {
+      return rep.code(400).send({ error: 'InvalidMaterial', message: 'Material não encontrado' });
+    }
+    const title = magnet.title;
 
     const landingUrl = env.LANDING_URL.replace(/\/$/, '');
     const downloadLink = `${landingUrl}/materiais/${magnetId}`;
@@ -45,7 +49,7 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
     const recipientName = nome || email;
     const result = await emailService.sendLeadMagnetDelivery(email, recipientName, title, downloadLink);
     if (!result.success) {
-      req.log.error({ email, magnetId, error: result.error }, 'lead magnet delivery email failed');
+      req.log.error({ magnetId }, 'lead magnet delivery email failed');
       return rep.code(500).send({ error: 'SendFailed', message: 'Falha ao enviar email' });
     }
 
@@ -81,7 +85,7 @@ const emailRoutes: FastifyPluginAsync = async (app) => {
       if (!result.success) {
         return rep.code(400).send({
           error: 'SendFailed',
-          message: result.error ?? 'Falha ao enviar e-mail de teste',
+          message: 'Falha ao enviar e-mail de teste',
         });
       }
 

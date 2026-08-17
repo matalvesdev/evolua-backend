@@ -256,6 +256,83 @@ def _validate_source_url(url: str) -> None:
         _resolve_public_addresses(hostname)
 
 
+def _parse_allowed_hosts(raw_hosts: str) -> tuple[str, ...]:
+    return tuple(host.strip().lower() for host in raw_hosts.split(",") if host.strip())
+
+
+def _is_allowed_remote_host(hostname: str, allowed_hosts: tuple[str, ...]) -> bool:
+    """Aceita somente host exato ou um subdomínio de sufixo explicitamente confiado."""
+    for allowed_host in allowed_hosts:
+        if allowed_host.startswith("."):
+            suffix = allowed_host[1:]
+            if hostname == suffix or hostname.endswith(allowed_host):
+                return True
+        elif hostname == allowed_host:
+            return True
+    return False
+
+
+def _require_trusted_remote_host(url: str) -> None:
+    """Em ambientes não locais, URL remota requer domínio confiável configurado.
+
+    A resolução DNS feita como defesa contra SSRF não consegue garantir que uma
+    segunda resolução pelo cliente HTTP apontará para o mesmo IP. Em produção,
+    restringimos a origem a domínios sob controle conhecido e falhamos fechados
+    até que a operação configure a allowlist.
+    """
+    settings = get_settings()
+    if settings.environment in {"development", "test"}:
+        return
+
+    from urllib.parse import urlparse
+
+    hostname = (urlparse(url).hostname or "").lower()
+    allowed_hosts = _parse_allowed_hosts(settings.library_ingest_allowed_hosts)
+    if not allowed_hosts or not _is_allowed_remote_host(hostname, allowed_hosts):
+        raise HTTPException(
+            403,
+            "source_url não está em um host confiável para este ambiente",
+        )
+
+
+async def _download_remote_document(source_url: str) -> tuple[bytes, str]:
+    """Baixa documento remoto em streaming, impondo o limite antes de alocar.
+
+    Redirects são desabilitados e a origem já passou por validação de HTTPS,
+    rede pública e allowlist de produção.
+    """
+    timeout = httpx.Timeout(connect=5.0, read=20.0, write=5.0, pool=5.0)
+    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
+        async with client.stream("GET", source_url) as response:
+            if response.status_code >= 400:
+                raise HTTPException(400, f"Falha ao baixar source_url: {response.status_code}")
+
+            blob = await _read_limited_response(response)
+            return blob, (response.headers.get("content-type") or "").lower()
+
+
+async def _read_limited_response(response: httpx.Response) -> bytes:
+    """Consome uma resposta HTTP sem permitir que ela exceda o limite aceito."""
+    raw_content_length = response.headers.get("content-length")
+    if raw_content_length:
+        try:
+            content_length = int(raw_content_length)
+        except ValueError:
+            content_length = None
+        if content_length is not None and content_length > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "Documento remoto excede 25MB")
+
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in response.aiter_bytes():
+        total += len(chunk)
+        if total > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "Documento remoto excede 25MB")
+        chunks.append(chunk)
+
+    return b"".join(chunks)
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────
 
 
@@ -297,15 +374,9 @@ async def ingest_document(
         source = filename
     elif source_url:
         _validate_source_url(source_url)
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=False) as client:
-            r = await client.get(source_url)
-        if r.status_code >= 400:
-            raise HTTPException(400, f"Falha ao baixar source_url: {r.status_code}")
-        blob = r.content
-        if len(blob) > MAX_UPLOAD_BYTES:
-            raise HTTPException(413, "Documento remoto excede 25MB")
+        _require_trusted_remote_host(source_url)
+        blob, content_type = await _download_remote_document(source_url)
         filename = source_url.rsplit("/", 1)[-1].split("?", 1)[0] or "remote"
-        content_type = r.headers.get("content-type", "").lower()
         source = filename
     else:
         raise HTTPException(400, "Envie 'file' (multipart) ou 'source_url' (form)")

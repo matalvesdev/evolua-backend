@@ -2,6 +2,7 @@ import type { Prisma, AudioSession } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { logger } from '../../lib/logger.js';
+import { recordTranscriptionAttempt } from '../../plugins/metrics.js';
 import type {
   CreateAudioUploadInput,
   CreateAudioSessionInput,
@@ -9,6 +10,7 @@ import type {
   TranscribeAudioInput,
 } from '@evolua/contracts';
 import { randomUUID } from 'node:crypto';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 
 export interface PaginatedAudioSessions {
   data: AudioSession[];
@@ -198,9 +200,10 @@ export class AudioService {
     };
   }
 
-  async remove(clinicId: string, id: string): Promise<boolean> {
+  async remove(clinicId: string, actorId: string, id: string): Promise<boolean> {
     const s = await this.findOne(clinicId, id);
     if (!s) return false;
+    await requireResourceOwnerOrClinicAdmin(actorId, s.therapistId);
     await prisma.audioSession.update({
       where: { id },
       data: { deletedAt: new Date() },
@@ -222,6 +225,7 @@ export class AudioService {
   ): Promise<AudioSession | null> {
     const session = await this.findOne(clinicId, input.audioSessionId);
     if (!session) return null;
+    await requireResourceOwnerOrClinicAdmin(therapistId, session.therapistId);
 
     const claimed = await prisma.audioSession.updateMany({
       where: {
@@ -259,6 +263,7 @@ export class AudioService {
 
       if (aiResult.success && aiResult.transcription) {
         await this.saveTranscription(session.id, aiResult.transcription);
+        recordTranscriptionAttempt('completed');
         return;
       }
 
@@ -271,6 +276,7 @@ export class AudioService {
       const hfResult = await this.tryHuggingFaceFallback(signedUrl);
       if (hfResult.success && hfResult.transcription) {
         await this.saveTranscription(session.id, hfResult.transcription);
+        recordTranscriptionAttempt('completed');
         return;
       }
 
@@ -282,6 +288,7 @@ export class AudioService {
           transcriptionError: 'Transcrição indisponível. Tente novamente mais tarde.',
         },
       });
+      recordTranscriptionAttempt('failed');
     } catch {
       await prisma.audioSession.update({
         where: { id: session.id },
@@ -367,6 +374,7 @@ export class AudioService {
         signal: AbortSignal.timeout(30_000),
         redirect: 'error',
       });
+      recordTranscriptionAttempt('failed');
       if (!audioRes.ok) {
         return { success: false, error: `Failed to download audio: ${audioRes.status}` };
       }

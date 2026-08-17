@@ -95,6 +95,7 @@ const clinicalProtocolsRoutes: FastifyPluginAsync = async (app) => {
     async (req, rep) => {
       const ok = await clinicalProtocolsService.deleteEntry(
         await resolveClinicId(req.user.id),
+        req.user.id,
         req.params.id,
       );
       if (!ok) return rep.code(404).send({ error: 'NotFound', message: 'Entry not found' });

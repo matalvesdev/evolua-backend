@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 import type {
   TreatmentPlan as PrismaPlan,
   TreatmentSession as PrismaSession,
@@ -65,7 +66,7 @@ export class TreatmentPlansService {
     return row ? planToDTO(row) : null;
   }
 
-  async create(clinicId: string, input: CreateTreatmentPlanInput) {
+  async create(clinicId: string, actorId: string, input: CreateTreatmentPlanInput) {
     const [patient, therapist] = await Promise.all([
       prisma.patient.findFirst({
         where: { id: input.patientId, clinicId, deletedAt: null },
@@ -77,6 +78,7 @@ export class TreatmentPlansService {
       }),
     ]);
     if (!patient || !therapist) return null;
+    await requireResourceOwnerOrClinicAdmin(actorId, therapist.id);
     const row = await prisma.treatmentPlan.create({
       data: {
         clinicId,
@@ -99,12 +101,13 @@ export class TreatmentPlansService {
     return planToDTO(row);
   }
 
-  async update(clinicId: string, id: string, input: UpdateTreatmentPlanInput) {
+  async update(clinicId: string, actorId: string, id: string, input: UpdateTreatmentPlanInput) {
     const exists = await prisma.treatmentPlan.findFirst({
       where: { id, clinicId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, therapistId: true },
     });
     if (!exists) return null;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.therapistId);
     const row = await prisma.treatmentPlan.update({
       where: { id },
       data: {
@@ -133,12 +136,13 @@ export class TreatmentPlansService {
     return planToDTO(row);
   }
 
-  async remove(clinicId: string, id: string): Promise<boolean> {
+  async remove(clinicId: string, actorId: string, id: string): Promise<boolean> {
     const exists = await prisma.treatmentPlan.findFirst({
       where: { id, clinicId, deletedAt: null },
-      select: { id: true },
+      select: { id: true, therapistId: true },
     });
     if (!exists) return false;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.therapistId);
     await prisma.treatmentPlan.update({
       where: { id },
       data: { deletedAt: new Date() },
@@ -162,6 +166,7 @@ export class TreatmentPlansService {
 
   async registerSession(
     clinicId: string,
+    actorId: string,
     planId: string,
     input: RegisterSessionInput,
   ): Promise<TreatmentSession | null> {
@@ -170,6 +175,7 @@ export class TreatmentPlansService {
         where: { id: planId, clinicId, deletedAt: null, status: 'active' },
       });
       if (!plan) return null;
+      await requireResourceOwnerOrClinicAdmin(actorId, plan.therapistId);
 
       if (input.appointmentId) {
         const appointment = await tx.appointment.findFirst({

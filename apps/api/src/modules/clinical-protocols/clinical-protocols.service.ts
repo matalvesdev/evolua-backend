@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 import type {
   ClinicalProtocolTemplate as PrismaTemplate,
   ClinicalProtocolEntry as PrismaEntry,
@@ -128,12 +129,13 @@ export class ClinicalProtocolsService {
     return entryToDTO(row);
   }
 
-  async deleteEntry(clinicId: string, id: string): Promise<boolean> {
+  async deleteEntry(clinicId: string, actorId: string, id: string): Promise<boolean> {
     const exists = await prisma.clinicalProtocolEntry.findFirst({
       where: { id, clinicId },
-      select: { id: true },
+      select: { id: true, therapistId: true },
     });
     if (!exists) return false;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.therapistId);
     await prisma.clinicalProtocolEntry.delete({ where: { id } });
     return true;
   }

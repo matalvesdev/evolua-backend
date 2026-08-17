@@ -174,7 +174,7 @@ const audioRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
-      const ok = await audioService.remove(clinicId, req.params.id);
+      const ok = await audioService.remove(clinicId, req.user.id, req.params.id);
       if (!ok) return rep.code(404).send(notFound);
       auditAsync({
         clinicId, userId: req.user.id, action: 'DELETE', resource: 'AudioSession',

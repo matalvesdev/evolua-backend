@@ -95,6 +95,7 @@ const clinicalScalesRoutes: FastifyPluginAsync = async (app) => {
     async (req, rep) => {
       const removed = await clinicalScalesService.removeResult(
         await resolveClinicId(req.user.id),
+        req.user.id,
         req.params.id,
       );
       if (!removed) return rep.code(404).send(notFound);

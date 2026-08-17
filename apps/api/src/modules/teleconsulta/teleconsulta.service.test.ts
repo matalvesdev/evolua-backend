@@ -21,12 +21,26 @@ describe('TeleconsultaService tenant isolation', () => {
 
     await expect(service.create('clinic-a', {
       patientId: '5df12004-91bd-4d52-b559-3a4419e9ca1d',
-      patient: 'Nome enviado pelo cliente',
       date: '2026-08-14',
       time: '12:00',
+      link: 'https://teleconsulta.example/sala-privada',
       sendWA: false,
     })).rejects.toMatchObject({ statusCode: 404 });
 
+    expect(prismaMock.teleSession.create).not.toHaveBeenCalled();
+  });
+
+  it('não finge enviar um link pelo WhatsApp sem integração configurada', async () => {
+    prismaMock.patient.findFirst.mockResolvedValueOnce({ id: 'patient-a', name: 'Paciente' });
+    const service = new TeleconsultaService();
+
+    await expect(service.create('clinic-a', {
+      patientId: 'patient-a',
+      date: '2026-08-14',
+      time: '12:00',
+      link: 'https://teleconsulta.example/sala-privada',
+      sendWA: true,
+    })).rejects.toMatchObject({ statusCode: 409 });
     expect(prismaMock.teleSession.create).not.toHaveBeenCalled();
   });
 });

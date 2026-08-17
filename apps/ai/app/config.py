@@ -30,6 +30,11 @@ class Settings(BaseSettings):
 
     database_url: str
 
+    # URLs remotas para ingestão RAG só são aceitas em staging/produção quando
+    # o host está explicitamente autorizado. Separar por vírgulas; use nomes
+    # exatos ou sufixos iniciados por ponto (ex.: ".supabase.co").
+    library_ingest_allowed_hosts: str = ""
+
     # OpenRouter (AI content generation — ebooks, infográficos, materiais)
     openrouter_api_key: str = ""
     openrouter_default_model: str = "openai/gpt-4o"

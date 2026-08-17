@@ -4,7 +4,13 @@ from pydantic import ValidationError
 
 from app.routers import library, library_ingest
 from app.routers.clinical import GenerateReportRequest, _is_allowed_audio_url, _safe_json
-from app.routers.library_ingest import _validate_source_url
+from app.routers.library_ingest import (
+    MAX_UPLOAD_BYTES,
+    _is_allowed_remote_host,
+    _read_limited_response,
+    _require_trusted_remote_host,
+    _validate_source_url,
+)
 
 
 def test_report_contract_rejects_short_or_unknown_template() -> None:
@@ -50,6 +56,42 @@ def test_library_ingest_rejects_hostname_resolving_to_private_network(
 
     with pytest.raises(HTTPException, match="rede não pública"):
         _validate_source_url("https://documents.example.com/source.pdf")
+
+
+def test_library_ingest_trusted_host_matching_has_domain_boundaries() -> None:
+    allowed_hosts = (".supabase.co", "documents.example.com")
+
+    assert _is_allowed_remote_host("tenant.supabase.co", allowed_hosts)
+    assert _is_allowed_remote_host("supabase.co", allowed_hosts)
+    assert _is_allowed_remote_host("documents.example.com", allowed_hosts)
+    assert not _is_allowed_remote_host("evil-supabase.co", allowed_hosts)
+    assert not _is_allowed_remote_host("other-documents.example.com", allowed_hosts)
+
+
+def test_library_ingest_requires_configured_host_in_production(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ProductionSettings:
+        environment = "production"
+        library_ingest_allowed_hosts = ".supabase.co"
+
+    monkeypatch.setattr(library_ingest, "get_settings", lambda: ProductionSettings())
+    _require_trusted_remote_host("https://tenant.supabase.co/knowledge.pdf")
+
+    with pytest.raises(HTTPException, match="host confiável"):
+        _require_trusted_remote_host("https://documents.example.com/knowledge.pdf")
+
+
+@pytest.mark.asyncio
+async def test_library_ingest_stops_reading_when_remote_response_exceeds_limit() -> None:
+    response = library_ingest.httpx.Response(
+        200,
+        headers={"content-length": str(MAX_UPLOAD_BYTES + 1)},
+        content=b"",
+    )
+
+    with pytest.raises(HTTPException, match="excede 25MB"):
+        await _read_limited_response(response)
 
 
 def test_library_retrieval_filters_by_clinic_before_vector_ranking(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -35,7 +35,7 @@ const documentsRoutes: FastifyPluginAsync = async (app) => {
       schema: {
         tags: ['documents'],
         body: CreateDocumentSchema,
-        response: { 201: DocumentSchema, 404: ErrorResponseSchema },
+        response: { 201: DocumentSchema, 403: ErrorResponseSchema, 404: ErrorResponseSchema },
       },
     },
     async (req, rep) => {
@@ -46,6 +46,9 @@ const documentsRoutes: FastifyPluginAsync = async (app) => {
       } catch (error) {
         if (error instanceof Error && error.message === 'Patient not found in this clinic') {
           return rep.code(404).send({ error: 'NotFound', message: 'Patient not found' });
+        }
+        if (error instanceof Error && error.message === 'Therapist not found in this clinic') {
+          return rep.code(403).send({ error: 'Forbidden', message: 'Unauthorized therapist' });
         }
         throw error;
       }

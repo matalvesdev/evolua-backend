@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { dashboardService } from './dashboard.service.js';
-import { resolveClinicId } from '../auth/auth.helpers.js';
+import { resolveClinicId, resolveClinicTimeZone } from '../auth/auth.helpers.js';
 import { prisma } from '../../lib/prisma.js';
 
 const DashboardHomeSchema = z.object({
@@ -48,9 +48,10 @@ const dashboardHomeRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req) => {
       const clinicId = await resolveClinicId(req.user.id);
+      const timeZone = await resolveClinicTimeZone(req.user.id);
 
       const [stats, todayAppointments, pendingTasks] = await Promise.all([
-        dashboardService.getStats(clinicId),
+        dashboardService.getStats(clinicId, timeZone),
         dashboardService.getUpcomingAppointments(clinicId, 5),
         prisma.task.findMany({
           where: { clinicId, status: 'pending' },

@@ -11,6 +11,7 @@ import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
 import { emailService } from '../email/email.service.js';
 import { waCrmService } from '../wa-crm/wa-crm.service.js';
+import { messagesService } from '../messages/messages.service.js';
 
 // ── Constants ───────────────────────────────────────────────────────────
 
@@ -248,6 +249,7 @@ async function processReminders(): Promise<void> {
   const now = new Date();
 
   try {
+    await messagesService.processPendingDeliveries();
     // ── 24h reminders ──────────────────────────────────────────────
     const twentyFourHAppointments = await prisma.appointment.findMany({
       where: {

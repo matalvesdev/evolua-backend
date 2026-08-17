@@ -49,9 +49,6 @@ export type Report = z.infer<typeof ReportSchema>;
 
 export const CreateReportSchema = z.object({
   patientId: UuidSchema,
-  patientName: z.string().min(1).max(200),
-  therapistName: z.string().min(1).max(200),
-  therapistCrfa: z.string().max(50).default(''),
   type: ReportTypeSchema,
   title: z.string().min(1).max(300),
   content: z.string().default(''),

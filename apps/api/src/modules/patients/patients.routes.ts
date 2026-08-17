@@ -15,7 +15,7 @@ import {
   MedicalRecordListSchema,
 } from '@evolua/contracts';
 import { patientsService } from './patients.service.js';
-import { resolveClinicId } from '../auth/auth.helpers.js';
+import { requireClinicAdministration, resolveClinicId } from '../auth/auth.helpers.js';
 import { auditAsync } from '../../lib/audit.js';
 import { logger } from '../../lib/logger.js';
 
@@ -127,7 +127,7 @@ const patientsRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async (req, rep) => {
-      const clinicId = await resolveClinicId(req.user.id);
+      const clinicId = await requireClinicAdministration(req.user.id);
       const removed = await patientsService.remove(clinicId, req.params.id);
       if (!removed) return rep.code(404).send({ error: 'NotFound', message: 'Patient not found' });
       auditAsync({
@@ -193,6 +193,7 @@ const patientsRoutes: FastifyPluginAsync = async (app) => {
     async (req, rep) => {
       const r = await patientsService.updateRecord(
         await resolveClinicId(req.user.id),
+        req.user.id,
         req.params.id,
         req.body,
       );

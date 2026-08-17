@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { dashboardService } from './dashboard.service.js';
-import { resolveClinicId } from '../auth/auth.helpers.js';
+import { resolveClinicId, resolveClinicTimeZone } from '../auth/auth.helpers.js';
 
 const StatsSchema = z.object({
   patients: z.object({ active: z.number(), total: z.number() }),
@@ -26,7 +26,10 @@ const dashboardRoutes: FastifyPluginAsync = async (app) => {
     {
       schema: { tags: ['dashboard'], response: { 200: StatsSchema } },
     },
-    async (req) => dashboardService.getStats(await resolveClinicId(req.user.id)),
+    async (req) => dashboardService.getStats(
+      await resolveClinicId(req.user.id),
+      await resolveClinicTimeZone(req.user.id),
+    ),
   );
 
   route.get(
@@ -77,8 +80,8 @@ const dashboardRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req) =>
       dashboardService.getRevenueByMonth(
-        await resolveClinicId(req.user.id),
-        req.query.months,
+        await resolveClinicId(req.user.id), req.query.months,
+        await resolveClinicTimeZone(req.user.id),
       ),
   );
 
@@ -105,7 +108,10 @@ const dashboardRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async (req) =>
-      dashboardService.getAnalytics(await resolveClinicId(req.user.id), req.query.period),
+      dashboardService.getAnalytics(
+        await resolveClinicId(req.user.id), req.query.period,
+        await resolveClinicTimeZone(req.user.id),
+      ),
   );
 };
 

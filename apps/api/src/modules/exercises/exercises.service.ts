@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 import type {
   ExerciseTemplate as PrismaExercise,
   PatientExercisePrescription as PrismaPrescription,
@@ -193,12 +194,13 @@ export class ExercisesService {
     return prescriptionToDTO(row);
   }
 
-  async cancelPrescription(clinicId: string, id: string) {
+  async cancelPrescription(clinicId: string, actorId: string, id: string) {
     const exists = await prisma.patientExercisePrescription.findFirst({
       where: { id, clinicId },
-      select: { id: true },
+      select: { id: true, therapistId: true },
     });
     if (!exists) return null;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.therapistId);
     const row = await prisma.patientExercisePrescription.update({
       where: { id },
       data: { status: 'cancelled' },

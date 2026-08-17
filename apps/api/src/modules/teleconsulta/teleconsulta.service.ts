@@ -1,10 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
 import { logger } from '../../lib/logger.js';
-import { randomBytes } from 'node:crypto';
-
-function generateLink(): string {
-  return `https://meet.evolua.app/fono/${randomBytes(24).toString('base64url')}`;
-}
 
 export class TeleconsultaService {
   async list(clinicId: string) {
@@ -26,7 +21,13 @@ export class TeleconsultaService {
     }));
   }
 
-  async create(clinicId: string, input: { patientId: string; patient: string; date: string; time: string; sendWA: boolean }) {
+  async create(clinicId: string, input: {
+    patientId: string;
+    date: string;
+    time: string;
+    link: string;
+    sendWA: boolean;
+  }) {
     const patient = await prisma.patient.findFirst({
       where: { id: input.patientId, clinicId, deletedAt: null },
       select: { id: true, name: true },
@@ -37,7 +38,13 @@ export class TeleconsultaService {
       throw err;
     }
 
-    const link = generateLink();
+    if (input.sendWA) {
+      throw Object.assign(
+        new Error('WhatsApp delivery for teleconsultation links is not configured'),
+        { statusCode: 409 },
+      );
+    }
+
     const row = await prisma.teleSession.create({
       data: {
         clinicId,
@@ -45,12 +52,12 @@ export class TeleconsultaService {
         patientName: patient.name,
         date: input.date,
         time: input.time,
-        link,
+        link: input.link,
         status: 'scheduled',
         sentViaWhatsApp: input.sendWA,
       },
     });
-    logger.info('teleconsulta: session created');
+    logger.info({ teleSessionId: row.id }, 'teleconsulta: session created');
     return {
       id: row.id,
       patient: row.patientName,

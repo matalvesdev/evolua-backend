@@ -35,7 +35,7 @@ const teleconsultaRoutes: FastifyPluginAsync = async (app) => {
         tags: ['teleconsulta'],
         summary: 'Cria sessão de teleconsulta',
         body: CreateTeleSessionSchema,
-        response: { 201: TeleSessionSchema, 404: ErrorResponseSchema },
+        response: { 201: TeleSessionSchema, 404: ErrorResponseSchema, 409: ErrorResponseSchema },
       },
     },
     async (req, rep) => {

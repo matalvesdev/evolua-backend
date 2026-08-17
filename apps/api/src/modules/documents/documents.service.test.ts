@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prismaMock = {
   patient: { findFirst: vi.fn() },
+  user: { findFirst: vi.fn() },
   report: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
 };
 
@@ -29,6 +30,9 @@ describe('DocumentsService tenant isolation', () => {
 
   it('derives patient name from the authorized patient record', async () => {
     prismaMock.patient.findFirst.mockResolvedValue({ id: 'patient-a', name: 'Paciente Real' });
+    prismaMock.user.findFirst.mockResolvedValue({
+      id: 'therapist-a', fullName: 'Profissional Autenticada', crfa: 'CRFa 1-12345',
+    });
     prismaMock.report.create.mockResolvedValue({
       id: 'document-a', patientId: 'patient-a', patientName: 'Paciente Real',
       type: 'document', title: 'Documento', content: '', status: 'draft',
@@ -41,7 +45,23 @@ describe('DocumentsService tenant isolation', () => {
     });
 
     expect(prismaMock.report.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ patientId: 'patient-a', patientName: 'Paciente Real' }),
+      data: expect.objectContaining({
+        patientId: 'patient-a',
+        patientName: 'Paciente Real',
+        therapistName: 'Profissional Autenticada',
+        therapistCrfa: 'CRFa 1-12345',
+      }),
     }));
+  });
+
+  it('rejects a therapist outside the clinic before persisting a document', async () => {
+    prismaMock.patient.findFirst.mockResolvedValue({ id: 'patient-a', name: 'Paciente Real' });
+    prismaMock.user.findFirst.mockResolvedValue(null);
+    const service = new DocumentsService();
+
+    await expect(service.create('clinic-a', 'therapist-b', {
+      patientId: 'patient-a', patientName: 'Paciente Real', type: 'document', title: 'Documento',
+    })).rejects.toThrow('Therapist not found in this clinic');
+    expect(prismaMock.report.create).not.toHaveBeenCalled();
   });
 });

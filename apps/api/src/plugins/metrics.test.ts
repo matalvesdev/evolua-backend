@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import Fastify from 'fastify';
-import metricsPlugin from './metrics.js';
+import metricsPlugin, { recordDeliveryAttempt, recordTranscriptionAttempt } from './metrics.js';
 
 /**
  * Plugin metrics — expõe `/metrics` em formato Prometheus e instrumenta
@@ -49,6 +49,16 @@ describe('metrics plugin', () => {
     const res = await app.inject({ method: 'GET', url: '/metrics' });
     expect(res.body).toMatch(/evolua_api_http_requests_total/);
     expect(res.body).toMatch(/evolua_api_http_request_duration_seconds/);
+    await app.close();
+  });
+
+  it('expõe métricas de falha sem labels sensíveis', async () => {
+    recordDeliveryAttempt('whatsapp', 'failed');
+    recordTranscriptionAttempt('failed');
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/metrics' });
+    expect(res.body).toMatch(/evolua_api_delivery_attempts_total\{channel="whatsapp",outcome="failed"\}/);
+    expect(res.body).toMatch(/evolua_api_transcription_attempts_total\{outcome="failed"\}/);
     await app.close();
   });
 

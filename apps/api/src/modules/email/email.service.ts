@@ -33,19 +33,19 @@ export class EmailService {
 
   async sendAppointmentReminder24h(to: string, patientName: string, date: string, time: string): Promise<{ success: boolean; error?: string }> {
     const { subject, html } = appointmentReminder24h(patientName, date, time);
-    logger.info({ to, template: 'appointmentReminder24h' }, 'Sending 24h reminder');
+    logger.info({ template: 'appointmentReminder24h' }, 'Sending 24h reminder');
     return this.client.sendEmail({ to, subject, html });
   }
 
   async sendAppointmentReminder1h(to: string, patientName: string, date: string, time: string): Promise<{ success: boolean; error?: string }> {
     const { subject, html } = appointmentReminder1h(patientName, date, time);
-    logger.info({ to, template: 'appointmentReminder1h' }, 'Sending 1h reminder');
+    logger.info({ template: 'appointmentReminder1h' }, 'Sending 1h reminder');
     return this.client.sendEmail({ to, subject, html });
   }
 
   async sendBillingReceipt(to: string, patientName: string, amount: string, date: string, paymentMethod: string): Promise<{ success: boolean; error?: string }> {
     const { subject, html } = billingReceipt(patientName, amount, date, paymentMethod);
-    logger.info({ to, template: 'billingReceipt' }, 'Sending billing receipt');
+    logger.info({ template: 'billingReceipt' }, 'Sending billing receipt');
     return this.client.sendEmail({ to, subject, html });
   }
 
@@ -57,13 +57,13 @@ export class EmailService {
 
   async sendNewsletterConfirmation(to: string, email: string, confirmLink: string): Promise<{ success: boolean; error?: string }> {
     const { subject, html } = newsletterConfirmation(email, confirmLink);
-    logger.info({ to, template: 'newsletterConfirmation' }, 'Sending newsletter confirmation');
+    logger.info({ template: 'newsletterConfirmation' }, 'Sending newsletter confirmation');
     return this.client.sendEmail({ to, subject, html });
   }
 
   async sendLeadMagnetDelivery(to: string, recipientName: string, magnetTitle: string, downloadLink: string): Promise<{ success: boolean; error?: string }> {
     const { subject, html } = leadMagnetDelivery(recipientName, magnetTitle, downloadLink);
-    logger.info({ to, template: 'leadMagnetDelivery' }, 'Sending lead magnet delivery');
+    logger.info({ template: 'leadMagnetDelivery' }, 'Sending lead magnet delivery');
     return this.client.sendEmail({ to, subject, html });
   }
 }

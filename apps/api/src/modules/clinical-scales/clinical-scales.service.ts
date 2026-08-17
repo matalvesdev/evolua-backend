@@ -1,4 +1,5 @@
 import { prisma } from '../../lib/prisma.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 import type {
   ClinicalScale,
   ClinicalScaleResult,
@@ -68,14 +69,15 @@ export class ClinicalScalesService {
     return resultToDTO(row);
   }
 
-  async removeResult(clinicId: string, id: string): Promise<boolean> {
+  async removeResult(clinicId: string, actorId: string, id: string): Promise<boolean> {
     const exists = await prisma.clinicalScaleResult.findUnique({
       where: { id },
-      select: { id: true, patientId: true },
+      select: { id: true, patientId: true, therapistId: true },
     });
     if (!exists) return false;
     const patient = await this.assertPatientBelongsToClinic(clinicId, exists.patientId);
     if (!patient) return false;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.therapistId);
     await prisma.clinicalScaleResult.delete({ where: { id } });
     return true;
   }

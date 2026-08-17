@@ -53,6 +53,13 @@ export class DocumentsService {
     });
   }
 
+  private async findTherapist(clinicId: string, therapistId: string) {
+    return prisma.user.findFirst({
+      where: { id: therapistId, clinicId },
+      select: { id: true, fullName: true, crfa: true },
+    });
+  }
+
   async list(clinicId: string, q: ListDocumentsQuery) {
     const where: Prisma.ReportWhereInput = {
       clinicId,
@@ -89,8 +96,6 @@ export class DocumentsService {
       type: string;
       title: string;
       content?: string;
-      therapistName?: string;
-      therapistCrfa?: string;
     },
   ): Promise<DocumentDTO> {
     const patient = await this.findPatient(clinicId, input.patientId);
@@ -99,17 +104,23 @@ export class DocumentsService {
       Object.assign(error, { statusCode: 404 });
       throw error;
     }
+    const therapist = await this.findTherapist(clinicId, therapistId);
+    if (!therapist) {
+      const error = new Error('Therapist not found in this clinic');
+      Object.assign(error, { statusCode: 403 });
+      throw error;
+    }
 
     const row = await prisma.report.create({
       data: {
         clinicId,
         patientId: patient.id,
         patientName: patient.name,
-        therapistId,
-        // Identificação profissional deve vir do perfil autenticado; o contrato
-        // legado ainda aceita estes campos, mas não os usa como autoridade.
-        therapistName: '',
-        therapistCrfa: '',
+        therapistId: therapist.id,
+        // Identificação profissional deriva do perfil autenticado, nunca do
+        // payload do cliente, para manter autoria e rastreabilidade.
+        therapistName: therapist.fullName,
+        therapistCrfa: therapist.crfa ?? '',
         type: input.type,
         title: input.title,
         content: input.content ?? '',

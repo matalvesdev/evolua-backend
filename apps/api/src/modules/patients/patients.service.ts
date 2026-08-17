@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma.js';
+import { requireResourceOwnerOrClinicAdmin } from '../auth/auth.helpers.js';
 import type {
   CreatePatientInput,
   UpdatePatientInput,
@@ -186,19 +187,40 @@ export class PatientsService {
       select: { id: true },
     });
     if (!patient) return null;
-    return prisma.medicalRecord.upsert({
-      where: { patientId: input.patientId },
-      create: { clinicId, patientId: input.patientId, createdBy: therapistId, clinicalArea: input.clinicalArea, diagnosis: input.diagnosis },
-      update: { clinicalArea: input.clinicalArea, diagnosis: input.diagnosis },
+    const existing = await prisma.medicalRecord.findFirst({
+      where: { patientId: input.patientId, clinicId },
+      select: { id: true, createdBy: true },
+    });
+    if (existing) {
+      await requireResourceOwnerOrClinicAdmin(therapistId, existing.createdBy);
+      return prisma.medicalRecord.update({
+        where: { id: existing.id },
+        data: { clinicalArea: input.clinicalArea, diagnosis: input.diagnosis },
+      });
+    }
+    return prisma.medicalRecord.create({
+      data: {
+        clinicId,
+        patientId: input.patientId,
+        createdBy: therapistId,
+        clinicalArea: input.clinicalArea,
+        diagnosis: input.diagnosis,
+      },
     });
   }
 
-  async updateRecord(clinicId: string, id: string, input: UpdateMedicalRecordInput) {
+  async updateRecord(
+    clinicId: string,
+    actorId: string,
+    id: string,
+    input: UpdateMedicalRecordInput,
+  ) {
     const exists = await prisma.medicalRecord.findFirst({
       where: { id, clinicId },
-      select: { id: true },
+      select: { id: true, createdBy: true },
     });
     if (!exists) return null;
+    await requireResourceOwnerOrClinicAdmin(actorId, exists.createdBy);
     return prisma.medicalRecord.update({
       where: { id },
       data: {

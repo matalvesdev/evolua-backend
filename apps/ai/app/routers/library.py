@@ -36,7 +36,9 @@ router = APIRouter(prefix="/library", tags=["library-rag"])
 
 
 class ChatMessage(BaseModel):
-    role: str = Field(pattern="^(user|assistant|system)$")
+    # System messages are composed by the server after authorization and
+    # retrieval. Accepting them from history would permit prompt injection.
+    role: str = Field(pattern="^(user|assistant)$")
     content: str
 
 

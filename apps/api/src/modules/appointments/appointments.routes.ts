@@ -13,7 +13,8 @@ import {
   UuidSchema,
 } from '@evolua/contracts';
 import { appointmentsService } from './appointments.service.js';
-import { resolveClinicId } from '../auth/auth.helpers.js';
+import { resolveClinicId, resolveClinicTimeZone } from '../auth/auth.helpers.js';
+import { clinicDayRange } from '../../lib/timezone.js';
 
 const appointmentsRoutes: FastifyPluginAsync = async (app) => {
   const route = app.withTypeProvider<ZodTypeProvider>();
@@ -53,10 +54,10 @@ const appointmentsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req) => {
       const clinicId = await resolveClinicId(req.user.id);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(today.getDate() + 1);
+      const { start: today, end: tomorrow } = clinicDayRange(
+        new Date(),
+        await resolveClinicTimeZone(req.user.id),
+      );
       return appointmentsService.list(clinicId, {
         page: 1,
         pageSize: 100,
@@ -96,7 +97,7 @@ const appointmentsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
-      const created = await appointmentsService.create(clinicId, req.body);
+      const created = await appointmentsService.create(clinicId, req.user.id, req.body);
       return rep.code(201).send(created);
     },
   );
@@ -114,6 +115,9 @@ const appointmentsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
+      if (!await appointmentsService.assertMutationPermission(clinicId, req.user.id, req.params.id)) {
+        return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
+      }
       const updated = await appointmentsService.update(clinicId, req.params.id, req.body);
       if (!updated) return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
       return updated;
@@ -132,6 +136,9 @@ const appointmentsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
+      if (!await appointmentsService.assertMutationPermission(clinicId, req.user.id, req.params.id)) {
+        return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
+      }
       const r = await appointmentsService.confirm(clinicId, req.params.id);
       if (!r) return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
       return r;
@@ -150,6 +157,9 @@ const appointmentsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
+      if (!await appointmentsService.assertMutationPermission(clinicId, req.user.id, req.params.id)) {
+        return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
+      }
       const r = await appointmentsService.start(clinicId, req.params.id);
       if (!r) return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
       return r;
@@ -169,6 +179,9 @@ const appointmentsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
+      if (!await appointmentsService.assertMutationPermission(clinicId, req.user.id, req.params.id)) {
+        return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
+      }
       const r = await appointmentsService.complete(clinicId, req.params.id, req.body);
       if (!r) return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
       return r;
@@ -188,6 +201,9 @@ const appointmentsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
+      if (!await appointmentsService.assertMutationPermission(clinicId, req.user.id, req.params.id)) {
+        return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
+      }
       const r = await appointmentsService.cancel(clinicId, req.params.id, req.body);
       if (!r) return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
       return r;
@@ -206,6 +222,9 @@ const appointmentsRoutes: FastifyPluginAsync = async (app) => {
     },
     async (req, rep) => {
       const clinicId = await resolveClinicId(req.user.id);
+      if (!await appointmentsService.assertMutationPermission(clinicId, req.user.id, req.params.id)) {
+        return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
+      }
       const r = await appointmentsService.remove(clinicId, req.params.id);
       if (!r) return rep.code(404).send({ error: 'NotFound', message: 'Appointment not found' });
       return rep.code(204).send(null);
