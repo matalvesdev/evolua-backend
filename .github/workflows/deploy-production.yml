@@ -1,0 +1,57 @@
+name: Deploy backend production
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - "contracts/**"
+      - "prisma/**"
+      - "package.json"
+      - "package-lock.json"
+      - "Dockerfile"
+      - "render.yaml"
+      - ".github/workflows/deploy-production.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-backend-production
+  cancel-in-progress: false
+
+jobs:
+  migrate-and-verify:
+    name: Migrate and verify production API
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://api.useevolua.com.br
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run prisma:generate
+      - name: Apply pending Prisma migrations through the direct connection
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        run: npx prisma migrate deploy --schema=prisma/schema.prisma
+      - run: npm run build:contracts
+      - run: npm run build:api
+      - run: npm run lint --workspace=@evolua/api
+      - run: npm test --workspace=@evolua/api
+      - name: Wait for Render auto-deploy readiness
+        run: |
+          for attempt in {1..36}; do
+            if curl --fail --silent --show-error https://api.useevolua.com.br/readyz; then
+              exit 0
+            fi
+            echo "API not ready yet (attempt ${attempt}/36)"
+            sleep 10
+          done
+          exit 1
