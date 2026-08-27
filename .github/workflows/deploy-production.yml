@@ -31,6 +31,21 @@ jobs:
       url: https://api.useevolua.com.br
     steps:
       - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: changes
+        with:
+          filters: |
+            api:
+              - 'apps/api/**'
+              - 'contracts/**'
+              - 'prisma/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'Dockerfile'
+              - 'render.yaml'
+            ai:
+              - 'apps/ai/**'
+              - 'render.yaml'
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -47,11 +62,14 @@ jobs:
       - run: npm run lint --workspace=@evolua/api
       - run: npm test --workspace=@evolua/api
       - name: Wait for Render auto-deploy readiness
+        if: steps.changes.outputs.api == 'true'
         run: |
           expected_commit="${GITHUB_SHA:0:12}"
           for attempt in {1..36}; do
-            actual_commit="$(curl --fail --silent --show-error https://api.useevolua.com.br/version | jq -r '.commit // empty' || true)"
-            if [ "$actual_commit" = "$expected_commit" ] && curl --fail --silent --show-error https://api.useevolua.com.br/readyz; then
+            version_payload="$(curl --fail --silent --show-error https://api.useevolua.com.br/version || true)"
+            actual_commit="$(printf '%s' "$version_payload" | jq -r '.commit // empty' 2>/dev/null || true)"
+            actual_environment="$(printf '%s' "$version_payload" | jq -r '.environment // empty' 2>/dev/null || true)"
+            if [ "$actual_commit" = "$expected_commit" ] && [ "$actual_environment" = "production" ] && curl --fail --silent --show-error https://api.useevolua.com.br/readyz; then
               exit 0
             fi
             echo "API commit not ready yet (attempt ${attempt}/36)"
@@ -60,11 +78,14 @@ jobs:
           echo "::error::API did not expose expected commit $expected_commit"
           exit 1
       - name: Wait for Render AI auto-deploy readiness
+        if: steps.changes.outputs.ai == 'true'
         run: |
           expected_commit="${GITHUB_SHA:0:12}"
           for attempt in {1..36}; do
-            actual_commit="$(curl --fail --silent --show-error https://evolua-ai.onrender.com/version | jq -r '.commit // empty' || true)"
-            if [ "$actual_commit" = "$expected_commit" ] && curl --fail --silent --show-error https://evolua-ai.onrender.com/readyz; then
+            version_payload="$(curl --fail --silent --show-error https://evolua-ai.onrender.com/version || true)"
+            actual_commit="$(printf '%s' "$version_payload" | jq -r '.commit // empty' 2>/dev/null || true)"
+            actual_environment="$(printf '%s' "$version_payload" | jq -r '.environment // empty' 2>/dev/null || true)"
+            if [ "$actual_commit" = "$expected_commit" ] && [ "$actual_environment" = "production" ] && curl --fail --silent --show-error https://evolua-ai.onrender.com/readyz; then
               exit 0
             fi
             echo "AI commit not ready yet (attempt ${attempt}/36)"

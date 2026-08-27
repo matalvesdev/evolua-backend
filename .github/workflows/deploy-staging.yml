@@ -78,8 +78,10 @@ jobs:
         run: |
           expected_commit="${GITHUB_SHA:0:12}"
           for _ in {1..30}; do
-            actual_commit="$(curl --fail --silent --show-error "$VERSION_URL" | jq -r '.commit // empty' || true)"
-            if [ "$actual_commit" = "$expected_commit" ] && curl --fail --silent --show-error "$HEALTH_URL"; then exit 0; fi
+            version_payload="$(curl --fail --silent --show-error "$VERSION_URL" || true)"
+            actual_commit="$(printf '%s' "$version_payload" | jq -r '.commit // empty' 2>/dev/null || true)"
+            actual_environment="$(printf '%s' "$version_payload" | jq -r '.environment // empty' 2>/dev/null || true)"
+            if [ "$actual_commit" = "$expected_commit" ] && [ "$actual_environment" = "staging" ] && curl --fail --silent --show-error "$HEALTH_URL"; then exit 0; fi
             sleep 10
           done
           echo "::error::API did not expose expected commit $expected_commit"
@@ -91,8 +93,10 @@ jobs:
         run: |
           expected_commit="${GITHUB_SHA:0:12}"
           for _ in {1..30}; do
-            actual_commit="$(curl --fail --silent --show-error "$VERSION_URL" | jq -r '.commit // empty' || true)"
-            if [ "$actual_commit" = "$expected_commit" ] && curl --fail --silent --show-error "$HEALTH_URL"; then exit 0; fi
+            version_payload="$(curl --fail --silent --show-error "$VERSION_URL" || true)"
+            actual_commit="$(printf '%s' "$version_payload" | jq -r '.commit // empty' 2>/dev/null || true)"
+            actual_environment="$(printf '%s' "$version_payload" | jq -r '.environment // empty' 2>/dev/null || true)"
+            if [ "$actual_commit" = "$expected_commit" ] && [ "$actual_environment" = "staging" ] && curl --fail --silent --show-error "$HEALTH_URL"; then exit 0; fi
             sleep 10
           done
           echo "::error::AI did not expose expected commit $expected_commit"
