@@ -1,8 +1,11 @@
 import { z } from 'zod';
 import 'dotenv/config';
+import { resolveDefaultNodeEnvironment } from './runtime-environment.js';
 
 const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
+  NODE_ENV: z
+    .enum(['development', 'staging', 'production', 'test'])
+    .default(resolveDefaultNodeEnvironment(process.env.RENDER)),
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   CORS_ORIGINS: z.string().transform((s) => s.split(',').map((o) => o.trim()).filter(Boolean)),

@@ -10,7 +10,7 @@ describe('application boot', () => {
     expect(versionResponse.statusCode).toBe(200);
     expect(versionResponse.json()).toMatchObject({
       service: 'evolua-api',
-      version: '2.0.2',
+      version: '2.0.3',
       environment: 'test',
     });
 
