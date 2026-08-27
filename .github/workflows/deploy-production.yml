@@ -50,8 +50,10 @@ jobs:
         run: |
           expected_commit="${GITHUB_SHA:0:12}"
           for attempt in {1..36}; do
-            actual_commit="$(curl --fail --silent --show-error https://api.useevolua.com.br/version | jq -r '.commit // empty' || true)"
-            if [ "$actual_commit" = "$expected_commit" ] && curl --fail --silent --show-error https://api.useevolua.com.br/readyz; then
+            version_payload="$(curl --fail --silent --show-error https://api.useevolua.com.br/version || true)"
+            actual_commit="$(printf '%s' "$version_payload" | jq -r '.commit // empty' 2>/dev/null || true)"
+            actual_environment="$(printf '%s' "$version_payload" | jq -r '.environment // empty' 2>/dev/null || true)"
+            if [ "$actual_commit" = "$expected_commit" ] && [ "$actual_environment" = "production" ] && curl --fail --silent --show-error https://api.useevolua.com.br/readyz; then
               exit 0
             fi
             echo "API commit not ready yet (attempt ${attempt}/36)"
@@ -63,8 +65,10 @@ jobs:
         run: |
           expected_commit="${GITHUB_SHA:0:12}"
           for attempt in {1..36}; do
-            actual_commit="$(curl --fail --silent --show-error https://evolua-ai.onrender.com/version | jq -r '.commit // empty' || true)"
-            if [ "$actual_commit" = "$expected_commit" ] && curl --fail --silent --show-error https://evolua-ai.onrender.com/readyz; then
+            version_payload="$(curl --fail --silent --show-error https://evolua-ai.onrender.com/version || true)"
+            actual_commit="$(printf '%s' "$version_payload" | jq -r '.commit // empty' 2>/dev/null || true)"
+            actual_environment="$(printf '%s' "$version_payload" | jq -r '.environment // empty' 2>/dev/null || true)"
+            if [ "$actual_commit" = "$expected_commit" ] && [ "$actual_environment" = "production" ] && curl --fail --silent --show-error https://evolua-ai.onrender.com/readyz; then
               exit 0
             fi
             echo "AI commit not ready yet (attempt ${attempt}/36)"
