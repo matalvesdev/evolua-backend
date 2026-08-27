@@ -1,4 +1,4 @@
-const API_VERSION = '2.0.1';
+const API_VERSION = '2.0.2';
 const UNKNOWN_COMMIT = 'unknown';
 
 export type RuntimeInfo = {
