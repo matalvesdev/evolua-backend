@@ -84,11 +84,18 @@ src/
     ├── auth/
     │   └── auth.helpers.ts  # resolveClinicId(userId)
     ├── health/
-    │   └── health.routes.ts # /healthz, /readyz
+    │   └── health.routes.ts # /healthz, /readyz, /version
     └── patients/            # ✅ vertical end-to-end completa
         ├── patients.service.ts
         └── patients.routes.ts
 ```
+
+## Verificação de deploy
+
+`GET /version` existe na API e no serviço de IA. A resposta pública contém apenas
+`service`, `version`, `environment` e os 12 primeiros caracteres de
+`RENDER_GIT_COMMIT`. Os workflows comparam esse commit ao SHA esperado antes de
+declarar o deploy concluído, evitando falso positivo contra uma instância antiga.
 
 ## Próximos passos (migração NestJS → Fastify)
 

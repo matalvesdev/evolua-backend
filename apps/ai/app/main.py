@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .routers import clinical, content_generation, library, library_ingest
+from .runtime_info import get_runtime_info
 from .sentry_init import init_sentry
 
 # Sentry deve ser inicializado o mais cedo possível, antes do FastAPI.
@@ -76,6 +77,10 @@ def create_app() -> FastAPI:
     @app.get("/healthz", tags=["health"])
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/version", tags=["health"])
+    async def runtime_version() -> dict[str, str]:
+        return get_runtime_info(settings.environment)
 
     @app.get("/readyz", tags=["health"])
     async def readyz() -> dict[str, str]:
