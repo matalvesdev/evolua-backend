@@ -17,7 +17,7 @@ describe('getRuntimeInfo', () => {
 
     expect(getRuntimeInfo('staging')).toEqual({
       service: 'evolua-api',
-      version: '2.0.1',
+      version: '2.0.2',
       commit: '1234567890ab',
       environment: 'staging',
     });
