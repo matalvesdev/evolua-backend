@@ -3,12 +3,14 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
+import { getRuntimeInfo } from './runtime-info.js';
 
 /**
  * Health endpoints.
  *
  * - `/healthz`  — liveness (sempre 200 se o processo respondeu).
  * - `/readyz`   — readiness shallow (DB + AI). Usar em load-balancers.
+ * - `/version`  — identidade pública e não sensível do artefato em execução.
  * - `/healthz/deep` — readiness completo + diagnóstico (DB latency + AI reachable +
  *                    versão). NÃO usar em probes — apenas debugging humano.
  */
@@ -44,6 +46,7 @@ async function probeAi(): Promise<z.infer<typeof ComponentSchema>> {
 
 const healthRoutes: FastifyPluginAsync = async (app) => {
   const route = app.withTypeProvider<ZodTypeProvider>();
+  const runtimeInfo = getRuntimeInfo(env.NODE_ENV);
 
   route.get(
     '/healthz',
@@ -55,6 +58,25 @@ const healthRoutes: FastifyPluginAsync = async (app) => {
       },
     },
     async () => ({ status: 'ok' as const }),
+  );
+
+  route.get(
+    '/version',
+    {
+      schema: {
+        tags: ['health'],
+        summary: 'Identidade do artefato em execução',
+        response: {
+          200: z.object({
+            service: z.literal('evolua-api'),
+            version: z.string(),
+            commit: z.string(),
+            environment: z.string(),
+          }),
+        },
+      },
+    },
+    async () => runtimeInfo,
   );
 
   route.get(
@@ -102,7 +124,7 @@ const healthRoutes: FastifyPluginAsync = async (app) => {
       const allUp = db.status === 'up' && (ai.status === 'up' || ai.status === 'skipped');
       return {
         status: allUp ? ('ok' as const) : ('degraded' as const),
-        version: process.env.npm_package_version ?? '2.0.0',
+        version: runtimeInfo.version,
         uptime: Math.round(process.uptime()),
         components: { db, ai },
       };
