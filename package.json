@@ -1,6 +1,6 @@
 {
   "name": "evolua-backend",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Evolua backend monorepo — Fastify API + Python AI + Go services",
   "private": true,
   "workspaces": [
