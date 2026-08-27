@@ -7,6 +7,9 @@
     "apps/api",
     "contracts"
   ],
+  "overrides": {
+    "esbuild": "^0.28.1"
+  },
   "scripts": {
     "dev:api": "npm run dev --workspace=@evolua/api",
     "build:api": "npm run build --workspace=@evolua/api",
