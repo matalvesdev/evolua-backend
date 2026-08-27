@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "apps/api/**"
+      - "apps/ai/**"
       - "contracts/**"
       - "prisma/**"
       - "package.json"
@@ -47,11 +48,27 @@ jobs:
       - run: npm test --workspace=@evolua/api
       - name: Wait for Render auto-deploy readiness
         run: |
+          expected_commit="${GITHUB_SHA:0:12}"
           for attempt in {1..36}; do
-            if curl --fail --silent --show-error https://api.useevolua.com.br/readyz; then
+            actual_commit="$(curl --fail --silent --show-error https://api.useevolua.com.br/version | jq -r '.commit // empty' || true)"
+            if [ "$actual_commit" = "$expected_commit" ] && curl --fail --silent --show-error https://api.useevolua.com.br/readyz; then
               exit 0
             fi
-            echo "API not ready yet (attempt ${attempt}/36)"
+            echo "API commit not ready yet (attempt ${attempt}/36)"
             sleep 10
           done
+          echo "::error::API did not expose expected commit $expected_commit"
+          exit 1
+      - name: Wait for Render AI auto-deploy readiness
+        run: |
+          expected_commit="${GITHUB_SHA:0:12}"
+          for attempt in {1..36}; do
+            actual_commit="$(curl --fail --silent --show-error https://evolua-ai.onrender.com/version | jq -r '.commit // empty' || true)"
+            if [ "$actual_commit" = "$expected_commit" ] && curl --fail --silent --show-error https://evolua-ai.onrender.com/readyz; then
+              exit 0
+            fi
+            echo "AI commit not ready yet (attempt ${attempt}/36)"
+            sleep 10
+          done
+          echo "::error::AI did not expose expected commit $expected_commit"
           exit 1

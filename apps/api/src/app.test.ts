@@ -6,6 +6,14 @@ describe('application boot', () => {
     const app = await buildApp();
 
     await app.ready();
+    const versionResponse = await app.inject({ method: 'GET', url: '/version' });
+    expect(versionResponse.statusCode).toBe(200);
+    expect(versionResponse.json()).toMatchObject({
+      service: 'evolua-api',
+      version: '2.0.2',
+      environment: 'test',
+    });
+
     const response = await app.inject({ method: 'GET', url: '/api/teleconsulta/sessions' });
     expect(response.statusCode).toBe(401);
 
