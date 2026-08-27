@@ -36,7 +36,9 @@ services:
           type: web
           name: evolua-ai-staging
           envVarKey: RENDER_EXTERNAL_URL
-      # Deve ser o domínio permanente do frontend de staging, não produção.
+      # No provisionamento, usar somente os aliases permanentes de staging:
+      # https://evolua-frontend-staging.vercel.app e
+      # https://evolua-landing-staging.vercel.app. Nunca ampliar para wildcard.
       - key: CORS_ORIGINS
         sync: false
       - key: FRONTEND_URL
