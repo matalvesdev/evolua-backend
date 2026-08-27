@@ -1,11 +1,9 @@
 import { z } from 'zod';
 import 'dotenv/config';
-import { resolveDefaultNodeEnvironment } from './runtime-environment.js';
+import { resolveRuntimeNodeEnvironment } from './runtime-environment.js';
 
 const envSchema = z.object({
-  NODE_ENV: z
-    .enum(['development', 'staging', 'production', 'test'])
-    .default(resolveDefaultNodeEnvironment(process.env.RENDER)),
+  NODE_ENV: z.enum(['development', 'staging', 'production', 'test']),
   PORT: z.coerce.number().int().positive().default(3000),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
   CORS_ORIGINS: z.string().transform((s) => s.split(',').map((o) => o.trim()).filter(Boolean)),
@@ -81,7 +79,10 @@ const envSchema = z.object({
   CALENDAR_SERVICE_TOKEN: z.string().min(1).optional(),
 });
 
-const parsed = envSchema.safeParse(process.env);
+const parsed = envSchema.safeParse({
+  ...process.env,
+  NODE_ENV: resolveRuntimeNodeEnvironment(process.env.NODE_ENV, process.env.RENDER),
+});
 
 if (!parsed.success) {
   throw new Error(`Invalid environment variables: ${JSON.stringify(parsed.error.flatten().fieldErrors)}`);
