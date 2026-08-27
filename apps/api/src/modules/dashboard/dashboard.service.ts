@@ -142,7 +142,10 @@ export class DashboardService {
         AND deleted_at IS NULL
         AND status = 'paid'
         AND paid_at >= ${start}
-      GROUP BY to_char(paid_at AT TIME ZONE ${timeZone}, 'YYYY-MM')
+      -- GROUP BY the selected expression position. Repeating the expression would
+      -- bind the timezone as a second SQL parameter and PostgreSQL would no longer
+      -- consider it identical to the SELECT expression (SQLSTATE 42803).
+      GROUP BY 1
       ORDER BY month ASC
     `;
 
@@ -153,7 +156,15 @@ export class DashboardService {
     }));
   }
   async getAnalytics(clinicId: string, period: string, timeZone = DEFAULT_CLINIC_TIME_ZONE) {
-    const intervals: Record<string, number> = { week: 7, month: 30, quarter: 90 };
+    const intervals: Record<string, number> = {
+      '7d': 7,
+      '30d': 30,
+      '90d': 90,
+      '12m': 365,
+      week: 7,
+      month: 30,
+      quarter: 90,
+    };
     const days = intervals[period] ?? 30;
     const { start, end, keys } = clinicDayRangeEndingToday(days, new Date(), timeZone);
 
@@ -182,7 +193,9 @@ export class DashboardService {
         AND status = 'paid'
         AND paid_at >= ${start}
         AND paid_at < ${end}
-      GROUP BY to_char(paid_at AT TIME ZONE ${timeZone}, 'YYYY-MM-DD')
+      -- See getRevenueByMonth: positional grouping reuses the SELECT expression
+      -- instead of creating a distinct timezone bind parameter.
+      GROUP BY 1
       ORDER BY day ASC
     `;
     const revenueMap = new Map(revenueRows.map((r) => [r.day, Number(r.total)]));
