@@ -267,15 +267,15 @@ export class AudioService {
         return;
       }
 
-      // Fallback: Hugging Face Inference API direto (serverless, sem cold start)
+      // Fallback: OpenRouter STT direto (serverless, sem cold start)
       logger.info(
-        { fallback: 'huggingface' },
-        'audio: AI service unavailable, falling back to Hugging Face Inference API',
+        { fallback: 'openrouter' },
+        'audio: AI service unavailable, falling back to OpenRouter STT',
       );
 
-      const hfResult = await this.tryHuggingFaceFallback(signedUrl);
-      if (hfResult.success && hfResult.transcription) {
-        await this.saveTranscription(session.id, hfResult.transcription);
+      const fallbackResult = await this.tryOpenRouterFallback(signedUrl);
+      if (fallbackResult.success && fallbackResult.transcription) {
+        await this.saveTranscription(session.id, fallbackResult.transcription);
         recordTranscriptionAttempt('completed');
         return;
       }
@@ -360,12 +360,12 @@ export class AudioService {
     return { success: false, error: `cold start timeout (${lastError})` };
   }
 
-  /** Fallback direto para Hugging Face Inference API (Whisper-large-v3). */
-  private async tryHuggingFaceFallback(
+  /** Fallback direto para OpenRouter Speech-to-Text. */
+  private async tryOpenRouterFallback(
     signedUrl: string,
   ): Promise<{ success: boolean; transcription?: string; error?: string }> {
-    if (!env.HUGGINGFACE_API_KEY) {
-      return { success: false, error: 'HUGGINGFACE_API_KEY not configured' };
+    if (!env.OPENROUTER_API_KEY) {
+      return { success: false, error: 'OPENROUTER_API_KEY not configured' };
     }
 
     try {
@@ -396,27 +396,31 @@ export class AudioService {
         return { success: false, error: 'Audio exceeds maximum size' };
       }
 
-      // 2. Envia para Hugging Face Inference API
-      const hfRes = await fetch(
-        'https://router.huggingface.co/hf-inference/models/openai/whisper-large-v3',
+      // 2. Envia para OpenRouter Speech-to-Text
+      const sttRes = await fetch(
+        'https://openrouter.ai/api/v1/audio/transcriptions',
         {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${env.HUGGINGFACE_API_KEY}`,
-          'Content-Type': contentType,
+            Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+            'Content-Type': 'application/json',
           },
-          body: audioBytes,
+          body: JSON.stringify({
+            model: env.OPENROUTER_TRANSCRIPTION_MODEL,
+            input_audio: { data: Buffer.from(audioBytes).toString('base64'), format: contentType.split('/')[1]?.replace('x-m4a', 'm4a') },
+            language: 'pt',
+          }),
           signal: AbortSignal.timeout(120_000),
         },
       );
 
-      if (!hfRes.ok) {
-        return { success: false, error: `HF API ${hfRes.status}` };
+      if (!sttRes.ok) {
+        return { success: false, error: `OpenRouter STT ${sttRes.status}` };
       }
 
-      const data = (await hfRes.json()) as { text?: string };
+      const data = (await sttRes.json()) as { text?: string };
       if (!data.text) {
-        return { success: false, error: 'HF API returned empty transcription' };
+        return { success: false, error: 'OpenRouter STT returned empty transcription' };
       }
 
       return { success: true, transcription: data.text };
