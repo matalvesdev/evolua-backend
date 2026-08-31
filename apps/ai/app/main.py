@@ -86,12 +86,16 @@ def create_app() -> FastAPI:
     async def readyz() -> dict[str, str]:
         if not _warm:
             return {"status": "warming_up"}
-        # Readiness = o provedor operacional de inferência (OpenRouter) é
-        # alcançável. Qualquer resposta HTTP comprova conectividade DNS/TLS;
-        # apenas falhas de rede indicam degradação.
+        # Readiness valida conectividade E a credencial do provedor
+        # operacional. O endpoint de modelos não gera conteúdo nem recebe
+        # dados clínicos.
         try:
             async with httpx.AsyncClient(timeout=5) as client:
-                await client.get("https://openrouter.ai")
+                response = await client.get(
+                    "https://openrouter.ai/api/v1/models",
+                    headers={"Authorization": f"Bearer {get_settings().openrouter_api_key}"},
+                )
+                response.raise_for_status()
         except Exception as exc:
             return {"status": "degraded", "detail": str(exc)}
         return {"status": "ready"}
