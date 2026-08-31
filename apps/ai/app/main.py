@@ -97,7 +97,8 @@ def create_app() -> FastAPI:
                 )
                 response.raise_for_status()
         except Exception as exc:
-            return {"status": "degraded", "detail": str(exc)}
+            logger.warning("OpenRouter readiness check failed: %s", type(exc).__name__)
+            return {"status": "degraded", "detail": "OpenRouter readiness check failed"}
         return {"status": "ready"}
 
     return app

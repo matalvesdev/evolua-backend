@@ -3,6 +3,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,6 +46,12 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = 0.1
     sentry_environment: str | None = None
+
+    @field_validator("openrouter_api_key", mode="before")
+    @classmethod
+    def normalize_openrouter_api_key(cls, value: object) -> object:
+        """Remove whitespace acidental de secrets configurados por ambiente."""
+        return value.strip() if isinstance(value, str) else value
 
 
 @lru_cache
