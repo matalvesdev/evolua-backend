@@ -26,7 +26,8 @@ from pydantic import BaseModel, Field
 
 from ..config import get_settings
 from ..deps import get_clinic_id, get_user_id, verify_internal_token
-from ..hf_client import HuggingFaceError, HuggingFaceModelLoadingError, hf_client
+from ..hf_client import HuggingFaceError, hf_client
+from ..openrouter_client import OpenRouterError, openrouter_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/library", tags=["library-rag"])
@@ -179,11 +180,9 @@ async def chat_with_library(
     messages.append({"role": "user", "content": req.question})
 
     try:
-        answer = await hf_client.chat(messages, max_tokens=900, temperature=0.2)
-    except HuggingFaceModelLoadingError as exc:
-        raise HTTPException(status_code=503, detail="Modelo de IA indisponível") from exc
-    except HuggingFaceError as exc:
-        logger.error("HF chat failed")
+        answer = await openrouter_client.chat(messages, model=openrouter_client.rag_model, max_tokens=900, temperature=0.2)
+    except OpenRouterError as exc:
+        logger.error("OpenRouter RAG generation failed")
         raise HTTPException(status_code=502, detail="Falha no provedor de IA") from exc
 
     citations = [
@@ -202,5 +201,5 @@ async def chat_with_library(
         answer=answer,
         citations=citations,
         latency_ms=int((time.perf_counter() - started) * 1000),
-        model=hf_client.chat_model,
+        model=openrouter_client.rag_model,
     )

@@ -16,17 +16,12 @@ class Settings(BaseSettings):
     internal_service_token: str
 
     # HuggingFace Inference API (https://huggingface.co/docs/api-inference)
-    huggingface_api_key: str
+    # Hugging Face permanece exclusivo para embeddings do RAG interno.
+    huggingface_api_key: str = ""
     huggingface_base_url: str = "https://router.huggingface.co"
-    # Modelo de chat/instrução para RAG e geração clínica.
-    # Usa Zephyr-7B (suportado no free tier do HF Inference) para evitar erros 400.
-    huggingface_chat_model: str = "HuggingFaceH4/zephyr-7b-beta"
-    huggingface_chat_provider: str = "hf-inference"
     # Embeddings para RAG (multilíngue, leve).
     huggingface_embedding_model: str = "intfloat/multilingual-e5-small"
     huggingface_embedding_dim: int = 384
-    # ASR para sessões clínicas. Mantém Whisper-large-v3 do legacy.
-    huggingface_whisper_model: str = "openai/whisper-large-v3"
 
     database_url: str
 
@@ -35,9 +30,12 @@ class Settings(BaseSettings):
     # exatos ou sufixos iniciados por ponto (ex.: ".supabase.co").
     library_ingest_allowed_hosts: str = ""
 
-    # OpenRouter (AI content generation — ebooks, infográficos, materiais)
+    # OpenRouter é o provider operacional para geração e transcrição.
     openrouter_api_key: str = ""
-    openrouter_default_model: str = "openai/gpt-4o"
+    openrouter_default_model: str = "google/gemini-2.5-flash-lite"
+    openrouter_clinical_model: str = "google/gemini-2.5-flash-lite"
+    openrouter_rag_model: str = "google/gemini-2.5-flash-lite"
+    openrouter_transcription_model: str = "qwen/qwen3-asr-0.6b"
     openrouter_site_url: str = "https://useevolua.com.br"
     openrouter_site_name: str = "Evolua"
 

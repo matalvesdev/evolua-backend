@@ -35,7 +35,7 @@ services:
           type: web
           name: evolua-ai
           envVarKey: RENDER_EXTERNAL_URL
-      - key: HUGGINGFACE_API_KEY
+      - key: OPENROUTER_API_KEY
         sync: false
       - key: RESEND_API_KEY
         sync: false
