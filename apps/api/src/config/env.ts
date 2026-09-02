@@ -23,7 +23,7 @@ const envSchema = z.object({
 
   // OpenRouter — fallback direto de ASR quando o serviço AI está indisponível.
   OPENROUTER_API_KEY: z.string().min(1).optional(),
-  OPENROUTER_TRANSCRIPTION_MODEL: z.string().default('qwen/qwen3-asr-0.6b'),
+  OPENROUTER_TRANSCRIPTION_MODEL: z.string().default('qwen/qwen3-asr-1.7b'),
 
   // HMAC para validar webhooks vindos do serviço Go (Evolution API gateway).
   // Em produção é OBRIGATÓRIO; em dev é opcional para facilitar testes locais.
