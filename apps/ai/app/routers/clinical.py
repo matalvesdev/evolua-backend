@@ -450,6 +450,12 @@ async def transcribe_audio(
         audio_format = content_type.rsplit("/", 1)[-1].replace("x-m4a", "m4a")
         text = await openrouter_client.transcribe(audio_bytes, audio_format=audio_format, language=req.language)
     except OpenRouterError as exc:
+        logger.warning(
+            "STT provider failure model=%s format=%s error=%s",
+            openrouter_client.transcription_model,
+            audio_format,
+            str(exc)[:300],
+        )
         raise HTTPException(status_code=502, detail="Falha no provedor de transcrição") from exc
 
     return TranscribeResponse(transcription=text)
