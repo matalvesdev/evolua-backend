@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     # exatos ou sufixos iniciados por ponto (ex.: ".supabase.co").
     library_ingest_allowed_hosts: str = ""
 
-    # OpenRouter é o provider operacional para geração e transcrição.
+    # OpenRouter é o provider operacional para geração; HF atende STT e embeddings/RAG.
     openrouter_api_key: str = ""
     openrouter_default_model: str = "google/gemini-2.5-flash-lite"
     openrouter_clinical_model: str = "google/gemini-2.5-flash-lite"
