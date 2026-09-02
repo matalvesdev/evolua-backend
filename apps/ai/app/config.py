@@ -17,9 +17,10 @@ class Settings(BaseSettings):
     internal_service_token: str
 
     # HuggingFace Inference API (https://huggingface.co/docs/api-inference)
-    # Hugging Face permanece exclusivo para embeddings do RAG interno.
+    # Hugging Face atende STT e embeddings do RAG interno.
     huggingface_api_key: str = ""
     huggingface_base_url: str = "https://router.huggingface.co"
+    huggingface_whisper_model: str = "openai/whisper-large-v3"
     # Embeddings para RAG (multilíngue, leve).
     huggingface_embedding_model: str = "intfloat/multilingual-e5-small"
     huggingface_embedding_dim: int = 384
