@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..deps import get_user_id, verify_internal_token
+from ..hf_client import HuggingFaceError, HuggingFaceModelLoadingError, hf_client
 from ..openrouter_client import OpenRouterError, openrouter_client
 
 logger = logging.getLogger(__name__)
@@ -445,11 +446,13 @@ async def transcribe_audio(
         raise HTTPException(status_code=502, detail="Falha baixando áudio") from exc
     logger.info("Transcribing audio (%d bytes)", len(audio_bytes))
 
-    # 2. Envia ao endpoint STT do OpenRouter.
+    # 2. Envia ao Whisper no Hugging Face (STT sem custo OpenRouter).
     try:
-        audio_format = content_type.rsplit("/", 1)[-1].replace("x-m4a", "m4a")
-        text = await openrouter_client.transcribe(audio_bytes, audio_format=audio_format, language=req.language)
-    except OpenRouterError as exc:
+        text = await hf_client.transcribe(audio_bytes, content_type=content_type)
+    except HuggingFaceModelLoadingError as exc:
+        raise HTTPException(status_code=503, detail="Modelo de transcrição está carregando") from exc
+    except HuggingFaceError as exc:
+        logger.warning("STT provider failure provider=huggingface error=%s", str(exc)[:300])
         raise HTTPException(status_code=502, detail="Falha no provedor de transcrição") from exc
 
     return TranscribeResponse(transcription=text)

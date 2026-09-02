@@ -35,6 +35,10 @@ class OpenRouterClient:
     def rag_model(self) -> str:
         return get_settings().openrouter_rag_model
 
+    @property
+    def transcription_model(self) -> str:
+        return get_settings().openrouter_transcription_model
+
     async def chat(
         self,
         messages: list[dict[str, str]],
