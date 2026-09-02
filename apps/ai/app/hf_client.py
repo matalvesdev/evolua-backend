@@ -192,8 +192,11 @@ class HuggingFaceClient:
             "Content-Type": content_type,
         }
 
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            r = await client.post(url, headers=headers, content=audio_bytes)
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                r = await client.post(url, headers=headers, content=audio_bytes)
+        except httpx.HTTPError as exc:
+            raise HuggingFaceError(f"HF whisper request failed: {type(exc).__name__}") from exc
 
         if r.status_code == 503:
             raise HuggingFaceModelLoadingError(
@@ -202,7 +205,10 @@ class HuggingFaceClient:
         if r.status_code >= 400:
             raise HuggingFaceError(f"HF whisper {r.status_code}: {r.text[:300]}")
 
-        data = r.json()
+        try:
+            data = r.json()
+        except ValueError as exc:
+            raise HuggingFaceError("HF whisper retornou resposta não-JSON") from exc
         if isinstance(data, dict) and "text" in data:
             return str(data["text"])
         raise HuggingFaceError(f"Whisper retornou formato inesperado: {data!r:.200}")
