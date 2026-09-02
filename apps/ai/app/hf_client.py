@@ -41,6 +41,7 @@ class HuggingFaceClient:
         s = get_settings()
         self._api_key = s.huggingface_api_key
         self._base_url = s.huggingface_base_url.rstrip("/")
+        self._whisper_model = s.huggingface_whisper_model
         self._embedding_model = s.huggingface_embedding_model
 
     def is_enabled(self) -> bool:
