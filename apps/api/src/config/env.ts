@@ -21,8 +21,9 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
   LANDING_URL: z.string().url().default('https://useevolua.com.br'),
 
-  // Hugging Face Inference API — fallback direto quando o AI service está em cold start
-  HUGGINGFACE_API_KEY: z.string().min(1).optional(),
+  // OpenRouter — fallback direto de ASR quando o serviço AI está indisponível.
+  OPENROUTER_API_KEY: z.string().min(1).optional(),
+  OPENROUTER_TRANSCRIPTION_MODEL: z.string().default('qwen/qwen3-asr-1.7b'),
 
   // HMAC para validar webhooks vindos do serviço Go (Evolution API gateway).
   // Em produção é OBRIGATÓRIO; em dev é opcional para facilitar testes locais.

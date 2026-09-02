@@ -49,7 +49,7 @@ services:
         sync: false
       - key: RESEND_FROM_EMAIL
         value: naoresponder@useevolua.com.br
-      - key: HUGGINGFACE_API_KEY
+      - key: OPENROUTER_API_KEY
         sync: false
       - key: SENTRY_DSN
         sync: false

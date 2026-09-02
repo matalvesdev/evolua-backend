@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..deps import get_user_id, verify_internal_token
-from ..hf_client import HuggingFaceError, HuggingFaceModelLoadingError, hf_client
+from ..openrouter_client import OpenRouterError, openrouter_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/clinical", tags=["clinical-ai"])
@@ -75,14 +75,8 @@ async def generate_evolution(
     ]
 
     try:
-        raw = await hf_client.chat(messages, max_tokens=900, temperature=0.2)
-    except HuggingFaceModelLoadingError as exc:
-        logger.warning("Clinical evolution model is loading")
-        raise HTTPException(
-            status_code=503,
-            detail="O serviço de IA está sendo preparado. Tente novamente em alguns instantes.",
-        ) from exc
-    except HuggingFaceError as exc:
+        raw = await openrouter_client.chat(messages, model=openrouter_client.clinical_model, max_tokens=900, temperature=0.2)
+    except OpenRouterError as exc:
         logger.warning("Clinical evolution provider unavailable")
         raise HTTPException(
             status_code=502,
@@ -227,14 +221,8 @@ async def generate_material(
     ]
 
     try:
-        raw = await hf_client.chat(messages, max_tokens=1100, temperature=0.5)
-    except HuggingFaceModelLoadingError as exc:
-        logger.warning("Clinical material model is loading")
-        raise HTTPException(
-            status_code=503,
-            detail="O serviço de IA está sendo preparado. Tente novamente em alguns instantes.",
-        ) from exc
-    except HuggingFaceError as exc:
+        raw = await openrouter_client.chat(messages, model=openrouter_client.clinical_model, max_tokens=1100, temperature=0.5)
+    except OpenRouterError as exc:
         logger.warning("Clinical material provider unavailable")
         raise HTTPException(
             status_code=502,
@@ -354,14 +342,13 @@ async def generate_report(
     )
 
     try:
-        raw = await hf_client.chat(
+        raw = await openrouter_client.chat(
             [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            model=openrouter_client.clinical_model,
             max_tokens=2000,
             temperature=0.2,
         )
-    except HuggingFaceModelLoadingError as e:
-        return GenerateReportResponse(success=False, error=str(e))
-    except HuggingFaceError as e:
+    except OpenRouterError as e:
         return GenerateReportResponse(success=False, error=str(e))
 
     parsed = _safe_json(raw) or {}
@@ -456,14 +443,13 @@ async def transcribe_audio(
                 audio_bytes = b"".join(chunks)
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail="Falha baixando áudio") from exc
-    logger.info("Transcribing audio session %s (%d bytes)", req.audio_session_id, len(audio_bytes))
+    logger.info("Transcribing audio (%d bytes)", len(audio_bytes))
 
-    # 2. Envia ao Whisper.
+    # 2. Envia ao endpoint STT do OpenRouter.
     try:
-        text = await hf_client.transcribe(audio_bytes, content_type=content_type)
-    except HuggingFaceModelLoadingError as exc:
-        raise HTTPException(status_code=503, detail="Modelo de transcrição indisponível") from exc
-    except HuggingFaceError as exc:
+        audio_format = content_type.rsplit("/", 1)[-1].replace("x-m4a", "m4a")
+        text = await openrouter_client.transcribe(audio_bytes, audio_format=audio_format, language=req.language)
+    except OpenRouterError as exc:
         raise HTTPException(status_code=502, detail="Falha no provedor de transcrição") from exc
 
     return TranscribeResponse(transcription=text)

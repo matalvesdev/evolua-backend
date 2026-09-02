@@ -26,25 +26,25 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     global _warm
     settings = get_settings()
     logger.info(
-        "AI service starting (env=%s, chat_model=%s, whisper=%s)",
+        "AI service starting (env=%s, clinical_model=%s, stt_model=%s)",
         settings.environment,
-        settings.huggingface_chat_model,
-        settings.huggingface_whisper_model,
+        settings.openrouter_clinical_model,
+        settings.openrouter_transcription_model,
     )
     try:
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(
-                f"{settings.huggingface_base_url}/{settings.huggingface_chat_provider}/v1/chat/completions",
-                headers={"Authorization": f"Bearer {settings.huggingface_api_key}"},
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {settings.openrouter_api_key}"},
                 json={
-                    "model": settings.huggingface_chat_model,
+                    "model": settings.openrouter_clinical_model,
                     "messages": [{"role": "user", "content": "warmup"}],
                     "max_tokens": 1,
                 },
             )
-            logger.info("HF model warmup: HTTP %s", resp.status_code)
+            logger.info("OpenRouter model warmup: HTTP %s", resp.status_code)
     except Exception as exc:
-        logger.warning("HF model warmup failed (non-fatal): %s", exc)
+        logger.warning("OpenRouter model warmup failed (non-fatal): %s", exc)
     _warm = True
     yield
     _warm = False
@@ -86,14 +86,19 @@ def create_app() -> FastAPI:
     async def readyz() -> dict[str, str]:
         if not _warm:
             return {"status": "warming_up"}
-        # Readiness = o provedor de inferência (router.huggingface.co) é
-        # alcançável. Qualquer resposta HTTP comprova conectividade DNS/TLS;
-        # apenas falhas de rede indicam degradação.
+        # Readiness valida conectividade E a credencial do provedor
+        # operacional. O endpoint de modelos não gera conteúdo nem recebe
+        # dados clínicos.
         try:
             async with httpx.AsyncClient(timeout=5) as client:
-                await client.get(settings.huggingface_base_url)
+                response = await client.get(
+                    "https://openrouter.ai/api/v1/models",
+                    headers={"Authorization": f"Bearer {get_settings().openrouter_api_key}"},
+                )
+                response.raise_for_status()
         except Exception as exc:
-            return {"status": "degraded", "detail": str(exc)}
+            logger.warning("OpenRouter readiness check failed: %s", type(exc).__name__)
+            return {"status": "degraded", "detail": "OpenRouter readiness check failed"}
         return {"status": "ready"}
 
     return app
