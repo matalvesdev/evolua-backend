@@ -39,7 +39,7 @@ class HuggingFaceClient:
 
     def __init__(self) -> None:
         s = get_settings()
-        self._api_key = s.huggingface_api_key
+        self._api_key = s.huggingface_api_key.strip()
         self._base_url = s.huggingface_base_url.rstrip("/")
         self._whisper_model = s.huggingface_whisper_model
         self._embedding_model = s.huggingface_embedding_model
