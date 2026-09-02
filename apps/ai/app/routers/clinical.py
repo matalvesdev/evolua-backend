@@ -454,6 +454,14 @@ async def transcribe_audio(
     except HuggingFaceError as exc:
         logger.warning("STT provider failure provider=huggingface error=%s", str(exc)[:300])
         raise HTTPException(status_code=502, detail="Falha no provedor de transcrição") from exc
+    except Exception as exc:
+        # Não permitir que falhas inesperadas do provider vazem como 500 sem contexto
+        # operacional; registrar somente o tipo para evitar exposição de dados sensíveis.
+        logger.exception(
+            "STT provider failure provider=huggingface unexpected_error=%s",
+            type(exc).__name__,
+        )
+        raise HTTPException(status_code=502, detail="Falha no provedor de transcrição") from exc
 
     return TranscribeResponse(transcription=text)
 
