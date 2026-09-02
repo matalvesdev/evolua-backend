@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     openrouter_default_model: str = "google/gemini-2.5-flash-lite"
     openrouter_clinical_model: str = "google/gemini-2.5-flash-lite"
     openrouter_rag_model: str = "google/gemini-2.5-flash-lite"
-    openrouter_transcription_model: str = "qwen/qwen3-asr-1.7b"
+    # Lowest-cost OpenRouter STT model currently available.
+    openrouter_transcription_model: str = "openai/gpt-4o-mini-transcribe"
     openrouter_site_url: str = "https://useevolua.com.br"
     openrouter_site_name: str = "Evolua"
 
